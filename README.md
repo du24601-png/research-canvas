@@ -106,10 +106,11 @@ npm run test:e2e:smoke
 
 ### Docker 自托管
 
-详见 **[docs/SELF-HOSTING.md](docs/SELF-HOSTING.md)**。
+详见 **[docs/SELF-HOSTING.md](docs/SELF-HOSTING.md)**（含[云服务器演示](docs/SELF-HOSTING.md#云服务器演示)）。演示**当前 git 提交**须在机器上 `docker compose up -d --build`，不要只拉取旧的 GHCR 镜像。对公网开放 8712 之前先完成所有者认领。
 
 ```bash
-docker compose up -d
+cp compose.env.example compose.env   # 填 LLM_API_KEY
+docker compose up -d --build
 ```
 
 ---

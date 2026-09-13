@@ -1,13 +1,15 @@
 # Research Canvas — recommended single-user self-host (Docker Compose)
 #
-# Users: pull-only via `research-canvas up` (prebuilt GHCR image). Do not rely on local build.
+# Users: pull-only via `research-canvas up` (prebuilt GHCR image). That image lags git HEAD.
 #   CLI sets OPPTRIX_IMAGE=ghcr.io/travisun/opptrix:opptrix-selfhost-vX.Y.Z then pull + up.
 #   Override registry/tag anytime: OPPTRIX_IMAGE=... docker compose up -d
 #
+# Cloud / git-SHA demo (required until this commit is published to GHCR):
+#   cp compose.env.example compose.env   # LLM_API_KEY; claim owner BEFORE opening 8712
+#   docker compose up -d --build
+#
 # Developer local build (OPPTRIX_DEV_ALLOW_BUILD=1 only):
-#   cp compose.env.example compose.env   # optional runtime overrides
 #   OPPTRIX_DEV_ALLOW_BUILD=1 research-canvas up --build
-#   # or: docker compose up -d --build
 #   open https://<公网IP或本机>:8712   （自签名 HTTPS，默认唯一入口）
 #   HTTP 默认关闭。反代需要明文 upstream 时设 OPPTRIX_ENABLE_HTTP=1 并自行映射 8711。
 #

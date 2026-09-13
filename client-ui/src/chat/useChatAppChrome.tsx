@@ -8,6 +8,8 @@ import {
   resolveSettingsNavigationTarget,
   writeSettingsDeepLink,
 } from '../utils/settingsDeepLink'
+import { normalizeSettingsSectionForRole } from '../auth/roles'
+import { useAuthStatus } from '../auth/AuthGate'
 import { useDesktopShell } from '../hooks/useDesktopShell'
 import SessionRolePersonaDrawer from './SessionRolePersonaDrawer'
 import { unlockChatCueSound } from '../platform/chatSound'
@@ -28,6 +30,7 @@ export function useChatAppChrome(ports: ChatAppChromePorts) {
   const {
     view, canGoBack, goBack, navigate, closeDrawer, restoreChatColumn, closeSidebarOverlay,
   } = useWorkspaceUi()
+  const { status } = useAuthStatus()
 
   useEffect(() => {
     const unlock = () => {
@@ -49,15 +52,16 @@ export function useChatAppChrome(ports: ChatAppChromePorts) {
 
   const openSystemSettings = useCallback((section?: SettingsSection) => {
     const target = resolveSettingsNavigationTarget(section)
+    const allowedSection = normalizeSettingsSectionForRole(target.section, status?.role)
     closeDrawer()
     closeSidebarOverlay()
-    setSettingsInitialSection(target.section)
+    setSettingsInitialSection(allowedSection)
     writeSettingsDeepLink(
-      target.section,
+      allowedSection,
       view === 'settings' ? 'replace' : 'push',
     )
     navigate('settings')
-  }, [closeDrawer, closeSidebarOverlay, navigate, setSettingsInitialSection, view])
+  }, [closeDrawer, closeSidebarOverlay, navigate, setSettingsInitialSection, status?.role, view])
 
   const syncSettingsDeepLink = useCallback((section: SettingsSection) => {
     writeSettingsDeepLink(section, 'replace')

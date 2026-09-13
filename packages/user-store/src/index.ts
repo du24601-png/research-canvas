@@ -26,6 +26,9 @@ export {
   APP_AUTH_SCHEMA_MIGRATION_KEY,
   AUTH_SESSION_TTL_DESKTOP_MS,
   AUTH_SESSION_TTL_WEB_MS,
+  ADMIN_USER_ID,
+  DEMO_USER_ID,
+  APP_AUTH_V2_MIGRATION_KEY,
   OWNER_ROW_ID,
   generateSessionToken,
   hashSessionToken,
@@ -44,6 +47,8 @@ export {
   generateRecoveryCodes,
   verifyRecoveryCode,
   type OwnerPublic,
+  type AppUserPublic,
+  type VerifiedLoginUser,
   type AuthSessionRow,
   type AuthSessionPublic,
 } from './app-auth.js'

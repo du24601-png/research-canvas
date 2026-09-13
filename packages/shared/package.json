@@ -66,6 +66,10 @@
       "types": "./dist/auth-credentials.d.ts",
       "import": "./dist/auth-credentials.js"
     },
+    "./auth-access": {
+      "types": "./dist/auth-access.d.ts",
+      "import": "./dist/auth-access.js"
+    },
     "./ui-cache-policy": {
       "types": "./dist/ui-cache-policy.d.ts",
       "import": "./dist/ui-cache-policy.js"

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Spinner, makeStyles } from '@fluentui/react-components'
 import { useAuthStatus } from '../../auth/AuthGate'
+import { isAdminSessionRole } from '../../auth/roles'
 import { CreateAccountCard } from './AccountSecurityCreateCard'
 import { ChangePasswordCard } from './AccountSecurityPasswordCard'
 import { RecoveryCodesBlock } from './AccountSecurityRecoveryCodes'
@@ -59,12 +60,30 @@ export default function AccountSecuritySettingsSection() {
   }
 
   if (!status.claimed) {
+    if (status.setup_disabled) {
+      return (
+        <div className={s.root}>
+          <SettingsGroup>
+            <SettingsRow
+              title="账户由部署预置"
+              desc="请使用管理员或演示账户登录。此实例已关闭自助注册。"
+              last
+            />
+          </SettingsGroup>
+        </div>
+      )
+    }
     return (
       <div className={s.root}>
         <CreateAccountCard />
       </div>
     )
   }
+
+  const isAdmin = isAdminSessionRole(status.role)
+  const visibleTabs = isAdmin
+    ? TABS
+    : TABS.filter(item => item.id === 'overview' || item.id === 'password')
 
   const totpOn = Boolean(status.totp_enabled)
   const showingRecovery = Boolean(recoveryCodes && recoveryCodes.length > 0)
@@ -85,7 +104,7 @@ export default function AccountSecuritySettingsSection() {
       <SettingsModeTabs
         value={tab}
         onChange={setTab}
-        items={TABS}
+        items={visibleTabs}
         ariaLabel="账户与安全分类"
         wrap
       />
@@ -108,8 +127,21 @@ export default function AccountSecuritySettingsSection() {
             <SettingsRow
               title="用户名"
               desc={status.username ?? '—'}
-              last
             />
+            {status.role ? (
+              <SettingsRow
+                title="角色"
+                desc={status.role === 'admin' ? '管理员' : '演示用户'}
+                last={!isAdmin}
+              />
+            ) : null}
+            {!isAdmin ? (
+              <SettingsRow
+                title="权限"
+                desc="可对话、看板与发布；修改模型与数据源需管理员账户。"
+                last
+              />
+            ) : null}
           </SettingsGroup>
         ) : null}
 
@@ -117,14 +149,14 @@ export default function AccountSecuritySettingsSection() {
           <ChangePasswordCard />
         ) : null}
 
-        {!showingRecovery && tab === 'totp' ? (
+        {!showingRecovery && isAdmin && tab === 'totp' ? (
           <TotpSettingsCard
             enabled={totpOn}
             onRecoveryCodes={setRecoveryCodes}
           />
         ) : null}
 
-        {!showingRecovery && tab === 'sessions' ? (
+        {!showingRecovery && isAdmin && tab === 'sessions' ? (
           <SessionsCard currentSessionId={status.session?.id} compact />
         ) : null}
       </div>

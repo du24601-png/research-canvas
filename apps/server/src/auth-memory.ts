@@ -14,6 +14,8 @@ const LOGIN_LOCK_STEP_MIN = 35
 
 interface TicketRow {
   expiresAt: number
+  userId: string
+  username: string
 }
 
 interface LoginFailRow {
@@ -49,19 +51,24 @@ function lockDurationMs(fails: number): number {
   return minutes * 60 * 1000
 }
 
-export function issueLoginTicket(): string {
+export function issueLoginTicket(user: { id: string; username: string }): string {
   const now = Date.now()
   pruneMap(now)
   const ticket = randomBytes(32).toString('base64url')
-  tickets.set(ticket, { expiresAt: now + LOGIN_TICKET_TTL_MS })
+  tickets.set(ticket, {
+    expiresAt: now + LOGIN_TICKET_TTL_MS,
+    userId: user.id,
+    username: user.username.trim(),
+  })
   return ticket
 }
 
-export function consumeLoginTicket(ticket: string): boolean {
+export function consumeLoginTicket(ticket: string): { userId: string; username: string } | null {
   const now = Date.now()
   const row = tickets.get(ticket)
   tickets.delete(ticket)
-  return Boolean(row && row.expiresAt > now)
+  if (!row || row.expiresAt <= now) return null
+  return { userId: row.userId, username: row.username }
 }
 
 export function grantStepUp(sessionId: string): void {

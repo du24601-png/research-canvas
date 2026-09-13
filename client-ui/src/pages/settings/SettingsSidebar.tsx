@@ -29,6 +29,8 @@ import {
 } from './settingsSearchIndex'
 import type { SettingsSection } from './settingsTypes'
 import { listRowKey } from '../../utils/listRowKey'
+import { useAuthStatus } from '../../auth/AuthGate'
+import { canAccessSettingsSection } from '../../auth/roles'
 
 export type { SettingsSection } from './settingsTypes'
 export type SettingsSidebarMode = 'panel' | 'overlay'
@@ -251,6 +253,7 @@ export default function SettingsSidebar({
   width,
 }: SettingsSidebarProps) {
   const s = useStyles()
+  const { status } = useAuthStatus()
   const { resolvedScheme } = useTheme()
   const isOverlay = mode === 'overlay'
   const electronChrome = isElectron() && !isMobile && !isOverlay
@@ -274,6 +277,7 @@ export default function SettingsSidebar({
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     const platformNav = NAV.filter(item => {
+      if (!canAccessSettingsSection(item.id, status?.role)) return false
       if (item.webOnly && isElectron()) return false
       if (item.electronOnly && !isElectron()) return false
       return true
@@ -281,7 +285,7 @@ export default function SettingsSidebar({
     if (!q) return platformNav
     const matched = new Set(searchHits.map(hit => hit.section))
     return platformNav.filter(item => matched.has(item.id))
-  }, [search, searchHits])
+  }, [search, searchHits, status?.role])
 
   const pickSection = (section: SettingsSection) => {
     onSelect(section)

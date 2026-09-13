@@ -13,6 +13,7 @@ import { ThemeProvider, useTheme } from './theme/ThemeContext'
 import { isDesktopApp, isElectron } from './platform/detect'
 import { applyFontFamily, readFontFamilyPreference } from './theme/fontFamily'
 import { applyFontScale, readFontScalePreference } from './theme/fontScale'
+import { readBoardSnapshotDeepLink } from './utils/boardSnapshotDeepLink'
 import './styles/fonts.css'
 import './styles/global.css'
 
@@ -51,17 +52,21 @@ function ThemedApp() {
   return (
     <FluentProvider theme={getOpptrixFluentTheme(resolvedScheme)}>
       <OpptrixDialogAlertProvider>
-        <AppUpdateProvider>
-          <SystemUpdateProvider>
-            <WatchlistProvider>
-              <WatchlistGroupsProvider>
-                <MarketPanelUiProvider>
-                  <App />
-                </MarketPanelUiProvider>
-              </WatchlistGroupsProvider>
-            </WatchlistProvider>
-          </SystemUpdateProvider>
-        </AppUpdateProvider>
+        {readBoardSnapshotDeepLink() ? (
+          <App />
+        ) : (
+          <AppUpdateProvider>
+            <SystemUpdateProvider>
+              <WatchlistProvider>
+                <WatchlistGroupsProvider>
+                  <MarketPanelUiProvider>
+                    <App />
+                  </MarketPanelUiProvider>
+                </WatchlistGroupsProvider>
+              </WatchlistProvider>
+            </SystemUpdateProvider>
+          </AppUpdateProvider>
+        )}
       </OpptrixDialogAlertProvider>
     </FluentProvider>
   )

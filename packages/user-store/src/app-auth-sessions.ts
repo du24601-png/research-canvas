@@ -6,6 +6,7 @@ import { AUTH_SESSION_TTL_DESKTOP_MS, AUTH_SESSION_TTL_WEB_MS } from './app-auth
 export interface AuthSessionRow {
   id: string
   token_hash: string
+  user_id: string | null
   label: string | null
   client_ip: string | null
   user_agent: string | null
@@ -27,6 +28,7 @@ export interface AuthSessionPublic {
 }
 
 export interface CreateSessionInput {
+  userId: string
   tokenPlain: string
   label?: string
   clientIp?: string
@@ -64,11 +66,12 @@ export function insertAuthSession(
   const expires = new Date(Date.now() + ttl).toISOString()
   db.prepare(`
     INSERT INTO auth_sessions(
-      id, token_hash, label, client_ip, user_agent, created_at, last_seen_at, expires_at, desktop
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      id, token_hash, user_id, label, client_ip, user_agent, created_at, last_seen_at, expires_at, desktop
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
     hashSessionToken(input.tokenPlain),
+    input.userId,
     input.label?.slice(0, 120) ?? null,
     input.clientIp?.slice(0, 64) ?? null,
     input.userAgent?.slice(0, 240) ?? null,
@@ -127,5 +130,5 @@ export function revokeAllAuthSessions(db: Database.Database, exceptId?: string):
 }
 
 export function wipeAuthTables(db: Database.Database): void {
-  db.exec('DELETE FROM auth_sessions; DELETE FROM app_owner;')
+  db.exec('DELETE FROM auth_sessions; DELETE FROM app_users; DELETE FROM app_owner;')
 }

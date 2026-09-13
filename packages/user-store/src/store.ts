@@ -31,7 +31,10 @@ import {
   AppAuthRepository,
   initAppAuthSchema,
   APP_AUTH_SCHEMA_MIGRATION_KEY,
+  APP_AUTH_V2_MIGRATION_KEY,
+  maybeSeedDemoAccountsFromEnv,
 } from './app-auth.js'
+import { migrateAppAuthV2 } from './app-auth-v2-migrate.js'
 import {
   ScheduleRepository,
   initScheduleSchema,
@@ -114,6 +117,8 @@ export class UserDataStore {
     this.appAuth = new AppAuthRepository(this.db)
     this.initSchema()
     this.ensureAppAuthSchemaMigration()
+    this.ensureAppAuthV2Migration()
+    maybeSeedDemoAccountsFromEnv(this.db)
     initScheduleSchema(this.db)
     this.schedule = new ScheduleRepository(
       this.db,
@@ -199,6 +204,12 @@ export class UserDataStore {
     if (this.hasMigration(APP_AUTH_SCHEMA_MIGRATION_KEY)) return
     initAppAuthSchema(this.db)
     this.markMigration(APP_AUTH_SCHEMA_MIGRATION_KEY)
+  }
+
+  private ensureAppAuthV2Migration() {
+    if (this.hasMigration(APP_AUTH_V2_MIGRATION_KEY)) return
+    migrateAppAuthV2(this.db)
+    this.markMigration(APP_AUTH_V2_MIGRATION_KEY)
   }
 
   /** 幂等：表已由 CREATE IF NOT EXISTS 创建，meta 标记保证迁移可观测 */

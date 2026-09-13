@@ -1,19 +1,41 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
+import type { AppUserRole } from '@opptrix/shared/auth-access'
+import { requiresAdminRole } from '@opptrix/shared/auth-access'
 import {
   isTrustedLocalAccess,
   resolveClientIp,
   trustedLocalCidrsFromEnv,
   trustedProxiesFromEnv,
 } from '@opptrix/shared'
-import { getUserDataStore, hashSessionToken, isAuthSafeModeEnv } from '@opptrix/user-store'
+import { ADMIN_USER_ID, getUserDataStore, hashSessionToken, isAuthSafeModeEnv } from '@opptrix/user-store'
 import { hasValidStepUp } from './auth-memory.js'
 import { peerIpOf, readSessionToken, requestPath } from './auth-cookies.js'
 
 declare module 'fastify' {
   interface FastifyRequest {
-    auth?: { sessionId: string; username: string; desktop: boolean }
+    auth?: {
+      sessionId: string
+      userId: string
+      username: string
+      role: AppUserRole
+      desktop: boolean
+    }
     ownerClientIp?: string
   }
+}
+
+function resolveSessionUser(
+  sessionUserId: string | null | undefined,
+): { userId: string; username: string; role: AppUserRole } | null {
+  const auth = getUserDataStore().appAuth
+  const userId = sessionUserId?.trim() || ADMIN_USER_ID
+  const user = auth.getUserPublic(userId)
+  if (user) {
+    return { userId: user.id, username: user.username, role: user.role }
+  }
+  const owner = auth.getOwnerPublic()
+  if (!owner) return null
+  return { userId: ADMIN_USER_ID, username: owner.username, role: 'admin' }
 }
 
 function tryAttachSession(req: FastifyRequest): void {
@@ -22,10 +44,13 @@ function tryAttachSession(req: FastifyRequest): void {
   const auth = getUserDataStore().appAuth
   const session = auth.getSessionByTokenHash(hashSessionToken(token))
   if (!session) return
-  const owner = auth.getOwnerPublic()
+  const resolved = resolveSessionUser(session.user_id)
+  if (!resolved) return
   req.auth = {
     sessionId: session.id,
-    username: owner?.username ?? '',
+    userId: resolved.userId,
+    username: resolved.username,
+    role: resolved.role,
     desktop: session.desktop === 1,
   }
   auth.touchSession(session.id)
@@ -145,8 +170,16 @@ async function ownerAuthOnRequest(req: FastifyRequest, reply: FastifyReply): Pro
     return
   }
 
-  const owner = auth.getOwnerPublic()
-  if (isSensitiveRoute(req.method, path) && owner?.totp_enabled) {
+  if (req.auth.role === 'user' && requiresAdminRole(req.method, path)) {
+    await reply.code(403).send({ error: '需要管理员权限', code: 'admin_required' })
+    return
+  }
+
+  const admin = auth.getUserPublic(req.auth.userId)?.role === 'admin'
+    ? auth.getUserPublic(req.auth.userId)
+    : auth.getUserPublic(ADMIN_USER_ID)
+  const totpEnabled = admin?.totp_enabled === true && req.auth.role === 'admin'
+  if (isSensitiveRoute(req.method, path) && totpEnabled) {
     if (!hasValidStepUp(req.auth.sessionId)) {
       await reply.code(403).send({ error: '需要两步验证', code: 'step_up_required' })
       return

@@ -79,7 +79,7 @@ describe('app-auth repository', () => {
     assert.equal(auth.verifyPassword('Owner1!pass'), true)
     assert.equal(auth.verifyUsernamePassword('owner1', 'nope'), false)
 
-    const issued = auth.issueSession({ label: 'test', desktop: true })
+    const issued = auth.issueSession({ userId: 'admin', label: 'test', desktop: true })
     assert.ok(issued.token.length >= 32)
     const row = auth.getSessionByTokenHash(
       (await import('../packages/user-store/dist/index.js')).hashSessionToken(issued.token),
@@ -113,8 +113,8 @@ describe('app-auth repository', () => {
     const code = totpCodeAt(setup.secret, Math.floor(Date.now() / 1000))
     auth.confirmTotp(code)
     assert.equal(auth.getOwnerPublic()?.totp_enabled, true)
-    auth.issueSession({ label: 'a', desktop: false })
-    auth.issueSession({ label: 'b', desktop: true })
+    auth.issueSession({ userId: 'admin', label: 'a', desktop: false })
+    auth.issueSession({ userId: 'admin', label: 'b', desktop: true })
     assert.equal(auth.listSessions().length, 2)
 
     const reset = auth.adminResetPassword({ newPassword: 'Admin2!pass' })
@@ -131,7 +131,7 @@ describe('app-auth repository', () => {
     const setup2 = auth.beginTotpSetup()
     const code2 = totpCodeAt(setup2.secret, Math.floor(Date.now() / 1000))
     auth.confirmTotp(code2)
-    auth.issueSession({ label: 'c', desktop: false })
+    auth.issueSession({ userId: 'admin', label: 'c', desktop: false })
     const keep = auth.adminResetPassword({ newPassword: 'Admin3!pass', disableTotp: false })
     assert.equal(keep.totpWasEnabled, true)
     assert.equal(keep.totpDisabled, false)

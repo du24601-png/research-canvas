@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
+import type { AppUserRole } from '@opptrix/shared/auth-access'
 import { evaluateAccessGate } from '@opptrix/shared'
-import { getUserDataStore, isAuthSafeModeEnv } from '@opptrix/user-store'
+import { ADMIN_USER_ID, getUserDataStore, isAuthSafeModeEnv } from '@opptrix/user-store'
 import {
   clearSessionCookie,
   clientLabel,
@@ -26,7 +27,6 @@ function bodyField(body: unknown, key: string): string {
 }
 
 function rateLimited(req: FastifyRequest, reply: FastifyReply): boolean {
-  // Loopback / trusted-local share one peer (Vite→API). Soft limit is for remote abuse only.
   if (clientIsLocal(req)) return false
   const ip = req.ownerClientIp ?? ''
   if (consumeAuthRateLimit(ip)) return false
@@ -39,7 +39,6 @@ function formatLockMessage(status: LoginLockStatus): string {
   return `登录失败次数过多，请约 ${mins} 分钟后再试`
 }
 
-/** Hard lock by visitor IP — skipped for trusted-local clients. */
 function loginLocked(req: FastifyRequest, reply: FastifyReply): boolean {
   if (clientIsLocal(req)) return false
   const status = getLoginLockStatus(req.ownerClientIp ?? '')
@@ -74,7 +73,13 @@ function noteLoginSuccess(req: FastifyRequest): void {
 }
 
 function requireAuth(req: FastifyRequest, reply: FastifyReply): req is FastifyRequest & {
-  auth: { sessionId: string; username: string; desktop: boolean }
+  auth: {
+    sessionId: string
+    userId: string
+    username: string
+    role: AppUserRole
+    desktop: boolean
+  }
 } {
   if (req.auth) return true
   void reply.code(401).send({ error: '需要登录', code: 'auth_required' })
@@ -85,11 +90,13 @@ function attachSession(
   req: FastifyRequest,
   reply: FastifyReply,
   issued: { id: string; token: string; expires_at: string },
-  username: string,
+  user: { id: string; username: string; role: AppUserRole },
 ): { id: string; expires_at: string } {
   req.auth = {
     sessionId: issued.id,
-    username,
+    userId: user.id,
+    username: user.username,
+    role: user.role,
     desktop: isDesktopClient(req),
   }
   setSessionCookie(req, reply, issued.token, issued.expires_at)
@@ -100,9 +107,15 @@ export function registerAuthRoutes(app: FastifyInstance): void {
   app.get('/api/auth/status', async (req) => {
     const auth = getUserDataStore().appAuth
     const claimed = auth.isClaimed()
-    const owner = auth.getOwnerPublic()
     const local = clientIsLocal(req)
     const gate = evaluateAccessGate(claimed, local)
+    const sessionUser = req.auth
+      ? auth.getUserPublic(req.auth.userId)
+      : null
+    const admin = auth.getUserPublic(ADMIN_USER_ID)
+    const totpEnabled = req.auth?.role === 'admin'
+      ? sessionUser?.totp_enabled
+      : admin?.totp_enabled
     const session = req.auth
       ? auth.listSessions().find(s => s.id === req.auth?.sessionId)
       : null
@@ -110,8 +123,10 @@ export function registerAuthRoutes(app: FastifyInstance): void {
       claimed,
       auth_required: gate === 'auth_required',
       local_access: local,
-      totp_enabled: owner?.totp_enabled,
-      username: owner?.username,
+      setup_disabled: auth.isSetupDisabled() || undefined,
+      totp_enabled: totpEnabled,
+      username: req.auth?.username ?? admin?.username,
+      role: req.auth?.role,
       session: session ? { id: session.id, expires_at: session.expires_at } : undefined,
       safe_mode: isAuthSafeModeEnv() || undefined,
     }
@@ -120,6 +135,12 @@ export function registerAuthRoutes(app: FastifyInstance): void {
   app.post('/api/auth/setup', async (req, reply) => {
     if (rateLimited(req, reply)) return
     const auth = getUserDataStore().appAuth
+    if (auth.isSetupDisabled()) {
+      return reply.code(403).send({
+        error: '当前部署已关闭自助注册，请使用预置账户登录',
+        code: 'setup_disabled',
+      })
+    }
     if (auth.isClaimed()) {
       return reply.code(409).send({ error: '账户已创建', code: 'already_claimed' })
     }
@@ -132,15 +153,20 @@ export function registerAuthRoutes(app: FastifyInstance): void {
       const msg = e instanceof Error ? e.message : '无法创建账户'
       return reply.code(400).send({ error: msg })
     }
-    const owner = auth.getOwnerPublic()
+    const admin = auth.getUserPublic(ADMIN_USER_ID)
     const issued = auth.issueSession({
+      userId: ADMIN_USER_ID,
       label: clientLabel(req),
       clientIp: req.ownerClientIp,
       userAgent: String(req.headers['user-agent'] ?? ''),
       desktop: isDesktopClient(req),
     })
-    const session = attachSession(req, reply, issued, owner?.username ?? '')
-    return { claimed: true, username: owner?.username, session }
+    const session = attachSession(req, reply, issued, {
+      id: ADMIN_USER_ID,
+      username: admin?.username ?? '',
+      role: 'admin',
+    })
+    return { claimed: true, username: admin?.username, role: 'admin', session }
   })
 
   app.post('/api/auth/login', async (req, reply) => {
@@ -152,24 +178,25 @@ export function registerAuthRoutes(app: FastifyInstance): void {
     }
     const username = bodyField(req.body, 'username')
     const password = bodyField(req.body, 'password')
-    if (!auth.verifyUsernamePassword(username, password)) {
+    const user = auth.verifyLogin(username, password)
+    if (!user) {
       noteLoginFailure(req, reply, '用户名或密码不正确')
       return
     }
-    const owner = auth.getOwnerPublic()
-    if (owner?.totp_enabled) {
-      const ticket = issueLoginTicket()
+    if (user.role === 'admin' && user.totp_enabled) {
+      const ticket = issueLoginTicket({ id: user.id, username: user.username })
       return { totp_required: true, ticket }
     }
     noteLoginSuccess(req)
     const issued = auth.issueSession({
+      userId: user.id,
       label: clientLabel(req),
       clientIp: req.ownerClientIp,
       userAgent: String(req.headers['user-agent'] ?? ''),
       desktop: isDesktopClient(req),
     })
-    const session = attachSession(req, reply, issued, owner?.username ?? '')
-    return { totp_required: false, session }
+    const session = attachSession(req, reply, issued, user)
+    return { totp_required: false, role: user.role, session }
   })
 
   app.post('/api/auth/login/totp', async (req, reply) => {
@@ -178,23 +205,29 @@ export function registerAuthRoutes(app: FastifyInstance): void {
     const auth = getUserDataStore().appAuth
     const ticket = bodyField(req.body, 'ticket')
     const code = bodyField(req.body, 'code')
-    if (!consumeLoginTicket(ticket)) {
+    const ticketUser = consumeLoginTicket(ticket)
+    if (!ticketUser) {
       return reply.code(401).send({ error: '登录已过期，请重新输入密码', code: 'ticket_expired' })
+    }
+    const user = auth.getUserPublic(ticketUser.userId)
+    if (!user || user.role !== 'admin') {
+      noteLoginFailure(req, reply, '登录已过期，请重新输入密码')
+      return
     }
     if (!auth.verifyTotp(code)) {
       noteLoginFailure(req, reply, '验证码不正确')
       return
     }
     noteLoginSuccess(req)
-    const owner = auth.getOwnerPublic()
     const issued = auth.issueSession({
+      userId: user.id,
       label: clientLabel(req),
       clientIp: req.ownerClientIp,
       userAgent: String(req.headers['user-agent'] ?? ''),
       desktop: isDesktopClient(req),
     })
-    const session = attachSession(req, reply, issued, owner?.username ?? '')
-    return { session }
+    const session = attachSession(req, reply, issued, user)
+    return { session, role: user.role }
   })
 
   app.post('/api/auth/logout', async (req, reply) => {
@@ -225,6 +258,9 @@ export function registerAuthRoutes(app: FastifyInstance): void {
   app.post('/api/auth/totp/begin', async (req, reply) => {
     if (rateLimited(req, reply)) return
     if (!requireAuth(req, reply)) return
+    if (req.auth.role !== 'admin') {
+      return reply.code(403).send({ error: '需要管理员权限', code: 'admin_required' })
+    }
     try {
       return getUserDataStore().appAuth.beginTotpSetup()
     } catch (e) {
@@ -236,6 +272,9 @@ export function registerAuthRoutes(app: FastifyInstance): void {
   app.post('/api/auth/totp/confirm', async (req, reply) => {
     if (rateLimited(req, reply)) return
     if (!requireAuth(req, reply)) return
+    if (req.auth.role !== 'admin') {
+      return reply.code(403).send({ error: '需要管理员权限', code: 'admin_required' })
+    }
     try {
       return getUserDataStore().appAuth.confirmTotp(bodyField(req.body, 'code'))
     } catch (e) {
@@ -246,6 +285,9 @@ export function registerAuthRoutes(app: FastifyInstance): void {
 
   app.post('/api/auth/totp/disable', async (req, reply) => {
     if (!requireAuth(req, reply)) return
+    if (req.auth.role !== 'admin') {
+      return reply.code(403).send({ error: '需要管理员权限', code: 'admin_required' })
+    }
     try {
       getUserDataStore().appAuth.disableTotp(
         bodyField(req.body, 'password'),
@@ -263,16 +305,16 @@ export function registerAuthRoutes(app: FastifyInstance): void {
     const auth = getUserDataStore().appAuth
     const current = bodyField(req.body, 'current_password')
     const next = bodyField(req.body, 'new_password')
-    if (!auth.verifyPassword(current)) {
+    if (!auth.verifyUserPassword(req.auth.userId, current)) {
       return reply.code(401).send({ error: '当前密码不正确' })
     }
-    const owner = auth.getOwnerPublic()
+    const sessionUser = auth.getUserPublic(req.auth.userId)
     const totpCode = bodyField(req.body, 'totp_code')
-    if (owner?.totp_enabled && totpCode && !auth.verifyTotp(totpCode)) {
+    if (sessionUser?.role === 'admin' && sessionUser.totp_enabled && totpCode && !auth.verifyTotp(totpCode)) {
       return reply.code(401).send({ error: '验证码不正确' })
     }
     try {
-      auth.setPassword(next)
+      auth.setUserPassword(req.auth.userId, next)
     } catch (e) {
       const msg = e instanceof Error ? e.message : '无法更新密码'
       return reply.code(400).send({ error: msg })
@@ -282,9 +324,12 @@ export function registerAuthRoutes(app: FastifyInstance): void {
 
   app.post('/api/auth/step-up', async (req, reply) => {
     if (!requireAuth(req, reply)) return
+    if (req.auth.role !== 'admin') {
+      return reply.code(403).send({ error: '需要管理员权限', code: 'admin_required' })
+    }
     const auth = getUserDataStore().appAuth
-    const owner = auth.getOwnerPublic()
-    if (!owner?.totp_enabled) {
+    const admin = auth.getUserPublic(ADMIN_USER_ID)
+    if (!admin?.totp_enabled) {
       grantStepUp(req.auth.sessionId)
       return { ok: true, step_up: true }
     }

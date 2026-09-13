@@ -75,5 +75,9 @@ example/runtime-local/
 .agents/
 skills-lock.json
 
+# Local Codex / profile helpers — never commit
+.codex-profile-push/
+.codex-github-profile-final/
+
 # local prepare:fonts debug
 .prepare-fonts-out.tmp

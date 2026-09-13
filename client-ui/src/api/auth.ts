@@ -1,4 +1,5 @@
 import { jsonFetch } from './client'
+import type { AppUserRole } from '@opptrix/shared/auth-access'
 
 export interface AuthSessionSummary {
   id: string
@@ -9,8 +10,10 @@ export interface AuthStatus {
   claimed: boolean
   auth_required: boolean
   local_access?: boolean
+  setup_disabled?: boolean
   totp_enabled?: boolean
   username?: string
+  role?: AppUserRole
   session?: AuthSessionSummary
   safe_mode?: boolean
 }
