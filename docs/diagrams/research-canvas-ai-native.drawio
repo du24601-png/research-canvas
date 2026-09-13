@@ -1,0 +1,25 @@
+<mxfile host="app.diagrams.net" modified="2026-09-13T00:00:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="ai-native-boundary" name="AI Native 架构">
+    <mxGraphModel dx="1200" dy="720" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0" adaptiveColors="auto">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="user" value="用户&#xa;提问与最终确认" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#d94b73;fontColor=#172033;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="40" y="160" width="140" height="60" as="geometry"/></mxCell>
+        <mxCell id="llm" value="LLM&#xa;理解意图、选择工具" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f4f8;strokeColor=#3b82f6;fontColor=#172033;" vertex="1" parent="1"><mxGeometry x="220" y="160" width="140" height="60" as="geometry"/></mxCell>
+        <mxCell id="tools" value="研究工具&#xa;查询 · 派生 · 视图提议" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f4f8;strokeColor=#3b82f6;fontColor=#172033;" vertex="1" parent="1"><mxGeometry x="400" y="160" width="140" height="60" as="geometry"/></mxCell>
+        <mxCell id="engine" value="确定性代码&#xa;取数、计算、校验" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9e6;strokeColor=#d6a51c;fontColor=#172033;" vertex="1" parent="1"><mxGeometry x="580" y="160" width="140" height="60" as="geometry"/></mxCell>
+        <mxCell id="dataset" value="Immutable Dataset" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#fff9e6;strokeColor=#d6a51c;fontColor=#172033;" vertex="1" parent="1"><mxGeometry x="760" y="155" width="100" height="70" as="geometry"/></mxCell>
+        <mxCell id="preview" value="Chat Preview" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#22a559;fontColor=#172033;" vertex="1" parent="1"><mxGeometry x="940" y="160" width="140" height="60" as="geometry"/></mxCell>
+        <mxCell id="canvas" value="Research Canvas" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#22a559;fontColor=#172033;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="940" y="280" width="140" height="60" as="geometry"/></mxCell>
+        <mxCell id="source" value="公司 · 指标 · 报告期 · 来源" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#22a559;fontColor=#172033;" vertex="1" parent="1"><mxGeometry x="760" y="280" width="140" height="60" as="geometry"/></mxCell>
+        <mxCell id="a1" edge="1" parent="1" source="user" target="llm" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#6b7280;"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="a2" edge="1" parent="1" source="llm" target="tools" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#6b7280;"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="a3" edge="1" parent="1" source="tools" target="engine" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#6b7280;"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="a4" edge="1" parent="1" source="engine" target="dataset" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#6b7280;"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="a5" edge="1" parent="1" source="dataset" target="preview" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#6b7280;"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="a6" value="Adopt" edge="1" parent="1" source="preview" target="canvas" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#22a559;"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="a7" edge="1" parent="1" source="canvas" target="source" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;strokeColor=#6b7280;"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
