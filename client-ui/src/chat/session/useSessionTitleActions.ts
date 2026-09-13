@@ -1,5 +1,7 @@
 import { useCallback } from 'react'
+import type { SettingsSection } from '../../pages/settings/SettingsSidebar'
 import type { SessionMeta } from '../../types/chat'
+import { DEFAULT_SESSION_DISPLAY_TITLE } from '../sessionSidebarPresentation'
 import { listWorkspaceGrants, renameSession } from '../../api/client'
 import { sessionToMarkdown } from '../sessionExportMarkdown'
 import { saveTextFileWithDialog } from '../../platform/saveTextFile'
@@ -20,6 +22,11 @@ export interface SessionTitleActionsPorts {
   handleDelete: (id: string) => Promise<void>
   setSessions: import('react').Dispatch<import('react').SetStateAction<SessionMeta[]>>
   setActiveSessionMeta: import('react').Dispatch<import('react').SetStateAction<SessionMeta | null>>
+  sessions: SessionMeta[]
+  onSelectSession: (id: string) => void
+  onOpenSearch: () => void
+  onOpenSettings: (section?: SettingsSection) => void
+  onNewChat: () => void
 }
 
 /** 标题槽纯数据束（L2 无头约定）：可见性 + 展示字段 + 回调；JSX 元素由 workspace/sessionTitleSlots 组装 */
@@ -36,6 +43,11 @@ export interface SessionTitleToolsData {
   onExport: () => Promise<void>
   onOpenSessionDir: () => Promise<void>
   onEditRolePersona: (() => void) | undefined
+  sessions: SessionMeta[]
+  onSelectSession: (id: string) => void
+  onOpenSearch: () => void
+  onOpenSettings: (section?: SettingsSection) => void
+  onNewChat: () => void
 }
 
 /** 标题工具动作集（原 ChatAppShell 对应段逐字迁移）；本文件零 JSX（L2 纯度） */
@@ -53,6 +65,11 @@ export function useSessionTitleActions(ports: SessionTitleActionsPorts) {
     handleDelete,
     setSessions,
     setActiveSessionMeta,
+    sessions,
+    onSelectSession,
+    onOpenSearch,
+    onOpenSettings,
+    onNewChat,
   } = ports
 
   const handleRenameSession = useCallback(async (title: string) => {
@@ -117,7 +134,7 @@ export function useSessionTitleActions(ports: SessionTitleActionsPorts) {
 
   const titleTools: SessionTitleToolsData = {
     visible: view === 'chat' && !isStandaloneView,
-    title: activeSession?.title ?? '新对话',
+    title: activeSession?.title ?? DEFAULT_SESSION_DISPLAY_TITLE,
     sessionId: activeId,
     createdAt: activeSession?.createdAt,
     sessionUsageTotal: activeSession?.usageTotals?.totalTokens ?? null,
@@ -127,6 +144,11 @@ export function useSessionTitleActions(ports: SessionTitleActionsPorts) {
     onExport: handleExportSession,
     onOpenSessionDir: handleOpenSessionDir,
     onEditRolePersona: activeId ? openRolePersonaDrawer : undefined,
+    sessions,
+    onSelectSession,
+    onOpenSearch,
+    onOpenSettings,
+    onNewChat,
   }
 
   return { titleTools }

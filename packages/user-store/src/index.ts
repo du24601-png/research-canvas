@@ -86,6 +86,12 @@ export {
   type ScheduleJobNotifyOverride,
 } from './schedule.js'
 export {
+  ResearchBoardSnapshotsRepository,
+  initResearchBoardSnapshotsSchema,
+  RESEARCH_BOARD_SNAPSHOTS_MIGRATION_KEY,
+  type ResearchBoardSnapshotRecord,
+} from './research-board-snapshots.js'
+export {
   UserDataStore,
   getUserDataStore,
   type DocumentPageCursor,

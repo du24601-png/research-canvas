@@ -25,6 +25,8 @@ docker compose up -d
 
 默认入口：`https://<主机>:8712`（自签名 HTTPS）。明文 HTTP 默认关闭；反代需要明文时设 `OPPTRIX_ENABLE_HTTP=1`。
 
+看板「发布」生成的只读链接只在**这台部署**上有效，仓库不提供公网托管。
+
 数据卷：`opptrix-home` → 容器内 `/opptrix`。
 
 CLI（可选）：`npm i -g @opptrix/selfhost`，命令 `research-canvas`（`opptrix` 仍可用）。说明见 [`packages/selfhost/README.md`](../packages/selfhost/README.md)。

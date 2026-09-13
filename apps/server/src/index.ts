@@ -52,6 +52,7 @@ import {
   registerSessionAttachmentRoutes,
 } from './session-attachment-routes.js'
 import { registerOpptrixVendorRoutes } from './opptrix-vendor-routes.js'
+import { registerResearchBoardRoutes } from './research-board-routes.js'
 import { registerMcpServerRoutes } from './mcp-server-routes.js'
 import { registerAgentSkillRoutes } from './agent-skill-routes.js'
 import { registerSpeechRoutes } from './speech-routes.js'
@@ -397,6 +398,7 @@ const app = Fastify({ logger: true, bodyLimit: ATTACHMENT_UPLOAD_BODY_LIMIT })
 registerSystemUpdateLockHook(app)
 registerOwnerAuthHook(app)
 registerAuthRoutes(app)
+registerResearchBoardRoutes(app)
 registerSystemUpdateRoutes(app)
 registerCoreModelsRoutes(app)
 

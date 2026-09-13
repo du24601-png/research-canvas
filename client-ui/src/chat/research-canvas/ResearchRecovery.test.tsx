@@ -4,7 +4,7 @@ import { renderWithProviders } from '../../test/testUtils'
 import ResearchRecovery from './ResearchRecovery'
 import { registerResearchAdjustDraftSink, consumePendingAdjustProposal } from './researchPreviewAdjust'
 import { subscribeResearchCanvasEvents } from './researchCanvasBus'
-import { safeSourceUrl, readableFetchTime, sourceProviderLabel } from './sourcePresentation'
+import { safeSourceUrl, readableFetchTime, sourceProviderLabel, researchMetricLabel } from './sourcePresentation'
 
 describe('research recovery and evidence safety', () => {
   it('prepares a query for confirmation without changing the canvas', () => {
@@ -29,8 +29,9 @@ describe('research recovery and evidence safety', () => {
     expect(safeSourceUrl('file:///private')).toBeUndefined()
     expect(readableFetchTime('invalid')).toBe('获取时间未记录')
     expect(readableFetchTime('2026-09-12T12:00:00Z')).toContain('获取时间：')
-    expect(sourceProviderLabel('tushare')).toBe('公开数据')
+    expect(sourceProviderLabel('tushare')).toBe('上市公司财报')
     expect(sourceProviderLabel('unknown')).toBe('来源未标注')
-    expect(sourceProviderLabel('mixed')).toBe('多个来源')
+    expect(sourceProviderLabel('mixed')).toBe('来源未标注')
+    expect(researchMetricLabel('roe', 'ROE')).toBe('净资产收益率')
   })
 })

@@ -24,6 +24,7 @@ function sampleDataset(): Dataset {
       provider: 'tushare',
       entityId: 'CN:SH.601398',
       metric: 'roe',
+      period: '2024',
       fetchedAt: '2026-09-12T00:00:00.000Z',
     }],
   }
@@ -32,7 +33,7 @@ function sampleDataset(): Dataset {
 describe('datasetLabels', () => {
   it('builds source and coverage labels', () => {
     const dataset = sampleDataset()
-    expect(sourceLabel(dataset)).toBe('公开数据')
+    expect(sourceLabel(dataset)).toBe('上市公司财报')
     expect(coverageLabel(dataset)).toBe('部分数据缺失（1/2）')
     expect(datasetMetaLine(dataset)).toBe('2024–2025 · % · 部分数据缺失（1/2）')
   })

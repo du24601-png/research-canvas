@@ -11,6 +11,7 @@ import { useStreamFlags } from './useStreamFlags'
 import { useSessionData } from './useSessionData'
 import { useChatEngine } from './useChatEngine'
 import { registerResearchAdjustDraftSink } from '../research-canvas/researchPreviewAdjust'
+import { registerResearchFetchPlanDraftSink } from '../research-canvas/researchFetchPlanAdjust'
 
 export interface ChatDomainPorts {
   /** viewRef 由 Shell 持有并注入（通知 / popstate 语义读取当前视图） */
@@ -101,6 +102,7 @@ export function useChatDomain(ports: ChatDomainPorts) {
   const wakeWaiting = activeId ? wakeWaitingSessionIds.includes(activeId) : false
 
   useEffect(() => registerResearchAdjustDraftSink(pushComposerDraft), [pushComposerDraft])
+  useEffect(() => registerResearchFetchPlanDraftSink(pushComposerDraft), [pushComposerDraft])
 
   // 预览桥（原 Shell 预览回调与效应逐字迁移）
   const toggleMobilePreviewSheet = useCallback(() => {

@@ -23,6 +23,8 @@ interface Props {
   dataset: Dataset | undefined
   selected?: boolean
   focusPulse?: boolean
+  adoptEnter?: boolean
+  readonly?: boolean
   onSelect: (widget: Widget) => void
   onDelete: (widgetId: string) => void
   onChangeView?: (widgetId: string, next: ViewSwitchValue) => void
@@ -65,6 +67,8 @@ function ResearchCanvasWidget({
   dataset,
   selected = false,
   focusPulse = false,
+  adoptEnter = false,
+  readonly = false,
   onSelect,
   onDelete,
   onChangeView,
@@ -75,8 +79,10 @@ function ResearchCanvasWidget({
         title={widget.title}
         selected={selected}
         focusPulse={focusPulse}
+        adoptEnter={adoptEnter}
+        readonly={readonly}
         onSelect={() => onSelect(widget)}
-        onDelete={() => onDelete(widget.id)}
+        onDelete={readonly ? undefined : () => onDelete(widget.id)}
       >
         <ResearchRecovery title={widget.title} missingData />
       </WidgetFrame>
@@ -90,11 +96,13 @@ function ResearchCanvasWidget({
       metaLine={metaLine || undefined}
       selected={selected}
       focusPulse={focusPulse}
+      adoptEnter={adoptEnter}
+      readonly={readonly}
       onSelect={() => onSelect(widget)}
-      onDelete={() => onDelete(widget.id)}
+      onDelete={readonly ? undefined : () => onDelete(widget.id)}
       toolbar={widget.type === 'sources' ? undefined : (
         <>
-          {onChangeView ? (
+          {!readonly && onChangeView ? (
             <ViewSwitcher
               dataset={dataset}
               type={widget.type}

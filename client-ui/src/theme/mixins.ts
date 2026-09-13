@@ -13,6 +13,19 @@ export const motion = {
   press: '100ms',
   /** Dropdowns, popovers */
   popover: '180ms',
+  /** Composer focus state (~Apple response 0.4s, critically damped) */
+  composerFocus: '360ms',
+} as const
+
+/** Opacity / layout reveals on composer focus — interruptible CSS transitions */
+export const composerFocusReveal = {
+  transitionProperty: 'opacity, transform, max-height, padding, margin, background-color, box-shadow, border-color',
+  transitionDuration: motion.composerFocus,
+  transitionTimingFunction: motion.easeOutStrong,
+  '@media (prefers-reduced-motion: reduce)': {
+    transitionDuration: motion.fast,
+    transform: 'none',
+  },
 } as const
 
 /** Keyboard focus ring — buttons, links, icon controls */

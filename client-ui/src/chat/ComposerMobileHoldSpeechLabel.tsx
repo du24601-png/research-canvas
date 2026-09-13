@@ -10,7 +10,7 @@ const useStyles = makeStyles({
     alignSelf: 'stretch',
     minWidth: 0,
     height: '100%',
-    minHeight: `${32}px`,
+    minHeight: `${28}px`,
     padding: '0 6px 0 2px',
     touchAction: 'none',
     WebkitUserSelect: 'none',

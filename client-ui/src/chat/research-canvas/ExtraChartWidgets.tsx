@@ -1,4 +1,5 @@
-import { memo, useMemo, useState } from 'react'
+import { memo, useCallback, useMemo, useState } from 'react'
+import type { CallbackDataParams } from 'echarts/types/dist/shared'
 import { useTheme } from '../../theme/ThemeContext'
 import {
   buildCandlestickOption,
@@ -9,7 +10,13 @@ import {
 import { getResearchChartTheme } from './chartTheme'
 import type { ChartContentMode } from './chartResponsive'
 import type { Dataset } from './types'
-import EchartsFill from './EchartsFill'
+import ChartWithSourceSelection from './ChartWithSourceSelection'
+import {
+  resolveCandlestickCell,
+  resolveComboBarLineCell,
+  resolvePieChartCell,
+  resolveStackedBarCell,
+} from './chartSourceClick'
 import {
   buildCandlestickView,
   buildComboChartView,
@@ -33,7 +40,18 @@ export const StackedBarChartWidget = memo(function StackedBarChartWidget({
   const [mode, setMode] = useChartMode()
   const view = useMemo(() => buildStackedBarView(dataset, percent), [dataset, percent])
   const option = useMemo(() => buildStackedBarOption(view, theme, mode), [theme, view, mode])
-  return <EchartsFill option={option} onContentModeChange={setMode} />
+  const resolveCell = useCallback(
+    (params: CallbackDataParams) => resolveStackedBarCell(view, params),
+    [view],
+  )
+  return (
+    <ChartWithSourceSelection
+      dataset={dataset}
+      option={option}
+      onContentModeChange={setMode}
+      resolveCell={resolveCell}
+    />
+  )
 })
 
 export const ComboBarLineChartWidget = memo(function ComboBarLineChartWidget({
@@ -46,7 +64,18 @@ export const ComboBarLineChartWidget = memo(function ComboBarLineChartWidget({
   const [mode, setMode] = useChartMode()
   const view = useMemo(() => buildComboChartView(dataset), [dataset])
   const option = useMemo(() => buildComboBarLineOption(view, theme, mode), [theme, view, mode])
-  return <EchartsFill option={option} onContentModeChange={setMode} />
+  const resolveCell = useCallback(
+    (params: CallbackDataParams) => resolveComboBarLineCell(view, params),
+    [view],
+  )
+  return (
+    <ChartWithSourceSelection
+      dataset={dataset}
+      option={option}
+      onContentModeChange={setMode}
+      resolveCell={resolveCell}
+    />
+  )
 })
 
 export const PieDonutChartWidget = memo(function PieDonutChartWidget({
@@ -66,10 +95,21 @@ export const PieDonutChartWidget = memo(function PieDonutChartWidget({
     () => buildPieChartOption(view, theme, donut, mode),
     [theme, view, donut, mode],
   )
+  const resolveCell = useCallback(
+    (params: CallbackDataParams) => resolvePieChartCell(view, params),
+    [view],
+  )
   if (!view.slices.length) {
     return <div>这一期没有可展示的正值。换一个年份，或改看柱状对比。</div>
   }
-  return <EchartsFill option={option} onContentModeChange={setMode} />
+  return (
+    <ChartWithSourceSelection
+      dataset={dataset}
+      option={option}
+      onContentModeChange={setMode}
+      resolveCell={resolveCell}
+    />
+  )
 })
 
 export const CandlestickChartWidget = memo(function CandlestickChartWidget({
@@ -85,8 +125,19 @@ export const CandlestickChartWidget = memo(function CandlestickChartWidget({
     () => (view ? buildCandlestickOption(view, theme, mode) : null),
     [theme, view, mode],
   )
+  const resolveCell = useCallback(
+    (params: CallbackDataParams) => (view ? resolveCandlestickCell(dataset, view, params) : null),
+    [dataset, view],
+  )
   if (!view || !option) {
     return <div>还没有可展示的日K。换一只股票或缩短年份后再查一次。</div>
   }
-  return <EchartsFill option={option} onContentModeChange={setMode} />
+  return (
+    <ChartWithSourceSelection
+      dataset={dataset}
+      option={option}
+      onContentModeChange={setMode}
+      resolveCell={resolveCell}
+    />
+  )
 })

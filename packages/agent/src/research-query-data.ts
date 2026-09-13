@@ -19,6 +19,8 @@ import {
   type ResearchMetric,
   type ResearchOhlcBar,
   type ResearchSource,
+  buildResearchFetchPlan,
+  isQueryDataConfirmed,
 } from '@opptrix/shared'
 import { randomUUID } from 'node:crypto'
 import { searchHitsFromHubData, resolveResearchEntity } from './research-entity-resolver.js'
@@ -100,17 +102,47 @@ function metricValue(row: FinancialSummary, metric: ResearchMetric): number | nu
   return value
 }
 
+function isBlockedResearchProvider(raw: string): boolean {
+  const id = raw.trim().toLowerCase()
+  return !id || id === 'mixed' || id === 'cache'
+}
+
 function providerFromResult(result: {
   source?: string
   cached?: boolean
   meta?: { provider?: string }
 }): string {
-  // 缓存命中时顶层 source 是 'cache'，真实 provider 只存在于 meta 中。
   const fromMeta = typeof result.meta?.provider === 'string' ? result.meta.provider.trim() : ''
-  if (fromMeta && fromMeta !== 'cache') return fromMeta
+  if (fromMeta && !isBlockedResearchProvider(fromMeta)) return fromMeta
   const source = typeof result.source === 'string' ? result.source.trim() : ''
-  if (!source || source === 'cache' || result.cached) return 'unknown'
-  return source
+  if (source && !isBlockedResearchProvider(source)) return source
+  return 'unknown'
+}
+
+function pushFinancialSources(
+  sources: ResearchSource[],
+  input: {
+    entityId: string
+    metric: ResearchMetric
+    provider: string
+    fetchedAt: string
+    periods: readonly string[]
+    valuesByPeriod: Map<string, number | null>
+  },
+): void {
+  for (const period of input.periods) {
+    if (!input.valuesByPeriod.has(period)) continue
+    const value = input.valuesByPeriod.get(period) ?? null
+    if (value == null) continue
+    sources.push({
+      provider: input.provider,
+      entityId: input.entityId,
+      metric: input.metric.id,
+      period,
+      fetchedAt: input.fetchedAt,
+      fieldLabel: input.metric.name,
+    })
+  }
 }
 
 function asKlineRows(data: unknown): Array<Record<string, unknown>> {
@@ -185,11 +217,16 @@ async function fetchEntityKlineSlice(
     data.push({ entityId: bar.entityId, period: bar.time, value: bar.close })
   }
   if (kept.length) {
+    const provider = providerFromResult(result)
+    const rangeStart = kept[0]?.time ?? ''
+    const rangeEnd = kept[kept.length - 1]?.time ?? rangeStart
     sources.push({
-      provider: providerFromResult(result),
+      provider,
       entityId: entity.id,
       metric: 'kline',
       fetchedAt,
+      fieldLabel: '日K',
+      ...(rangeStart ? { period: rangeStart === rangeEnd ? rangeStart : `${rangeStart}–${rangeEnd}` } : {}),
     })
   }
   return { data, ohlc: kept, sources }
@@ -256,12 +293,7 @@ export async function fetchEntityMetricSlice(
     if (!year || year < start || year > end) continue
     byYear.set(year, metricValue(row, metric))
   }
-  sources.push({
-    provider: providerFromResult(result),
-    entityId: entity.id,
-    metric: metric.id,
-    fetchedAt,
-  })
+  const provider = providerFromResult(result)
   for (const period of periods) {
     data.push({
       entityId: entity.id,
@@ -269,6 +301,14 @@ export async function fetchEntityMetricSlice(
       value: byYear.has(period) ? byYear.get(period) ?? null : null,
     })
   }
+  pushFinancialSources(sources, {
+    entityId: entity.id,
+    metric,
+    provider,
+    fetchedAt,
+    periods,
+    valuesByPeriod: byYear,
+  })
   return { data, sources }
 }
 
@@ -327,6 +367,30 @@ export async function executeQueryData(
     return { error: 'K 线最多比较两只标的' }
   }
 
+  const plan = buildResearchFetchPlan({
+    entityNames: entities.map(entity => entity.name),
+    metric,
+    start,
+    end,
+  })
+  const confirmed = isQueryDataConfirmed(args.confirmed)
+  if (!confirmed && plan.tier === 'must_confirm') {
+    return {
+      ok: true,
+      status: 'plan_preview',
+      plan,
+      query: {
+        entities: names,
+        metric: metric.id,
+        start,
+        end,
+      },
+      tier: plan.tier,
+      requires_user_confirm: true,
+      hint: '等待用户确认后再取数；须再次调用 query_data 并设置 confirmed 为 true。',
+    }
+  }
+
   const slice = await fetchEntitiesMetricSlice(hub, entities, metric, start, end)
   const periods = isKlineMetricId(metric.id)
     ? uniqueSortedPeriods(slice.data)
@@ -366,6 +430,9 @@ export async function executeQueryData(
     entities: entities.length,
     periods: periods.length,
     ...describeDatasetForModel(dataset),
+    ...(!confirmed && plan.tier === 'auto'
+      ? { plan, tier: plan.tier, statement: plan.statement }
+      : {}),
     canvas_event: { type: 'dataset_created', dataset },
   }
 }

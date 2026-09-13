@@ -14,9 +14,12 @@ import { SettingsViewHost } from './workspace/SettingsViewHost'
 import { ChatDesktopChrome } from './workspace/ChatDesktopChrome'
 import { ChatWorkspace } from './workspace/ChatWorkspace'
 import { useChatDomain } from './session/useChatDomain'
+import ResearchBoardSnapshotPage from './research-canvas/ResearchBoardSnapshotPage'
+import { readBoardSnapshotDeepLink } from '../utils/boardSnapshotDeepLink'
 import { useChatSessionFlow } from './session/useChatSessionFlow'
 import { useChatColumnProps } from './session/useChatColumnProps'
 import { buildSessionTitleSlots } from './workspace/sessionTitleSlots'
+import { DEFAULT_SESSION_DISPLAY_TITLE } from './sessionSidebarPresentation'
 import { useChatAppChrome } from './useChatAppChrome'
 
 const useStyles = makeStyles({
@@ -45,9 +48,17 @@ const useStyles = makeStyles({
 export default function ChatApp() {
   return (
     <WorkspaceUiProvider>
-      <ChatAppShell />
+      <ChatAppEntry />
     </WorkspaceUiProvider>
   )
+}
+
+function ChatAppEntry() {
+  const snapshotId = readBoardSnapshotDeepLink()
+  if (snapshotId) {
+    return <ResearchBoardSnapshotPage snapshotId={snapshotId} />
+  }
+  return <ChatAppShell />
 }
 
 function ChatAppShell() {
@@ -124,7 +135,8 @@ function ChatAppShell() {
 
   const isSettings = view === 'settings'
   const isStandaloneView = false
-  const chromeTitle = domain.activeSession?.title ?? '新对话'
+  const chromeTitle = domain.activeSession?.title ?? DEFAULT_SESSION_DISPLAY_TITLE
+  const hideChrome = ui.presentMode
 
   return (
     <>
@@ -133,24 +145,21 @@ function ChatAppShell() {
         onClose={() => chrome.setSearchOpen(false)}
         onAction={flow.handleSearchAction}
       />
-      <ChatDesktopChrome
-        view={view}
-        isSettings={isSettings}
-        isStandaloneView={isStandaloneView}
-        chromeTitle={chromeTitle}
-        canGoBack={canGoBack}
-        canGoForward={canGoForward}
-        onGoBack={chrome.handleChromeGoBack}
-        onGoForward={goForward}
-        onNewChat={flow.handleNew}
-        onOpenSearch={chrome.handleOpenSearch}
-        onOpenSettings={chrome.openSystemSettings}
-        onSelectSession={flow.handleSelect}
-        sessions={flow.sidebarProps.sessions}
-        onToggleSessionFilesPreview={domain.handleToggleSessionFilesPreview}
-        activeSessionId={domain.activeId}
-        titleSlot={sessionTitleTools}
-      />
+      {!hideChrome ? (
+        <ChatDesktopChrome
+          view={view}
+          isSettings={isSettings}
+          isStandaloneView={isStandaloneView}
+          chromeTitle={chromeTitle}
+          canGoBack={canGoBack}
+          canGoForward={canGoForward}
+          onGoBack={chrome.handleChromeGoBack}
+          onGoForward={goForward}
+          onToggleSessionFilesPreview={domain.handleToggleSessionFilesPreview}
+          activeSessionId={domain.activeId}
+          titleSlot={sessionTitleTools}
+        />
+      ) : null}
       <div className={mergeClasses(
         s.root,
         electronChrome && s.rootElectron,

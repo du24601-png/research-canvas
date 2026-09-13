@@ -164,6 +164,22 @@ function periodYear(period: string): string {
   return YEAR_RE.test(period) ? period : period.slice(0, 4)
 }
 
+function filterSourcesToPeriods(
+  sources: readonly ResearchSource[],
+  periods: readonly string[],
+  metric: string,
+): ResearchSource[] {
+  const periodSet = new Set(periods)
+  const kline = isKlineMetricId(metric)
+  return sources
+    .filter((source) => {
+      if (source.provider.trim().toLowerCase() === 'mixed') return false
+      if (kline) return !source.period || periodSet.has(source.period)
+      return Boolean(source.period && periodSet.has(source.period))
+    })
+    .map(source => ({ ...source }))
+}
+
 function periodInYearRange(period: string, start: string, end: string): boolean {
   const year = periodYear(period)
   return YEAR_RE.test(year) && year >= start && year <= end
@@ -197,7 +213,7 @@ export function filterDatasetByPeriod(
     periods,
     data,
     ...(ohlc ? { ohlc } : {}),
-    sources: parent.sources.map(source => ({ ...source })),
+    sources: filterSourcesToPeriods(parent.sources, periods, parent.metric),
     query: query ? { ...query, start, end } : undefined,
   }
 }

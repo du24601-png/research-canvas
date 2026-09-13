@@ -76,6 +76,9 @@ export interface WorkspaceUiContextValue {
   openMobileSheet: (kind: MobileRightSheetKind) => void
   openMobileMarketPanel: () => void
   closeMobileRightSheet: () => void
+  presentMode: boolean
+  enterPresentMode: () => void
+  exitPresentMode: () => void
 }
 
 export const WorkspaceUiContext = createContext<WorkspaceUiContextValue | null>(null)

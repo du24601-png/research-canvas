@@ -6,6 +6,8 @@ import { writePersistedCanvasState, readPersistedCanvasState } from './layoutSto
 import { publishResearchCanvasEvent } from './researchCanvasBus'
 import type { Dataset, PersistedCanvasState } from './types'
 
+const TEST_SESSION = 'sess-test-canvas'
+
 const DATASET_ID = 'research-ds-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 
 function dataset(): Dataset {
@@ -46,11 +48,11 @@ describe('useResearchCanvas active widget', () => {
   beforeEach(() => {
     window.localStorage.clear()
     resetActiveWidgetForTests()
-    writePersistedCanvasState(seededState())
+    writePersistedCanvasState(TEST_SESSION, seededState())
   })
 
   it('selects one widget at a time and clears after delete', () => {
-    const { result } = renderHook(() => useResearchCanvas())
+    const { result } = renderHook(() => useResearchCanvas(TEST_SESSION))
     act(() => {
       result.current.handleSelectWidget(result.current.widgets[0]!)
     })
@@ -67,7 +69,7 @@ describe('useResearchCanvas active widget', () => {
   })
 
   it('keeps selection through auto arrange', () => {
-    const { result } = renderHook(() => useResearchCanvas())
+    const { result } = renderHook(() => useResearchCanvas(TEST_SESSION))
     act(() => {
       result.current.handleSelectWidget(result.current.widgets[0]!)
     })
@@ -79,24 +81,24 @@ describe('useResearchCanvas active widget', () => {
   })
 
   it('undo restores the same widget, data reference, order and layout after compaction', () => {
-    const { result } = renderHook(() => useResearchCanvas())
+    const { result } = renderHook(() => useResearchCanvas(TEST_SESSION))
     const beforeWidgets = result.current.widgets
     const beforeLayout = result.current.layout
-    const beforeData = readPersistedCanvasState().datasets
+    const beforeData = readPersistedCanvasState(TEST_SESSION).datasets
     act(() => result.current.handleDeleteWidget('rc-a'))
     act(() => result.current.handleLayoutChange(result.current.layout.map(item => ({ ...item, x: 0, y: 0 }))))
     expect(result.current.removedTitle).toBe('A')
     act(() => result.current.undoRemoval())
     expect(result.current.widgets).toEqual(beforeWidgets)
     expect(result.current.layout).toEqual(beforeLayout)
-    expect(readPersistedCanvasState().datasets).toEqual(beforeData)
-    expect(readPersistedCanvasState().widgets).toEqual(beforeWidgets)
+    expect(readPersistedCanvasState(TEST_SESSION).datasets).toEqual(beforeData)
+    expect(readPersistedCanvasState(TEST_SESSION).widgets).toEqual(beforeWidgets)
     expect(result.current.activeWidgetId).toBe('rc-a')
     expect(result.current.removedTitle).toBeNull()
   })
 
   it('does not roll back newer canvas work with a stale undo', () => {
-    const { result } = renderHook(() => useResearchCanvas())
+    const { result } = renderHook(() => useResearchCanvas(TEST_SESSION))
     act(() => result.current.handleDeleteWidget('rc-a'))
     act(() => publishResearchCanvasEvent({ type: 'widget_created', widget: {
       id: 'rc-new', title: 'New research', type: 'line_chart', datasetId: DATASET_ID,

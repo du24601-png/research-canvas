@@ -96,6 +96,8 @@ interface Props {
   metaLine?: string
   selected?: boolean
   focusPulse?: boolean
+  adoptEnter?: boolean
+  readonly?: boolean
   onSelect?: () => void
   onDelete?: () => void
   toolbar?: ReactNode
@@ -107,6 +109,8 @@ export default function WidgetFrame({
   metaLine,
   selected = false,
   focusPulse = false,
+  adoptEnter = false,
+  readonly = false,
   onSelect,
   onDelete,
   toolbar,
@@ -120,6 +124,7 @@ export default function WidgetFrame({
       className={mergeClasses(s.root, 'research-canvas-widget')}
       data-selected={selected ? 'true' : undefined}
       data-focus-pulse={focusPulse ? 'true' : undefined}
+      data-adopt-enter={adoptEnter ? 'true' : undefined}
       aria-selected={selected || undefined}
       onClick={(event) => {
         const target = event.target
@@ -129,14 +134,16 @@ export default function WidgetFrame({
       }}
     >
       <div className={s.header}>
-        <span
-          className={mergeClasses(s.dragHandle, 'research-canvas-drag-handle')}
-          role="button"
-          aria-label={`拖动${title}`}
-          tabIndex={0}
-        >
-          <ReOrderDotsVerticalRegular fontSize={16} />
-        </span>
+        {!readonly ? (
+          <span
+            className={mergeClasses(s.dragHandle, 'research-canvas-drag-handle')}
+            role="button"
+            aria-label={`拖动${title}`}
+            tabIndex={0}
+          >
+            <ReOrderDotsVerticalRegular fontSize={16} />
+          </span>
+        ) : null}
         <div className={s.titleBlock}>
           <Text className={s.title} title={hoverTitle}>
             {title}
@@ -147,7 +154,7 @@ export default function WidgetFrame({
             </Text>
           ) : null}
         </div>
-        {onDelete ? (
+        {onDelete && !readonly ? (
           <Menu>
             <MenuTrigger disableButtonEnhancement>
               <ChromeToolButton className="research-canvas-no-drag" label={`更多操作：${title}`} iconPadding={DESKTOP_SIDEBAR_TOOL_ICON_PADDING}>

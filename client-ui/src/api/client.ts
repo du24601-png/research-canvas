@@ -1850,6 +1850,32 @@ export async function steerSessionChat(sessionId: string, message: string) {
   )
 }
 
+export async function publishResearchBoardSnapshot(
+  sessionId: string,
+  payload: Record<string, unknown>,
+) {
+  return jsonFetch<{ ok: true; id: string; createdAt: string }>('/research/snapshots', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId, payload }),
+  })
+}
+
+export async function fetchResearchBoardSnapshot(id: string) {
+  return jsonFetch<{
+    ok: true
+    id: string
+    title: string
+    createdAt: string
+    payload: {
+      title: string
+      widgets: unknown[]
+      layout: unknown[]
+      datasets: unknown[]
+    }
+  }>(`/research/snapshots/${encodeURIComponent(id)}`)
+}
+
 export async function submitUserPromptResponse(
   sessionId: string,
   promptId: string,

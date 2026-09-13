@@ -6,7 +6,7 @@ import {
 
 export const WORKSPACE_SPLIT_RATIO_KEY = 'opptrix.workspace-split.right-ratio'
 /** Research Canvas occupies most of the workspace; chat stays a narrow agent column. */
-export const WORKSPACE_CANVAS_DEFAULT_RATIO = 0.75
+export const WORKSPACE_CANVAS_DEFAULT_RATIO = 0.78
 
 export function clampSplitRatio(ratio: number): number {
   if (!Number.isFinite(ratio)) return WORKSPACE_CANVAS_DEFAULT_RATIO

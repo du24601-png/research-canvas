@@ -24,10 +24,15 @@ import {
 
 const SESSION = 'rc-query-test'
 
+function confirmedQuery(input) {
+  return { ...input, confirmed: true }
+}
+
 const NAMES = {
   赛轮轮胎: { symbol: '601058', exchange: 'SH' },
   玲珑轮胎: { symbol: '601966', exchange: 'SH' },
   森麒麟: { symbol: '002283', exchange: 'SZ' },
+  青岛双星: { symbol: '000599', exchange: 'SZ' },
 }
 
 function financialRow(year, grossMargin) {
@@ -177,24 +182,24 @@ test('query_data schema fail-closed', async () => {
 test('provider miss does not fabricate numbers and all-null fails closed', async () => {
   const failed = makeHub({ fail: true })
   await withTurn(failed.hub, async (tools) => {
-    const result = await tools.query_data.handler({
+    const result = await tools.query_data.handler(confirmedQuery({
       entities: ['赛轮轮胎'],
       metric: 'gross_margin',
       start: '2021',
       end: '2025',
-    })
+    }))
     assert.match(String(result.error), /未能提供该指标/)
     assert.equal(extractResearchCanvasEvent(result), null)
   })
 
   const empty = makeHub({ value: null })
   await withTurn(empty.hub, async (tools) => {
-    const result = await tools.query_data.handler({
+    const result = await tools.query_data.handler(confirmedQuery({
       entities: ['赛轮轮胎'],
       metric: 'gross_margin',
       start: '2021',
       end: '2025',
-    })
+    }))
     assert.match(String(result.error), /未能提供该指标/)
   })
 })
@@ -202,12 +207,12 @@ test('provider miss does not fabricate numbers and all-null fails closed', async
 test('query_data builds dataset, emits dataset_created, and strips data from the model payload', async () => {
   const { hub } = makeHub({ source: 'tushare', value: 18.2 })
   await withTurn(hub, async (tools) => {
-    const result = await tools.query_data.handler({
+    const result = await tools.query_data.handler(confirmedQuery({
       entities: ['赛轮轮胎', '玲珑轮胎', '森麒麟'],
       metric: 'gross_margin',
       start: '2021',
       end: '2025',
-    })
+    }))
     assert.equal(result.ok, true)
     assert.match(result.datasetId, /^research-ds-/)
     assert.notEqual(result.datasetId, 'ds-tire-gross-margin-2021-2025')
@@ -219,6 +224,15 @@ test('query_data builds dataset, emits dataset_created, and strips data from the
     assert.equal(event?.type, 'dataset_created')
     assert.equal(event.dataset.sources[0].provider, 'tushare')
     assert.equal(event.dataset.data.some(point => point.value === 0), false)
+    for (const source of event.dataset.sources) {
+      assert.notEqual(source.provider, 'mixed')
+      assert.ok(source.period, 'each source must bind a report period')
+      assert.ok(source.fieldLabel, 'each source must include a field label')
+    }
+    assert.equal(
+      event.dataset.sources.filter(source => source.entityId && source.period).length,
+      event.dataset.sources.length,
+    )
     const sanitized = sanitizeResearchDataset(event.dataset)
     assert.ok(sanitized)
     assert.equal(getTurnCanvasDatasets(SESSION)?.length, 1)
@@ -229,6 +243,60 @@ test('query_data builds dataset, emits dataset_created, and strips data from the
     const stripped = stripResearchCanvasEventField(result)
     assert.equal('canvas_event' in stripped, false)
     assert.equal(stripped.datasetId, result.datasetId)
+  })
+})
+
+test('query_data auto tier fetches immediately without confirmed', async () => {
+  const boxed = makeHub()
+  await withTurn(boxed.hub, async (tools) => {
+    const result = await tools.query_data.handler({
+      entities: ['赛轮轮胎'],
+      metric: 'gross_margin',
+      start: '2021',
+      end: '2025',
+    })
+    assert.equal(result.ok, true)
+    assert.match(result.datasetId, /^research-ds-/)
+    assert.equal(result.status, undefined)
+    assert.equal(result.tier, 'auto')
+    assert.match(result.statement, /赛轮轮胎/)
+    assert.equal(boxed.queryCount(), 1)
+    assert.equal(extractResearchCanvasEvent(result)?.type, 'dataset_created')
+  })
+})
+
+test('query_data with more than three entities requires confirm before provider fetch', async () => {
+  const boxed = makeHub()
+  await withTurn(boxed.hub, async (tools) => {
+    const preview = await tools.query_data.handler({
+      entities: ['赛轮轮胎', '玲珑轮胎', '森麒麟', '青岛双星'],
+      metric: 'gross_margin',
+      start: '2021',
+      end: '2025',
+    })
+    assert.equal(preview.status, 'plan_preview')
+    assert.equal(preview.tier, 'must_confirm')
+    assert.equal(preview.requires_user_confirm, true)
+    assert.equal(boxed.queryCount(), 0)
+  })
+})
+
+test('query_data keeps independent per-period sources for each company', async () => {
+  const { hub } = makeHub({ source: 'tushare', value: 21.5 })
+  await withTurn(hub, async (tools) => {
+    const result = await tools.query_data.handler(confirmedQuery({
+      entities: ['赛轮轮胎', '玲珑轮胎'],
+      metric: 'roe',
+      start: '2022',
+      end: '2023',
+    }))
+    assert.equal(result.ok, true)
+    const event = extractResearchCanvasEvent(result)
+    assert.equal(event?.type, 'dataset_created')
+    const keys = new Set(event.dataset.sources.map(source => `${source.entityId}:${source.period}`))
+    assert.equal(keys.size, event.dataset.sources.length)
+    assert.ok(event.dataset.sources.every(source => source.provider === 'tushare'))
+    assert.ok(event.dataset.sources.every(source => source.period === '2022' || source.period === '2023'))
   })
 })
 
@@ -250,12 +318,12 @@ test('annual window ignores quarterly rows even if reportType is stamped annual'
     }
   }
   await withTurn(boxed.hub, async (tools) => {
-    const result = await tools.query_data.handler({
+    const result = await tools.query_data.handler(confirmedQuery({
       entities: ['赛轮轮胎'],
       metric: 'gross_margin',
       start: '2021',
       end: '2025',
-    })
+    }))
     const event = extractResearchCanvasEvent(result)
     const values = Object.fromEntries(
       (event?.dataset?.data ?? []).map(point => [point.period, point.value]),
@@ -270,12 +338,12 @@ test('annual window ignores quarterly rows even if reportType is stamped annual'
 test('existing dataset can create a bar view without querying again', async () => {
   const boxed = makeHub({ source: 'tickflow', value: 21 })
   await withTurn(boxed.hub, async (tools) => {
-    const queried = await tools.query_data.handler({
+    const queried = await tools.query_data.handler(confirmedQuery({
       entities: ['赛轮轮胎'],
       metric: 'gross_margin',
       start: '2021',
       end: '2025',
-    })
+    }))
     const queriesAfterData = boxed.queryCount()
     const created = await tools.create_widget.handler({
       type: 'bar_chart',
@@ -368,12 +436,12 @@ test('query_data kline builds ohlc candlestick dataset', async () => {
     })
     assert.match(String(tooMany.error), /最多比较两只/)
 
-    const result = await tools.query_data.handler({
+    const result = await tools.query_data.handler(confirmedQuery({
       entities: ['赛轮轮胎'],
       metric: 'kline',
       start: '2024',
       end: '2024',
-    })
+    }))
     assert.equal(result.ok, true)
     assert.equal(result.metric, 'kline')
     const event = extractResearchCanvasEvent(result)
@@ -406,12 +474,12 @@ test('klineBarBudget scales with year span instead of a hardcoded 800', () => {
 test('query_data kline passes year-span bar budget as count', async () => {
   const boxed = makeKlineHub()
   await withTurn(boxed.hub, async (tools) => {
-    await tools.query_data.handler({
+    await tools.query_data.handler(confirmedQuery({
       entities: ['赛轮轮胎'],
       metric: 'kline',
       start: '2021',
       end: '2025',
-    })
+    }))
     assert.equal(boxed.lastOpts()?.count, 1250)
     assert.equal(boxed.lastOpts()?.startDate, '2021-01-01')
     assert.equal(boxed.lastOpts()?.endDate, '2025-12-31')

@@ -31,7 +31,7 @@ export interface QueryResult<T> {
 export interface QueryResultMeta {
   /**
    * 真实数据源名；缓存命中时为原始 provider 名，不是 'cache'。
-   * merge 策略下为 `'mixed'`（多源合并结果，逐字段溯源尚未支持）。
+   * merge 批量行情时为贡献最多条目的 provider（逐条见 StockRealtime.dataSource）。
    */
   provider?: string
   cached?: boolean
@@ -63,6 +63,8 @@ export interface StockRealtime {
   change?: number | null
   amplitude?: number | null
   volumeRatio?: number | null
+  /** 批量 merge 时该条报价来自哪个 Provider（可选，只增不破） */
+  dataSource?: string
   timestamp?: string
   /** US equities — trading session for displayed price */
   quoteSession?: 'pre' | 'regular' | 'post' | 'closed'

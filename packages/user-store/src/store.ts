@@ -38,6 +38,11 @@ import {
   SCHEDULE_SCHEMA_MIGRATION_KEY,
 } from './schedule.js'
 import {
+  ResearchBoardSnapshotsRepository,
+  initResearchBoardSnapshotsSchema,
+  RESEARCH_BOARD_SNAPSHOTS_MIGRATION_KEY,
+} from './research-board-snapshots.js'
+import {
   clearFtsNews,
   clearFtsSessions,
   deleteFtsNews,
@@ -87,6 +92,7 @@ export class UserDataStore {
   readonly agentVault: AgentVaultRepository
   readonly appAuth: AppAuthRepository
   readonly schedule: ScheduleRepository
+  readonly researchBoardSnapshots: ResearchBoardSnapshotsRepository
 
   private constructor(dbPath: string) {
     fs.mkdirSync(path.dirname(dbPath), { recursive: true })
@@ -115,6 +121,9 @@ export class UserDataStore {
       (ns, id, data) => this.setDocument(ns, id, data),
     )
     this.ensureScheduleSchemaMigration()
+    initResearchBoardSnapshotsSchema(this.db)
+    this.researchBoardSnapshots = new ResearchBoardSnapshotsRepository(this.db)
+    this.ensureResearchBoardSnapshotsMigration()
     this.migrateFromLegacyFiles()
     this.providerSettings.migrateFromLegacy(
       key => this.hasMigration(key),
@@ -197,6 +206,12 @@ export class UserDataStore {
     if (this.hasMigration(SCHEDULE_SCHEMA_MIGRATION_KEY)) return
     initScheduleSchema(this.db)
     this.markMigration(SCHEDULE_SCHEMA_MIGRATION_KEY)
+  }
+
+  private ensureResearchBoardSnapshotsMigration() {
+    if (this.hasMigration(RESEARCH_BOARD_SNAPSHOTS_MIGRATION_KEY)) return
+    initResearchBoardSnapshotsSchema(this.db)
+    this.markMigration(RESEARCH_BOARD_SNAPSHOTS_MIGRATION_KEY)
   }
 
   getMetaFlag(key: string): boolean {

@@ -1,10 +1,10 @@
 # Research Canvas 交接
 
-> 下一会话先读本文件，再读 `TECH_ARCHITECTURE.md`。Research Canvas 独立产品仓库。
+> 下一会话先读本文件。Research Canvas 独立产品仓库。
 
-**当前阶段：Phase 4C.5 Chat 流式 UX + Composer 输入框已完成。Phase 4C.4 artifacts 按需加载 + Preview 样式调整已完成。2026-09-12 量化/Discover/Experts/crypto 遗留已剥离；PWA「添加到主屏幕」引导已移除。不要进入 Inspector / Notes / Excel / Phase 5 / 全局 UI polish，除非用户明确要求。**
+**当前阶段（2026-09-13）：C 端金融看板 P0–P4 已落地。** 一个会话一块活看板；点数字看科目/报告期/来源；点名 ≤3 家直接取数，>3 家或行业对比先确认；可演示、导出 16:9 / 竖版；发布生成本机只读快照（不是公网分享）。不要进入 Inspector / Notes / Excel / Phase 5，除非用户明确要求。
 
-日期：2026-09-12（4C.5 流式呈现 / Composer 空态单行 / artifacts opt-in / 桌面会话导航方案 3）
+日期：2026-09-13（会话看板 / 单元格溯源 / 分级取数 / 演示导出 / 本机快照）
 
 ---
 
@@ -59,6 +59,11 @@ Generate / Review / Adjust     Keep / Organize / Deliver
 | **Phase 4C.4.1 Preview 样式** | **完成** | `update_proposal`（图例/颜色/轴标题/标题）；未 Adopt 走 proposal，已 Adopt 走 `update_widget` |
 | **Phase 4C.5 Chat 流式 UX** | **完成** | 单行 status morph（投资者文案）；溯源 chip；思考摘要折叠；Receipt + 回复同气泡；工具步骤仅「展开详细过程」 |
 | **Phase 4C.5.1 Composer 输入框** | **完成** | 空态单行 `+ | 输入 | 麦克风/发送`；聚焦 hint；Composer footer 与流式状态联动 |
+| **C 端看板 P0** | **完成** | 画布按 `sessionId` 分桶；板名 = 会话标题 |
+| **C 端看板 P1** | **完成** | 单元格溯源；入库禁止 `mixed`；折线/柱/堆积/饼/K 线/热力/表可点看来源 |
+| **C 端看板 P2** | **完成** | ≤3 家直接取数；>3 家 `plan_preview` 须确认；禁止无数据集就 `propose_widget` |
+| **C 端看板 P3** | **完成** | 演示模式、Esc 退出、导出 16:9 / 9:16 |
+| **C 端看板 P4** | **完成** | 本机只读快照 `?board=`；链接只在当前部署有效 |
 
 未开始：Inspector / Notes / Multi-select / Phase 5–8（Excel / UI polish 等）。
 
@@ -94,7 +99,7 @@ Generate / Review / Adjust     Keep / Organize / Deliver
   layout 与 widget id 不变
 ```
 
-Dataset 永不原地修改。localStorage `opptrix.research-canvas.v1` 仍是全局 v2；发给 Agent 的 `datasetRecords` 只含本会话实际引用的 Dataset（active proposal / Canvas widgets / session toolSteps），不含无关 Store 条目。LLM 只看 metadata，没有 `data[]`。
+Dataset 永不原地修改。localStorage `opptrix.research-canvas.v2.{sessionId}` 按会话分桶；发给 Agent 的 `datasetRecords` 只含本会话实际引用的 Dataset（active proposal / Canvas widgets / session toolSteps），不含无关 Store 条目。LLM 只看 metadata，没有 `data[]`。
 
 remove / 子集年份：本地 derive，不访问 Tushare。年份超出父集：按 query 语义重新取数。add_entities 只查新增公司。中文名解析失败则报 unresolved，禁止 ticker 硬编码回退。
 

@@ -44,9 +44,10 @@ export function buildLineChartOption(
       return {
       name: labels[index] ?? item.name,
       type: 'line',
-      smooth: true,
+      smooth: false,
       symbol: 'circle',
-      symbolSize: mode === 'compact' ? 4 : 6,
+      symbolSize: mode === 'compact' ? 8 : 10,
+      triggerLineEvent: true,
       data: item.values,
       color: seriesColor,
       ...(item.dim ? {
@@ -247,7 +248,7 @@ export function buildComboBarLineOption(
         name: view.line.name,
         type: 'line' as const,
         data: view.line.values,
-        smooth: true,
+        smooth: false,
         symbol: 'circle',
         symbolSize: 5,
       },

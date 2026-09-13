@@ -5,6 +5,9 @@ export type SessionSidebarPresentation = 'drawer' | 'none'
 
 export const SESSION_PICKER_RECENT_LIMIT = 8
 
+/** 无自定义标题时的展示名（与「新建对话」动作区分） */
+export const DEFAULT_SESSION_DISPLAY_TITLE = '未命名对话'
+
 /** Overlay width fraction — kept for settings overlay geometry helpers. */
 export const SESSION_OVERLAY_SIDEBAR_RATIO = 0.25
 

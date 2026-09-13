@@ -85,6 +85,14 @@
     "./research-chart-style": {
       "types": "./dist/research-chart-style.d.ts",
       "import": "./dist/research-chart-style.js"
+    },
+    "./research-query-plan": {
+      "types": "./dist/research-query-plan.d.ts",
+      "import": "./dist/research-query-plan.js"
+    },
+    "./research-board-snapshot": {
+      "types": "./dist/research-board-snapshot.d.ts",
+      "import": "./dist/research-board-snapshot.js"
     }
   },
   "scripts": {

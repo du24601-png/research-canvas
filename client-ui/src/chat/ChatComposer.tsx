@@ -61,7 +61,14 @@ import ComposerMobileHoldSpeechLabel from './ComposerMobileHoldSpeechLabel'
 import { useComposerMobileHoldSpeech } from './useComposerMobileHoldSpeech'
 import { unlockChatCueSound } from '../platform/chatSound'
 import { opptrixTokens, opptrixCssVars } from '../theme/tokens'
-import { motion, primaryInteractive, ghostInteractive, interactiveTransition, fadeInUp } from '../theme/mixins'
+import {
+  composerFocusReveal,
+  motion,
+  primaryInteractive,
+  ghostInteractive,
+  interactiveTransition,
+  fadeInUp,
+} from '../theme/mixins'
 import ComposerAttachmentStrip from './ComposerAttachmentStrip'
 import { useComposerAttachments } from './useComposerAttachments'
 import { resolveActiveModelMedia, modelAllowsAttachments, buildAcceptForMedia, isLegacyOfficeAttachment } from './mediaCapabilities'
@@ -74,7 +81,7 @@ const ROW_PX = Math.round(FONT_SIZE * LINE_HEIGHT)
 	/** 空态约一行；多行仍可长到 MAX */
 	const MIN_TEXT_HEIGHT = ROW_PX
 	const MAX_TEXT_HEIGHT = ROW_PX * 8
-const ACTION_BTN = 32
+const ACTION_BTN = 28
 
 const useStyles = makeStyles({
   wrap: {
@@ -90,6 +97,21 @@ const useStyles = makeStyles({
     gap: '6px',
     padding: `0 ${opptrixTokens.chatComposerPadding}`,
     boxSizing: 'border-box',
+    overflow: 'hidden',
+    maxHeight: '220px',
+    opacity: 1,
+    transform: 'translateY(0)',
+    ...composerFocusReveal,
+  },
+  startersSectionCollapsed: {
+    maxHeight: 0,
+    opacity: 0,
+    transform: 'translateY(8px)',
+    marginTop: 0,
+    marginBottom: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    pointerEvents: 'none',
   },
   /** 空态入场；勿写死 opacity:0，否则常驻态关掉动画后会一直隐形 */
   startersSectionEnter: {
@@ -176,7 +198,6 @@ const useStyles = makeStyles({
     backgroundColor: 'transparent',
   },
   panel: {
-    ...interactiveTransition,
     position: 'relative',
     zIndex: 1,
     display: 'flex',
@@ -186,10 +207,11 @@ const useStyles = makeStyles({
 	    padding: '8px 12px',
 	    gap: '8px',
     borderRadius: opptrixTokens.chatComposerRadius,
-    border: 'none',
+    border: '1px solid transparent',
     backgroundColor: opptrixCssVars.canvasAlt,
     backdropFilter: 'blur(12px) saturate(180%)',
     boxShadow: 'none',
+    ...composerFocusReveal,
     '@media (prefers-reduced-transparency: reduce)': {
       backdropFilter: 'none',
     },
@@ -201,39 +223,57 @@ const useStyles = makeStyles({
       backgroundColor: opptrixCssVars.canvas,
       boxShadow: `inset 0 0 0 1px ${opptrixCssVars.separator}`,
     },
+    '&[data-composer-focused="true"]': {
+      backgroundColor: opptrixCssVars.canvas,
+      boxShadow: `inset 0 0 0 1px ${opptrixCssVars.separator}`,
+    },
   },
 	  panelMobileCompact: {
-	    padding: '8px 10px',
-	    gap: '8px',
+	    padding: '4px 10px',
+	    gap: 0,
+	  },
+	  panelSingleRow: {
+	    padding: '4px 10px',
+	    gap: 0,
 	  },
 	  focusHint: {
-	    position: 'absolute',
-	    left: 0,
-	    right: 0,
-	    bottom: '100%',
-	    zIndex: 2,
+	    flexShrink: 0,
+	    overflow: 'hidden',
+	    maxHeight: 0,
+	    opacity: 0,
+	    transform: 'translateY(4px)',
 	    fontSize: 'var(--opptrix-font-sm)',
 	    fontWeight: 400,
-	    lineHeight: 1.35,
+	    lineHeight: 1.25,
 	    color: opptrixCssVars.textTertiary,
 	    letterSpacing: '0.01em',
-	    padding: '0 12px 4px',
+	    padding: '0 12px 0',
 	    boxSizing: 'border-box',
 	    pointerEvents: 'none',
-	    animationDuration: motion.normal,
-	    animationTimingFunction: 'cubic-bezier(0, 0, 0.2, 1)',
-	    animationFillMode: 'both',
-	    animationName: {
-	      from: { opacity: 0, transform: 'translateY(2px)' },
-	      to: { opacity: 1, transform: 'translateY(0)' },
-	    },
-	    '@media (prefers-reduced-motion: reduce)': {
-	      animationName: {
-	        from: { opacity: 0 },
-	        to: { opacity: 1 },
-	      },
-	      transform: 'none',
-	    },
+	    ...composerFocusReveal,
+	  },
+	  focusHintVisible: {
+	    maxHeight: '18px',
+	    opacity: 1,
+	    transform: 'translateY(0)',
+	    padding: '0 12px 4px',
+	  },
+	  mobileHoldSlot: {
+	    display: 'flex',
+	    alignItems: 'center',
+	    flex: '1 1 auto',
+	    minWidth: 0,
+	    maxWidth: '100%',
+	    opacity: 1,
+	    transform: 'translateX(0)',
+	    ...composerFocusReveal,
+	  },
+	  mobileHoldSlotHidden: {
+	    flex: '0 0 0',
+	    maxWidth: 0,
+	    opacity: 0,
+	    transform: 'translateX(8px)',
+	    pointerEvents: 'none',
 	  },
 	  inputRow: {
 	    display: 'flex',
@@ -248,7 +288,7 @@ const useStyles = makeStyles({
 	  inputRowSingle: {
 	    flexDirection: 'row',
 	    alignItems: 'center',
-	    gap: '8px',
+	    gap: '6px',
 	    minHeight: `${ACTION_BTN}px`,
 	  },
 	  /** 上行：全宽 editor（录音中仍可见已输入文字） */
@@ -259,7 +299,7 @@ const useStyles = makeStyles({
 	    display: 'flex',
 	    alignItems: 'center',
 	  },
-	  /** 空态单行内 editor：与 32px 按钮同高 */
+	  /** 空态单行内 editor：与 28px 按钮同高 */
 	  editorRowInline: {
 	    flex: '1 1 auto',
 	    width: 'auto',
@@ -979,7 +1019,7 @@ const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(function 
   const canSend = canEnqueueOrSend && (!loading || (hasContent && attachmentIds.length === 0))
   /** 仅 ask_user / 上传中锁定编辑；执行中仍可输入以补充或排队 */
   const composerLocked = Boolean(userPrompt) || uploading
-  const showWelcomeStarters = starters.length > 0 && isEmpty && !alwaysShowStarters
+  const canShowWelcomeStarters = starters.length > 0 && isEmpty && !alwaysShowStarters
   const plusMenuStarters = alwaysShowStarters && starters.length > 0 ? starters : []
 
   const handleAuthorizeFolders = useCallback(async () => {
@@ -1078,6 +1118,8 @@ const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(function 
     onTapToInput: openMobileInput,
   })
 
+  const showMobileHoldSlot = isMobile && (holdControlActive || holdPending || mobileInputExpanded)
+
   const handleMicClick = useCallback(() => {
     if (isMobile) return
     unlockChatCueSound()
@@ -1124,11 +1166,11 @@ const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(function 
     && !contextRef
     && !speechListening
     && (!isMobile || showMobileEditorBlock)
-  const showFocusHint = editorFocused
-    && !hasContent
+  const focusHintEligible = !hasContent
     && !speechListening
     && !loading
     && useSingleRowEmpty
+  const showFocusHint = editorFocused && focusHintEligible
 
   const handleInput = useCallback(() => {
     refreshContentState()
@@ -1266,15 +1308,22 @@ const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(function 
     setEditorFocused(true)
   }, [])
 
+  const handleEditorPointerDown = useCallback(() => {
+    if (composerLocked || speechListening) return
+    setEditorFocused(true)
+  }, [composerLocked, speechListening])
+
   return (
     <div className={s.wrap}>
-      {showWelcomeStarters && (
+      {canShowWelcomeStarters && (
         <div
           key={welcomeKey}
           className={mergeClasses(
             s.startersSection,
             s.startersSectionEnter,
+            editorFocused && s.startersSectionCollapsed,
           )}
+          aria-hidden={editorFocused || undefined}
         >
           <Text className={s.startersLabel}>你可以这样问</Text>
           <div className={s.starters}>
@@ -1313,22 +1362,28 @@ const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(function 
             onSubmit={onUserPromptSubmit}
           />
         )}
+        {focusHintEligible && (
+          <div
+            className={mergeClasses(s.focusHint, showFocusHint && s.focusHintVisible)}
+            role="note"
+            aria-hidden={!showFocusHint || undefined}
+          >
+            @ 选股票 · / 引用技能 · Enter 发送
+          </div>
+        )}
         <div
           className={mergeClasses(
             s.panel,
             'opptrix-composer-shell',
             isMobile && !showMobileEditorBlock && s.panelMobileCompact,
+            useSingleRowEmpty && s.panelSingleRow,
           )}
           data-speech-listening={speechListening ? 'true' : undefined}
           data-hold-pending={holdPending ? 'true' : undefined}
           data-mobile-speech={mobileSpeechBaseEligible ? 'true' : undefined}
           data-mobile-compact={isMobile && !showMobileEditorBlock ? 'true' : undefined}
+          data-composer-focused={editorFocused ? 'true' : undefined}
         >
-          {showFocusHint && (
-            <div className={s.focusHint} role="note">
-              @ 选股票 · / 引用技能 · Enter 发送
-            </div>
-          )}
           {speechListening && speechListeningPhase && (
             <div
               className={mergeClasses(
@@ -1468,6 +1523,7 @@ const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(function 
                 aria-label={editorAriaLabel}
                 data-placeholder={editorPlaceholder}
                 data-empty={hasContent || speechListening ? undefined : 'true'}
+                data-composer-focused={editorFocused ? 'true' : undefined}
                 data-single-row={useSingleRowEmpty ? 'true' : undefined}
                 data-speech-listening={speechListening ? 'true' : undefined}
                 data-hold-pending={holdPending ? 'true' : undefined}
@@ -1478,6 +1534,7 @@ const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(function 
                 onPaste={handlePaste}
                 onCompositionStart={handleCompositionStart}
                 onCompositionEnd={handleCompositionEnd}
+                onPointerDown={handleEditorPointerDown}
                 onFocus={handleEditorFocus}
                 onBlur={handleBlur}
               />
@@ -1511,17 +1568,27 @@ const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(function 
                 </div>
               )}
               <div className={mergeClasses(s.toolbarCenter, isMobile && s.toolbarCenterMobile)}>
-                {isMobile && (
-                  <ComposerMobileHoldSpeechLabel
-                    active={holdControlActive}
-                    holdPending={holdPending}
-                    label={mobileHoldLabel}
-                    ariaLabel={mobileHoldAriaLabel}
-                    onPointerDown={handleHoldPointerDown}
-                    onPointerUp={handleHoldPointerUp}
-                    onPointerCancel={handleHoldPointerUp}
-                  />
-                )}
+                {showMobileHoldSlot ? (
+                  <div
+                    className={mergeClasses(
+                      s.mobileHoldSlot,
+                      !holdControlActive && s.mobileHoldSlotHidden,
+                    )}
+                    aria-hidden={!holdControlActive || undefined}
+                  >
+                    {holdControlActive ? (
+                      <ComposerMobileHoldSpeechLabel
+                        active
+                        holdPending={holdPending}
+                        label={mobileHoldLabel}
+                        ariaLabel={mobileHoldAriaLabel}
+                        onPointerDown={handleHoldPointerDown}
+                        onPointerUp={handleHoldPointerUp}
+                        onPointerCancel={handleHoldPointerUp}
+                      />
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
               <div className={mergeClasses(s.toolbarEnd, isMobile && s.toolbarEndMobile)}>
                 {showStop && (

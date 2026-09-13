@@ -71,7 +71,7 @@ export const RESEARCH_METRICS: readonly ResearchMetric[] = [
   },
   {
     id: 'roe',
-    name: 'ROE',
+    name: '净资产收益率',
     aliases: ['ROE', 'roe', '净资产收益率', '加权净资产收益率'],
     unit: '%',
     kind: 'ratio',

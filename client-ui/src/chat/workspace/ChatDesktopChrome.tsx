@@ -5,8 +5,6 @@ import DesktopWindowChrome from '../../desktop/DesktopWindowChrome'
 import ChromeToolButton from '../../desktop/ChromeToolButton'
 import OverlaySidebarEdgeTrigger from '../../desktop/OverlaySidebarEdgeTrigger'
 import { DESKTOP_TOOL_ICON_SIZE } from '../../desktop/constants'
-import type { SessionMeta } from '../../types/chat'
-import SessionPickerMenu from '../SessionPickerMenu'
 import { useWorkspaceUi } from './WorkspaceUiContext'
 
 export interface ChatDesktopChromeProps {
@@ -18,11 +16,6 @@ export interface ChatDesktopChromeProps {
   canGoForward: boolean
   onGoBack: () => void
   onGoForward: () => void
-  onNewChat: () => void
-  onOpenSearch: () => void
-  onOpenSettings: () => void
-  onSelectSession: (id: string) => void
-  sessions: SessionMeta[]
   onToggleSessionFilesPreview: () => void
   activeSessionId: string | null
   titleSlot: ReactNode
@@ -41,14 +34,9 @@ export function ChatDesktopChrome({
   canGoForward,
   onGoBack,
   onGoForward,
-  onNewChat,
-  onOpenSearch,
-  onOpenSettings,
-  onSelectSession,
-  sessions,
+  titleSlot,
   onToggleSessionFilesPreview,
   activeSessionId,
-  titleSlot,
 }: ChatDesktopChromeProps) {
   const {
     isMobile,
@@ -114,17 +102,6 @@ export function ChatDesktopChrome({
           canGoBack={isSettings || canGoBack}
           canGoForward={!isSettings && canGoForward}
           onToggleSidebar={isSettings ? toggleSidebar : undefined}
-          toolbarLeading={!isSettings && !isMobile ? (
-            <SessionPickerMenu
-              sessions={sessions}
-              activeId={activeSessionId}
-              onSelect={onSelectSession}
-              onOpenSearch={onOpenSearch}
-              onOpenSettings={onOpenSettings}
-            />
-          ) : undefined}
-          onNewChat={onNewChat}
-          onOpenSearch={!isSettings ? onOpenSearch : undefined}
           onGoBack={!isSettings ? onGoBack : undefined}
           onGoForward={!isSettings ? onGoForward : undefined}
           rightPanelOpen={view === 'chat' && !isMobile ? rightPanelVisible : undefined}

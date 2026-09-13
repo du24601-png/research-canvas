@@ -13,6 +13,7 @@ import type {
   SessionMeta,
 } from '../../types/chat'
 import { useWorkspaceUi } from './WorkspaceUiContext'
+import { DEFAULT_SESSION_DISPLAY_TITLE } from '../sessionSidebarPresentation'
 
 /** mobile / desktop 两分支共享的 ChatView 字段束（分支差异字段全部剔除） */
 export type ChatColumnSharedProps = Omit<
@@ -154,7 +155,7 @@ export function useChatColumnSharedProps(input: ChatColumnSharedInput): ChatColu
   } = input
 
   return {
-    title: activeSession?.title ?? '新对话',
+    title: activeSession?.title ?? DEFAULT_SESSION_DISPLAY_TITLE,
     sessionId: activeId,
     welcomeEpoch,
     chatScrollEpoch,

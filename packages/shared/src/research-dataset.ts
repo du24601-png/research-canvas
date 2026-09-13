@@ -54,9 +54,12 @@ export interface ResearchSource {
   provider: string
   entityId: string
   metric: string
+  /** 财务指标必填；日 K 可为交易日或省略（按实体级来源） */
   period?: string
   fetchedAt: string
   sourceUrl?: string
+  /** 投资者可读科目名，如「净资产收益率」 */
+  fieldLabel?: string
 }
 
 export interface ResearchDatasetQuery {
@@ -187,20 +190,36 @@ function sanitizePoint(raw: unknown, entityIds: ReadonlySet<string>): ResearchDa
   return { entityId, period, value: raw.value }
 }
 
-function sanitizeSource(raw: unknown, entityIds: ReadonlySet<string>): ResearchSource | null {
+function isBlockedResearchProvider(raw: string): boolean {
+  const id = raw.trim().toLowerCase()
+  return !id || id === 'mixed' || id === 'cache'
+}
+
+function sanitizeSource(
+  raw: unknown,
+  entityIds: ReadonlySet<string>,
+  metric: string,
+): ResearchSource | null {
   if (!isRecord(raw)) return null
   const entityId = typeof raw.entityId === 'string' ? raw.entityId.trim() : ''
-  const metric = typeof raw.metric === 'string' ? raw.metric.trim() : ''
+  const sourceMetric = typeof raw.metric === 'string' ? raw.metric.trim() : ''
   const fetchedAt = typeof raw.fetchedAt === 'string' ? raw.fetchedAt.trim() : ''
-  if (!entityId || !metric || !fetchedAt || !entityIds.has(entityId)) return null
+  if (!entityId || !sourceMetric || !fetchedAt || !entityIds.has(entityId)) return null
   const provider = typeof raw.provider === 'string' ? raw.provider.trim() : ''
+  if (isBlockedResearchProvider(provider)) return null
+  const period = typeof raw.period === 'string' ? raw.period.trim() : ''
+  const kline = isKlineMetricId(metric)
+  if (!kline && !period) return null
   const source: ResearchSource = {
-    provider: provider || 'unknown',
+    provider,
     entityId,
-    metric,
+    metric: sourceMetric,
     fetchedAt,
   }
-  if (typeof raw.period === 'string' && raw.period.trim()) source.period = raw.period.trim()
+  if (period) source.period = period
+  if (typeof raw.fieldLabel === 'string' && raw.fieldLabel.trim()) {
+    source.fieldLabel = raw.fieldLabel.trim()
+  }
   if (typeof raw.sourceUrl === 'string' && raw.sourceUrl.trim()) source.sourceUrl = raw.sourceUrl.trim()
   return source
 }
@@ -247,10 +266,14 @@ export function sanitizeResearchDataset(raw: unknown): ResearchDataset | null {
   }
 
   const sources: ResearchSource[] = []
+  const sourceKeys = new Set<string>()
   if (Array.isArray(raw.sources)) {
     for (const item of raw.sources) {
-      const source = sanitizeSource(item, seenEntities)
+      const source = sanitizeSource(item, seenEntities, metric)
       if (!source) return null
+      const key = `${source.entityId}\0${source.period ?? ''}`
+      if (sourceKeys.has(key)) return null
+      sourceKeys.add(key)
       sources.push(source)
     }
   }

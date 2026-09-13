@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { makeStyles, Skeleton, SkeletonItem, Text } from '@fluentui/react-components'
 import { CheckmarkRegular } from '@fluentui/react-icons'
 import type { ChatToolStep } from '../../types/chatProgress'
@@ -24,6 +24,7 @@ import ResearchRecovery from './ResearchRecovery'
 import { readPersistedCanvasState, resolveLiveResearchDataset } from './layoutStorage'
 import { hasLiveWidgetForProposal } from './proposalCanvasLink'
 import { requestAdjustResearchProposal } from './researchPreviewAdjust'
+import { flyPreviewToCanvas } from './adoptFlyAnimation'
 import { compactChartStyle, sanitizeChartStyle } from '@opptrix/shared/research-chart-style'
 import { compactResearchWidgetView, sanitizeResearchWidgetView } from '@opptrix/shared/research-view-params'
 import { previewLoadingStageLabel } from '../toolLiveStatus'
@@ -38,8 +39,9 @@ const useStyles = makeStyles({
     margin: '8px 0 12px',
     padding: '14px 16px 12px',
     borderRadius: opptrixTokens.radiusLg,
-    backgroundColor: opptrixCssVars.canvasAlt,
-    border: 'none',
+    backgroundColor: opptrixCssVars.surface,
+    border: `1px solid ${opptrixCssVars.separator}`,
+    boxShadow: opptrixCssVars.composerFloatShadow,
   },
   cardAccepted: {
     backgroundColor: opptrixCssVars.successSoft,
@@ -64,6 +66,7 @@ const useStyles = makeStyles({
     borderRadius: opptrixTokens.radiusMd,
     backgroundColor: opptrixCssVars.canvasAlt,
     overflow: 'hidden',
+    border: `1px solid ${opptrixCssVars.separator}`,
   },
   skeletonPlot: {
     height: '240px',
@@ -86,6 +89,10 @@ const useStyles = makeStyles({
     alignItems: 'center',
     gap: '8px',
     flexWrap: 'wrap',
+  },
+  adoptButton: {
+    minWidth: '112px',
+    fontWeight: 650,
   },
   accepted: {
     display: 'flex',
@@ -116,6 +123,7 @@ const useStyles = makeStyles({
 
 interface Props {
   step: ChatToolStep
+  sessionId?: string | null
 }
 
 function PreviewPlot({ type, dataset, period, topN, style }: {
@@ -139,13 +147,14 @@ function PreviewPlot({ type, dataset, period, topN, style }: {
   return <SourcesWidget dataset={dataset} />
 }
 
-export default function ResearchWidgetPreviewCard({ step }: Props) {
+export default function ResearchWidgetPreviewCard({ step, sessionId = null }: Props) {
   const s = useStyles()
   const [persistEpoch, setPersistEpoch] = useState(0)
   const [liveProposal, setLiveProposal] = useState<PreviewProposalMeta | null>(null)
   const [override, setOverride] = useState<Pick<PreviewProposalMeta, 'type' | 'title' | 'view'> | null>(null)
   const [adoptedHere, setAdoptedHere] = useState(false)
   const [dismissed, setDismissed] = useState(false)
+  const plotRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => subscribeResearchCanvasEvents((event) => {
     if (typeof event !== 'object' || event === null) return
@@ -188,7 +197,10 @@ export default function ResearchWidgetPreviewCard({ step }: Props) {
   const parsed = proposalMetaFromToolStep(step)
   const base = liveProposal ?? (parsed ? { ...parsed, id: step.id } : null)
   const meta = base && override ? { ...base, ...override } : base
-  const persist = useMemo(() => readPersistedCanvasState(), [persistEpoch, liveProposal, step.status])
+  const persist = useMemo(
+    () => readPersistedCanvasState(sessionId),
+    [persistEpoch, liveProposal, step.status, sessionId],
+  )
   const markedAccepted = adoptedHere || Boolean(
     persist.acceptedProposalIds?.includes(step.id)
     || (meta && persist.acceptedProposalIds?.includes(meta.id)),
@@ -266,7 +278,7 @@ export default function ResearchWidgetPreviewCard({ step }: Props) {
             },
           })}
         />
-      <div className={s.plot}>
+      <div className={s.plot} ref={plotRef}>
         <PreviewPlot
           type={meta.type}
           dataset={dataset}
@@ -316,8 +328,10 @@ export default function ResearchWidgetPreviewCard({ step }: Props) {
             </OpptrixButton>
             <OpptrixButton
               variant="primary"
-              size="small"
+              size="medium"
+              className={s.adoptButton}
               onClick={() => {
+                if (plotRef.current) flyPreviewToCanvas(plotRef.current)
                 setAdoptedHere(true)
                 publishResearchCanvasEvent({
                   type: 'widget_adopted',

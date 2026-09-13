@@ -501,6 +501,7 @@ function ChatMessageItem({
               <div style={{ marginTop: message.content || attachmentStrip ? 8 : 0 }}>
                 <ChatProcessTrace
                   steps={message.toolSteps ?? []}
+                  sessionId={sessionId}
                   thinkingSnippet={message.reasoningContent?.trim() || undefined}
                   thinkingSegments={message.reasoningSegments}
                   hiddenPreviewStepIds={hiddenPreviewStepIds}

@@ -25,6 +25,7 @@ import {
   WORKSPACE_CHAT_RIGHT_MIN_WIDTH,
 } from '../../desktop/constants'
 import { readSettingsDeepLink } from '../../utils/settingsDeepLink'
+import { readPresentModeDeepLink, writePresentModeDeepLink } from '../../utils/boardSnapshotDeepLink'
 import { isElectron } from '../../platform/detect'
 import type { ChatAttachmentMeta } from '../../types/chat'
 import type { FilePreviewTarget } from '../FilePreviewPanel'
@@ -147,6 +148,50 @@ export function WorkspaceUiProvider({ children }: { children: ReactNode }) {
     openDrawer,
     closeDrawer,
   } = useSidebarPreference(isMobile, sidebarWidth)
+
+  const [presentMode, setPresentMode] = useState(false)
+
+  const enterPresentMode = useCallback(() => {
+    setPresentMode(true)
+    writePresentModeDeepLink(true)
+    setSidebarVisible(false)
+    closeDrawer()
+    if (chatVisible && canToggleChatColumn) toggleChatColumn()
+    openMarket()
+  }, [
+    canToggleChatColumn,
+    chatVisible,
+    closeDrawer,
+    openMarket,
+    setSidebarVisible,
+    toggleChatColumn,
+  ])
+
+  const exitPresentMode = useCallback(() => {
+    setPresentMode(false)
+    writePresentModeDeepLink(false)
+  }, [])
+
+  useEffect(() => {
+    if (readPresentModeDeepLink()) enterPresentMode()
+  }, [enterPresentMode])
+
+  useEffect(() => {
+    if (presentMode) {
+      document.documentElement.dataset.opptrixPresent = '1'
+    } else {
+      delete document.documentElement.dataset.opptrixPresent
+    }
+  }, [presentMode])
+
+  useEffect(() => {
+    if (!presentMode) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') exitPresentMode()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [exitPresentMode, presentMode])
 
   const [settingsSidebarVisible, setSettingsSidebarVisible] = useState(() => {
     if (typeof window === 'undefined') return false
@@ -274,6 +319,7 @@ export function WorkspaceUiProvider({ children }: { children: ReactNode }) {
     openFilePreview, openPreviewTarget, setPreviewTarget: setPreview,
     markPreviewAutoOpenDismissed, resetPreviewAutoOpenState, closePreview, onPeerSlideSettled,
     mobileRightSheet, mobileSheetOpen, openMobileSheet, openMobileMarketPanel, closeMobileRightSheet,
+    presentMode, enterPresentMode, exitPresentMode,
   }), [
     view, canGoBack, canGoForward, navigate, goBack, goForward,
     isMobile, electronChrome, viewportWidth, chromeToolbarReserve,
@@ -288,6 +334,7 @@ export function WorkspaceUiProvider({ children }: { children: ReactNode }) {
     openFilePreview, openPreviewTarget, setPreview,
     markPreviewAutoOpenDismissed, resetPreviewAutoOpenState, closePreview, onPeerSlideSettled,
     mobileRightSheet, mobileSheetOpen, openMobileSheet, openMobileMarketPanel, closeMobileRightSheet,
+    presentMode, enterPresentMode, exitPresentMode,
   ])
 
   return (

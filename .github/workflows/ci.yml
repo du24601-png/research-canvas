@@ -21,7 +21,7 @@ jobs:
   build-and-test:
     name: Build & test (server / selfhost)
     runs-on: ubuntu-24.04  # pin: scripts/lib/ci-pins.env CI_UBUNTU_RUNNER
-    timeout-minutes: 25
+    timeout-minutes: 35
 
     steps:
       - name: Checkout
@@ -47,6 +47,9 @@ jobs:
 
       - name: Check client UI
         run: npm run check:ui
+
+      - name: Client UI tests
+        run: npm run test:ui
 
       - name: Gate tests
         run: npm run test:gate

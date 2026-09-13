@@ -36,16 +36,15 @@ import {
   PanelRightExpandRegular,
   ArrowMaximizeRegular,
   ArrowMinimizeRegular,
-  ChatAddRegular,
 } from './chatIcons'
-import { ArrowLeftRegular, FolderListRegular, SearchRegular } from '@fluentui/react-icons'
-import SessionPickerMenu from './SessionPickerMenu'
+import { ArrowLeftRegular, FolderListRegular } from '@fluentui/react-icons'
 import {
   DESKTOP_SIDEBAR_TOOL_ICON_PADDING,
   DESKTOP_SIDEBAR_TOOL_ICON_SIZE,
   DESKTOP_TOOL_ICON_SIZE,
 } from '../desktop/constants'
 import { pickWelcomeVariant } from './chatWelcomeVariants'
+import { DEFAULT_SESSION_DISPLAY_TITLE } from './sessionSidebarPresentation'
 import MessageOutlineRail, { buildOutlineEntries } from './MessageOutlineRail'
 
 /** 消息区底 padding 初始/下限（ResizeObserver 测 composerInner 后覆盖） */
@@ -376,40 +375,7 @@ const useStyles = makeStyles({
   welcomeEnter: {
     ...fadeInUp,
     animationDuration: '480ms',
-    opacity: 0,
-  },
-  welcomeBrand: {
-    display: 'inline-flex',
-    alignItems: 'baseline',
-    fontSize: 'var(--opptrix-font-display)',
-    fontWeight: 600,
-    letterSpacing: '0.08em',
-    lineHeight: 1,
-    animationDelay: '0.35s',
-  },
-  welcomeBrandExpert: {
-    letterSpacing: '0.04em',
-  },
-  welcomeBrandLetter: {
-    display: 'inline-block',
-    color: opptrixCssVars.textTertiary,
-    animationName: {
-      '0%, 100%': {
-        color: opptrixCssVars.textTertiary,
-        opacity: 0.45,
-      },
-      '35%': {
-        color: opptrixCssVars.textPrimary,
-        opacity: 1,
-      },
-      '55%': {
-        color: opptrixCssVars.textSecondary,
-        opacity: 0.78,
-      },
-    },
-    animationDuration: '1.9s',
-    animationTimingFunction: 'ease-in-out',
-    animationIterationCount: 'infinite',
+    animationIterationCount: 1,
   },
   welcomeTitle: {
     fontSize: 'var(--opptrix-font-2xl)',
@@ -546,7 +512,7 @@ export interface ChatViewProps {
 }
 
 function ChatView({
-  title = '新对话', titleSlot, headerTrailing, overlaySlot, contextHint, sessionId = null, welcomeEpoch = 0, chatScrollEpoch = 0, messages, contextRef = null, composerDraft, loading, wakeWaiting = false, streamUiRef, error,
+  title = DEFAULT_SESSION_DISPLAY_TITLE, titleSlot, headerTrailing, overlaySlot, contextHint, sessionId = null, welcomeEpoch = 0, chatScrollEpoch = 0, messages, contextRef = null, composerDraft, loading, wakeWaiting = false, streamUiRef, error,
   availableModels = [],
   sessionModel,
   sessionLlmParams,
@@ -980,36 +946,9 @@ function ChatView({
           <div className={s.headerMain}>
             <div className={s.headerInner}>
               <div className={s.headerTitleSlot}>
-                {onSelectSession && onOpenSearch && onOpenSettings ? (
-                  <SessionPickerMenu
-                    sessions={sessions}
-                    activeId={sessionId}
-                    onSelect={onSelectSession}
-                    onOpenSearch={onOpenSearch}
-                    onOpenSettings={onOpenSettings}
-                  />
-                ) : null}
-                {onNewChat ? (
-                  <ChromeToolButton
-                    className={s.headerSidebarToggle}
-                    label="新建对话"
-                    iconPadding={DESKTOP_SIDEBAR_TOOL_ICON_PADDING}
-                    onClick={onNewChat}
-                  >
-                    <ChatAddRegular fontSize={DESKTOP_SIDEBAR_TOOL_ICON_SIZE} />
-                  </ChromeToolButton>
-                ) : null}
-                {onOpenSearch ? (
-                  <ChromeToolButton
-                    className={s.headerSidebarToggle}
-                    label="搜索对话"
-                    iconPadding={DESKTOP_SIDEBAR_TOOL_ICON_PADDING}
-                    onClick={onOpenSearch}
-                  >
-                    <SearchRegular fontSize={DESKTOP_SIDEBAR_TOOL_ICON_SIZE} />
-                  </ChromeToolButton>
-                ) : null}
-                {titleSlot ?? <Text className={s.title}>{title || '新对话'}</Text>}
+                {titleSlot ?? (
+                  <Text className={s.title}>{title || DEFAULT_SESSION_DISPLAY_TITLE}</Text>
+                )}
               </div>
               {(sessionFilesToggle || headerTrailing || (!rightPanelOpen && (onToggleRightPanel || onToggleChatColumn))) && (
                 <div className={s.headerActions}>
@@ -1171,6 +1110,7 @@ function ChatView({
                       <>
                         <ChatProcessTrace
                           steps={childTrace?.steps ?? []}
+                          sessionId={sessionId}
                           thinkingLabel={childTrace?.thinkingLabel ?? '正在处理协作任务…'}
                           phaseLabel={childTrace?.phaseLabel ?? '正在处理协作任务'}
                           estimatedTokens={childTrace?.estimatedTokens}
@@ -1222,6 +1162,7 @@ function ChatView({
                       <>
                         <ChatProcessTrace
                           steps={liveTrace.steps}
+                          sessionId={sessionId}
                           thinkingLabel={liveTrace.thinkingLabel}
                           phaseLabel={liveTrace.phaseLabel}
                           estimatedTokens={liveTrace.estimatedTokens}
@@ -1244,6 +1185,7 @@ function ChatView({
                 <div className={s.loadingRow}>
                   <ChatProcessTrace
                     steps={[]}
+                    sessionId={sessionId}
                     thinkingLabel="模型正在思考…"
                     live
                   />

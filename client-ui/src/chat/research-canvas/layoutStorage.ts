@@ -14,8 +14,44 @@ import type {
 } from './types'
 import { WIDGET_TYPE_SET } from './types'
 
-export const RESEARCH_CANVAS_STORAGE_KEY = 'opptrix.research-canvas.v1'
+/** @deprecated Global v1 key; migrated once into the active session v2 bucket. */
+export const LEGACY_RESEARCH_CANVAS_STORAGE_KEY = 'opptrix.research-canvas.v1'
+/** @deprecated Use {@link researchCanvasStorageKey} with a session id. */
+export const RESEARCH_CANVAS_STORAGE_KEY = LEGACY_RESEARCH_CANVAS_STORAGE_KEY
 export const RESEARCH_DATASET_ID_RE = /^research-ds-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+export function researchCanvasStorageKey(sessionId: string): string {
+  return `opptrix.research-canvas.v2.${sessionId}`
+}
+
+function serializePersistedCanvasState(state: PersistedCanvasState): string {
+  return JSON.stringify({
+    version: 2,
+    widgets: state.widgets,
+    layout: state.layout,
+    datasets: state.datasets,
+    acceptedProposalIds: state.acceptedProposalIds ?? [],
+  })
+}
+
+function migrateLegacyGlobalCanvasIfNeeded(sessionId: string): void {
+  if (typeof window === 'undefined') return
+  const legacyRaw = window.localStorage.getItem(LEGACY_RESEARCH_CANVAS_STORAGE_KEY)
+  if (!legacyRaw) return
+
+  const v2Key = researchCanvasStorageKey(sessionId)
+  if (!window.localStorage.getItem(v2Key)) {
+    try {
+      const parsed = normalizePersistedCanvasState(JSON.parse(legacyRaw))
+      if (parsed) {
+        window.localStorage.setItem(v2Key, serializePersistedCanvasState(parsed))
+      }
+    } catch {
+      /* ignore corrupt legacy payload */
+    }
+  }
+  window.localStorage.removeItem(LEGACY_RESEARCH_CANVAS_STORAGE_KEY)
+}
 
 const WIDGET_TYPES = WIDGET_TYPE_SET
 const METRIC_IDS = new Set([
@@ -118,17 +154,30 @@ function normalizeOhlc(raw: unknown, entityIds: ReadonlySet<string>): ResearchOh
   return bar
 }
 
-function normalizeSource(raw: unknown, entityIds: ReadonlySet<string>): ResearchSource | null {
+function isBlockedResearchProvider(raw: string): boolean {
+  const id = raw.trim().toLowerCase()
+  return !id || id === 'mixed' || id === 'cache'
+}
+
+function normalizeSource(
+  raw: unknown,
+  entityIds: ReadonlySet<string>,
+  metric: string,
+): ResearchSource | null {
   if (!isRecord(raw)) return null
   const entityId = typeof raw.entityId === 'string' ? raw.entityId.trim() : ''
-  const metric = typeof raw.metric === 'string' ? raw.metric.trim() : ''
+  const sourceMetric = typeof raw.metric === 'string' ? raw.metric.trim() : ''
   const fetchedAt = typeof raw.fetchedAt === 'string' ? raw.fetchedAt.trim() : ''
-  if (!entityId || !metric || !fetchedAt || !entityIds.has(entityId)) return null
-  const provider = typeof raw.provider === 'string' && raw.provider.trim()
-    ? raw.provider.trim()
-    : 'unknown'
-  const source: ResearchSource = { provider, entityId, metric, fetchedAt }
-  if (typeof raw.period === 'string' && raw.period.trim()) source.period = raw.period.trim()
+  if (!entityId || !sourceMetric || !fetchedAt || !entityIds.has(entityId)) return null
+  const provider = typeof raw.provider === 'string' ? raw.provider.trim() : ''
+  if (isBlockedResearchProvider(provider)) return null
+  const period = typeof raw.period === 'string' ? raw.period.trim() : ''
+  if (metric !== 'kline' && !period) return null
+  const source: ResearchSource = { provider, entityId, metric: sourceMetric, fetchedAt }
+  if (period) source.period = period
+  if (typeof raw.fieldLabel === 'string' && raw.fieldLabel.trim()) {
+    source.fieldLabel = raw.fieldLabel.trim()
+  }
   if (typeof raw.sourceUrl === 'string' && raw.sourceUrl.trim()) source.sourceUrl = raw.sourceUrl.trim()
   return source
 }
@@ -166,10 +215,14 @@ export function normalizeResearchDataset(raw: unknown): Dataset | null {
     data.push(point)
   }
   const sources: ResearchSource[] = []
+  const sourceKeys = new Set<string>()
   if (Array.isArray(raw.sources)) {
     for (const item of raw.sources) {
-      const source = normalizeSource(item, entityIds)
+      const source = normalizeSource(item, entityIds, metric)
       if (!source) return null
+      const key = `${source.entityId}\0${source.period ?? ''}`
+      if (sourceKeys.has(key)) return null
+      sourceKeys.add(key)
       sources.push(source)
     }
   }
@@ -338,10 +391,12 @@ export function createDefaultCanvasState(): PersistedCanvasState {
   }
 }
 
-export function readPersistedCanvasState(): PersistedCanvasState {
+export function readPersistedCanvasState(sessionId?: string | null): PersistedCanvasState {
   if (typeof window === 'undefined') return createDefaultCanvasState()
+  if (!sessionId) return createDefaultCanvasState()
+  migrateLegacyGlobalCanvasIfNeeded(sessionId)
   try {
-    const raw = localStorage.getItem(RESEARCH_CANVAS_STORAGE_KEY)
+    const raw = localStorage.getItem(researchCanvasStorageKey(sessionId))
     if (!raw) return createDefaultCanvasState()
     const parsed = normalizePersistedCanvasState(JSON.parse(raw))
     return parsed ?? createDefaultCanvasState()
@@ -350,16 +405,14 @@ export function readPersistedCanvasState(): PersistedCanvasState {
   }
 }
 
-export function writePersistedCanvasState(state: PersistedCanvasState): void {
+export function writePersistedCanvasState(
+  sessionId: string | null | undefined,
+  state: PersistedCanvasState,
+): void {
   if (typeof window === 'undefined') return
+  if (!sessionId) return
   try {
-    localStorage.setItem(RESEARCH_CANVAS_STORAGE_KEY, JSON.stringify({
-      version: 2,
-      widgets: state.widgets,
-      layout: state.layout,
-      datasets: state.datasets,
-      acceptedProposalIds: state.acceptedProposalIds ?? [],
-    }))
+    localStorage.setItem(researchCanvasStorageKey(sessionId), serializePersistedCanvasState(state))
   } catch {
     /* ignore quota / private mode */
   }

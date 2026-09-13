@@ -4,8 +4,12 @@
 
 ## 主路径工具
 
-- `query_data` / `refine_dataset`：取数、派生数据集
-- `propose_widget`：聊天区预览，不写右侧画布
+- `query_data` / `refine_dataset`：取数、派生数据集。点名 ≤3 家直接取数；>3 家或行业对比先返回计划，用户确认后再查。
+- `propose_widget`：聊天区预览，不写右侧画布；必须已有数据集。
+
+报告 / 脑图 / 网页（`create_canvas` 等）默认不在工具列表。用户须在输入框 **+ → 报告与脑图** 勾选。`activate_tool_pack` 不能替用户打开。
+
+画布「发布」只生成当前部署上的只读快照，不是公网分享。
 - `create_widget` / `update_widget` / `delete_widget`：仅在用户明确改已有图，或 Adopt 之后的画布编辑
 
 报告 / 脑图 / 网页（`create_canvas` 等）默认不在工具列表。用户须在输入框 **+ → 报告与脑图** 勾选。`activate_tool_pack` 不能替用户打开。

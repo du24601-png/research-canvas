@@ -311,16 +311,22 @@ export class QueryPlanExecutor {
     const assetClasses = ctx.args[2] as Record<string, import('@opptrix/shared').AssetClass | undefined> | undefined
     const normalized = codes.map(c => normalizeCode(String(c)))
     const results: StockRealtime[] = []
-    const seen = new Set<string>()
     const mergeKey = ctx.mergeKey ?? ((item: unknown) => normalizeCode(String((item as StockRealtime).code)))
 
-    const pushRows = (rows: StockRealtime[] | null | undefined) => {
+    const seen = new Set<string>()
+    const driverCounts = new Map<string, number>()
+
+    const pushRows = (rows: StockRealtime[] | null | undefined, driverName: string) => {
       if (!rows?.length) return
+      driverCounts.set(driverName, (driverCounts.get(driverName) ?? 0) + rows.length)
       for (const row of rows) {
         const key = mergeKey(row)
         if (seen.has(key)) continue
         seen.add(key)
-        results.push(normalizePreOpenRealtimeQuote({ ...row, code: key }))
+        results.push({
+          ...normalizePreOpenRealtimeQuote({ ...row, code: key }),
+          dataSource: driverName,
+        })
       }
     }
 
@@ -367,7 +373,7 @@ export class QueryPlanExecutor {
         recordProviderQuerySuccess(driver.name, capStr, health)
         this.registry.notifyRelease(driver.name, elapsed, true)
         this.speedRanker?.recordResult(driver.name, capStr, elapsed, true)
-        pushRows(result)
+        pushRows(result, driver.name)
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
         recordProviderQueryError(driver.name, capStr, e, health)
@@ -380,12 +386,14 @@ export class QueryPlanExecutor {
     }
 
     if (!results.length) return { success: false, error: 'batchRealtime failed' }
+    const primaryProvider = [...driverCounts.entries()]
+      .sort((left, right) => right[1] - left[1])[0]?.[0] ?? 'unknown'
     return {
       success: true,
       data: results as T[],
-      source: 'mixed',
+      source: primaryProvider,
       cached: false,
-      meta: { provider: 'mixed', cached: false, cachedAt: Date.now() },
+      meta: { provider: primaryProvider, cached: false, cachedAt: Date.now() },
     }
   }
 }

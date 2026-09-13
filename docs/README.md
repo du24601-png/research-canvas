@@ -8,6 +8,7 @@
 | [SELF-HOSTING.md](./SELF-HOSTING.md) | Docker / 裸 Node 部署 |
 | [DATA-LAYER.md](./DATA-LAYER.md) | Engine、Provider 落点、缓存 |
 | [AGENT-GUIDE.md](./AGENT-GUIDE.md) | Agent 工具与技能 |
+| [images/](./images/preview.png) | README 预览 / 画布 / 溯源截图与演示封面 |
 | [REPO-LAYOUT.md](./REPO-LAYOUT.md) | 根目录地图 |
 
 工程约束（给 Agent / 贡献者）：根目录 [`AGENTS.md`](../AGENTS.md)。  

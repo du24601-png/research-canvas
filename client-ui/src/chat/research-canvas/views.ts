@@ -5,7 +5,7 @@ function entityName(dataset: Dataset, entity: ResearchEntity): string {
   return entity.name
 }
 
-function pointValue(dataset: Dataset, entityId: string, period: string): number | null {
+export function pointValue(dataset: Dataset, entityId: string, period: string): number | null {
   const point = dataset.data.find(item => item.entityId === entityId && item.period === period)
   if (!point || point.value == null) return null
   return point.value
@@ -52,6 +52,7 @@ export interface StackedBarView {
 export interface PieSliceView {
   name: string
   ticker: string
+  entityId: string
   value: number
 }
 
@@ -120,9 +121,12 @@ export function buildPieChartView(dataset: Dataset, period?: string): PieChartVi
     .map((name, index) => ({
       name,
       ticker: bar.tickers[index] ?? '',
+      entityId: bar.entityIds[index] ?? '',
       value: bar.values[index],
     }))
-    .filter((row): row is PieSliceView => row.value != null && row.value > 0)
+    .filter((row): row is PieSliceView => (
+      Boolean(row.entityId) && row.value != null && row.value > 0
+    ))
   return { period: bar.period, slices, unit: bar.unit }
 }
 

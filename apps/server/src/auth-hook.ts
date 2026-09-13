@@ -89,6 +89,7 @@ async function ownerAuthOnRequest(req: FastifyRequest, reply: FastifyReply): Pro
   const claimed = auth.isClaimed()
 
   if (path === '/api/health' || path.startsWith('/api/legal/')) return
+  if (req.method.toUpperCase() === 'GET' && /^\/api\/research\/snapshots\/[^/]+$/.test(path)) return
   if (path === '/api/auth/status') {
     tryAttachSession(req)
     return

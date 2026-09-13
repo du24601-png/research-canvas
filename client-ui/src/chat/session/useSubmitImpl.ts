@@ -195,7 +195,7 @@ export function useSubmitImpl(refs: ChatEngineRefs, flags: StreamFlags, ports: C
           }
         }
       }, sessionModelRef.current, abortController.signal, ids.length ? ids : undefined, (() => {
-        const state = readPersistedCanvasState()
+        const state = readPersistedCanvasState(sessionId)
         const activeProposal = consumePendingAdjustProposal()
         return buildResearchCanvasAgentSnapshot({
           state,

@@ -868,6 +868,14 @@ html.opptrix-electron .opptrix-news-reader-selectable .opptrix-news-video-extern
   color: var(--opptrix-text-tertiary);
   letter-spacing: 0.01em;
   pointer-events: none;
+  opacity: 1;
+  transition: opacity 360ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .opptrix-composer-editor[data-empty='true']::before {
+    transition-duration: 150ms;
+  }
 }
 
 /* 空态单行：placeholder 垂直居中 */
@@ -906,9 +914,9 @@ html.opptrix-electron .opptrix-news-reader-selectable .opptrix-news-video-extern
   pointer-events: none;
 }
 
+.opptrix-composer-editor[data-empty='true'][data-composer-focused='true']::before,
 .opptrix-composer-editor[data-empty='true']:focus::before {
-  content: none;
-  display: none;
+  opacity: 0;
 }
 
 .opptrix-composer-mobile-hold-speech-zone {
@@ -2221,6 +2229,60 @@ html.opptrix-electron .opptrix-session-title-btn:disabled {
   box-sizing: border-box;
   border-radius: var(--opptrix-radius-lg, 14px);
   animation: opptrix-composer-tooltip-in 160ms cubic-bezier(0, 0, 0.2, 1) both;
+}
+
+.opptrix-session-tools-menu--unified {
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+
+.opptrix-session-tools-menu__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px;
+  box-sizing: border-box;
+}
+
+.opptrix-session-tools-menu__section {
+  padding: 8px 10px 4px;
+  font-size: var(--opptrix-font-sm, 11px);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--opptrix-text-tertiary, #8E8E93);
+}
+
+.opptrix-session-tools-menu__empty {
+  padding: 8px 10px 10px;
+  font-size: var(--opptrix-font-sm, 11px);
+  color: var(--opptrix-text-tertiary, #8E8E93);
+  line-height: 1.45;
+}
+
+.opptrix-session-tools-menu__session-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.opptrix-session-tools-menu__session-date {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-size: var(--opptrix-font-sm, 11px);
+  color: var(--opptrix-text-tertiary, #8E8E93);
+}
+
+.opptrix-session-tools-menu__footer {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  border-top: 1px solid var(--opptrix-separator, rgba(0, 0, 0, 0.08));
+  box-sizing: border-box;
 }
 
 .opptrix-session-tools-menu__meta {

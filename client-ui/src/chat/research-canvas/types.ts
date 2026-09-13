@@ -88,6 +88,7 @@ export interface ResearchSource {
   period?: string
   fetchedAt: string
   sourceUrl?: string
+  fieldLabel?: string
 }
 
 export interface ResearchDatasetQuery {

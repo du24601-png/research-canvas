@@ -13,6 +13,7 @@ import {
 import { opptrixCssVars } from '../theme/tokens'
 import { electronPlatform } from '../platform/detect'
 import ResearchCanvas from './research-canvas/ResearchCanvas'
+import { useWorkspaceUi } from './workspace/WorkspaceUiContext'
 
 const useStyles = makeStyles({
   root: {
@@ -48,6 +49,8 @@ const useStyles = makeStyles({
 export interface BlankCanvasPlaceholderProps {
   electronChrome?: boolean
   chatColumnVisible?: boolean
+  canvasSessionId?: string | null
+  canvasTitle?: string
   onToggleRightPanel?: () => void
   onToggleChatColumn?: () => void
 }
@@ -56,12 +59,15 @@ export interface BlankCanvasPlaceholderProps {
 export default function BlankCanvasPlaceholder({
   electronChrome = false,
   chatColumnVisible = true,
+  canvasSessionId = null,
+  canvasTitle,
   onToggleRightPanel,
   onToggleChatColumn,
 }: BlankCanvasPlaceholderProps) {
   const s = useStyles()
+  const ui = useWorkspaceUi()
   const electronWin = electronChrome && electronPlatform() === 'win32'
-  const showActions = Boolean(onToggleRightPanel || onToggleChatColumn)
+  const showActions = Boolean(onToggleRightPanel || onToggleChatColumn) && !ui.presentMode
 
   return (
     <div className={mergeClasses(s.root, electronChrome && s.rootElectron)}>
@@ -98,7 +104,7 @@ export default function BlankCanvasPlaceholder({
         </div>
       ) : null}
       <div className={s.body}>
-        <ResearchCanvas />
+        <ResearchCanvas sessionId={canvasSessionId} sessionTitle={canvasTitle} />
       </div>
     </div>
   )

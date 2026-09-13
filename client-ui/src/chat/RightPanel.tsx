@@ -132,6 +132,8 @@ interface Props {
   preview?: FilePreviewTarget | null
   /** 空预览时用当前会话 id（preview.sessionId 可能为空） */
   previewSessionId?: string | null
+  canvasSessionId?: string | null
+  canvasTitle?: string
   onSelectAttachment?: (attachment: ChatAttachmentMeta) => void
   onClosePreview?: () => void
   onSlideTransitionEnd?: () => void
@@ -150,6 +152,8 @@ function RightPanel({
   previewMode = false,
   preview = null,
   previewSessionId = null,
+  canvasSessionId = null,
+  canvasTitle,
   onSelectAttachment,
   onClosePreview,
   onSlideTransitionEnd,
@@ -334,6 +338,8 @@ function RightPanel({
               <BlankCanvasPlaceholder
                 electronChrome={electronChrome}
                 chatColumnVisible={chatColumnVisible}
+                canvasSessionId={canvasSessionId}
+                canvasTitle={canvasTitle}
                 onToggleRightPanel={visible ? onToggleRightPanel : undefined}
                 onToggleChatColumn={visible ? onToggleChatColumn : undefined}
               />

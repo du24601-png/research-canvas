@@ -21,10 +21,10 @@ describe('workspace split ratio', () => {
     window.localStorage.clear()
   })
 
-  it('defaults canvas to 75% of the workspace', () => {
+  it('defaults canvas to 78% of the workspace', () => {
     const ws = 1600
     const right = rightWidthFromRatio(ws, WORKSPACE_CANVAS_DEFAULT_RATIO)
-    expect(right).toBe(1200)
+    expect(right).toBe(1248)
     expect(ws - right - WORKSPACE_SPLITTER_WIDTH).toBeGreaterThanOrEqual(WORKSPACE_CHAT_MIN_WIDTH)
   })
 

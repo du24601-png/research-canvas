@@ -4,11 +4,13 @@ import { adoptProposalIntoState } from './adoptProposal'
 import { DEFAULT_CANVAS_STATE } from './defaultCanvasState'
 import {
   readPersistedCanvasState,
-  RESEARCH_CANVAS_STORAGE_KEY,
+  researchCanvasStorageKey,
   writePersistedCanvasState,
 } from './layoutStorage'
 import { MOCK_GROSS_MARGIN_DATASET } from './mockGrossMarginDataset'
 import type { PersistedCanvasState } from './types'
+
+const TEST_SESSION = 'sess-test-canvas'
 
 function cloneDefault(): PersistedCanvasState {
   return {
@@ -153,9 +155,9 @@ describe('research-canvas controller', () => {
     expect(deleted?.widgets[0]?.title).toBe('五年毛利率趋势')
     state = deleted!
 
-    writePersistedCanvasState(state)
-    expect(window.localStorage.getItem(RESEARCH_CANVAS_STORAGE_KEY)).toBeTruthy()
-    const restored = readPersistedCanvasState()
+    writePersistedCanvasState(TEST_SESSION, state)
+    expect(window.localStorage.getItem(researchCanvasStorageKey(TEST_SESSION))).toBeTruthy()
+    const restored = readPersistedCanvasState(TEST_SESSION)
     expect(restored).toEqual(state)
   })
 
@@ -179,6 +181,7 @@ describe('research-canvas controller', () => {
         provider: 'tushare',
         entityId: 'CN:SH.601058',
         metric: 'gross_margin',
+        period: '2025',
         fetchedAt: '2026-09-10T00:00:00.000Z',
       }],
     }
@@ -231,6 +234,7 @@ describe('research-canvas controller', () => {
         provider: 'tushare',
         entityId: 'CN:SH.601058',
         metric: 'gross_margin',
+        period: '2025',
         fetchedAt: '2026-09-10T00:00:00.000Z',
       }],
     }
@@ -294,6 +298,7 @@ describe('research-canvas controller', () => {
         provider: 'tushare',
         entityId: 'CN:SH.601058',
         metric: 'gross_margin',
+        period: '2025',
         fetchedAt: '2026-09-10T00:00:00.000Z',
       }],
     }

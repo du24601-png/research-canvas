@@ -37,7 +37,9 @@ export const MOCK_GROSS_MARGIN_DATASET: Dataset = {
     provider: 'unknown',
     entityId: LEGACY_ENTITIES[0].id,
     metric: 'gross_margin',
+    period: '2023',
     fetchedAt: '2026-01-01T00:00:00.000Z',
+    fieldLabel: '毛利率',
   }],
 }
 

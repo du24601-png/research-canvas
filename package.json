@@ -54,7 +54,8 @@
     "harness:lab": "node scripts/harness-lab-auto.mjs",
     "postinstall": "node scripts/scrub-install-deps.mjs",
     "scrub:install-deps": "node scripts/scrub-install-deps.mjs",
-    "test:ui": "npm run test -w research-canvas-client"
+    "test:ui": "npm run test -w research-canvas-client",
+    "test:e2e:smoke": "node scripts/e2e-research-board-smoke.mjs"
   },
   "engines": {
     "node": ">=24"

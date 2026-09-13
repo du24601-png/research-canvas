@@ -899,9 +899,9 @@ export const TOOL_META: Record<string, ToolMeta> = {
     packId: 'research_canvas',
     miningEligible: false,
     usageGuide:
-      '比较或查询多家公司的毛利率、营收、净利润、ROE 等标准财务指标，或查询日K时，先用本工具生成数据集。只传公司名/代码、指标与年份。禁止编造数字，禁止把明细行写进回复。改看另一个指标时重新调用本工具，不要 refine_dataset。K 线用 metric=kline，最多两只标的。行业或板块对比须先 resolve_industry_universe 并经用户确认，禁止凭印象填公司。',
+      '比较或查询多家公司的毛利率、营收、净利润、ROE 等标准财务指标，或查询日K时，先用本工具生成数据集。点名不超过 3 家时直接取数；超过 3 家时首次返回 plan_preview，用户确认后再传 confirmed:true。禁止编造数字，禁止把明细行写进回复。改看另一个指标时重新调用本工具，不要 refine_dataset。K 线用 metric=kline，最多两只标的。行业或板块对比须先 resolve_industry_universe 并经用户确认，禁止凭印象填公司。',
     compliance:
-      'entities 为公司简称/全称/代码，最多 20 家；metric 仅 gross_margin / revenue / revenue_growth / net_income / net_margin / roe / kline；start/end 为四位年份。成功后只用返回的 datasetId 调用 propose_widget；图种默认取 view.recommended，意图取 intent，标题取 view.suggestedTitle。同一数据集禁止再次 query_data。',
+      'entities 为公司简称/全称/代码，最多 20 家；metric 仅 gross_margin / revenue / revenue_growth / net_income / net_margin / roe / kline；start/end 为四位年份。>3 家且未 confirmed 时只返回 plan_preview；≤3 家直接取数。成功后只用返回的 datasetId 调用 propose_widget；图种默认取 view.recommended，意图取 intent，标题取 view.suggestedTitle。同一数据集禁止再次 query_data。',
   },
   resolve_industry_universe: {
     packId: 'research_canvas',

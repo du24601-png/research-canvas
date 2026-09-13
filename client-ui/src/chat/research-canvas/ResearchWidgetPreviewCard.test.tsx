@@ -8,6 +8,8 @@ import { resetActiveWidgetForTests, getActiveWidgetId } from './activeWidgetSele
 import { useResearchCanvas } from './useResearchCanvas'
 import type { Dataset } from './types'
 
+const TEST_SESSION = 'sess-test-canvas'
+
 vi.mock('./LineChartWidget', () => ({
   default: (props: { style?: { series?: Record<string, { color?: string }> } }) => (
     <div data-testid="line-preview" data-style={JSON.stringify(props.style ?? null)}>line-preview</div>
@@ -46,6 +48,7 @@ function dataset(): Dataset {
       provider: 'tushare',
       entityId: 'CN:SH.601058',
       metric: 'gross_margin',
+      period: '2022',
       fetchedAt: '2026-09-10T00:00:00.000Z',
     }],
   }
@@ -72,7 +75,7 @@ describe('create widget proposal card', () => {
   beforeEach(() => {
     window.localStorage.clear()
     resetActiveWidgetForTests()
-    writePersistedCanvasState({
+    writePersistedCanvasState(TEST_SESSION, {
       version: 2,
       widgets: [],
       layout: [],
@@ -86,23 +89,23 @@ describe('create widget proposal card', () => {
 
   it('renders the proposal and cancel leaves the canvas unchanged', async () => {
     const { default: Preview } = await import('./ResearchWidgetPreviewCard')
-    renderWithProviders(<Preview step={step()} />)
+    renderWithProviders(<Preview step={step()} sessionId={TEST_SESSION} />)
     expect(screen.getByText('Microsoft vs Google Operating Margin')).toBeTruthy()
     expect(screen.getByText(/2022/)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '取消' }))
     expect(screen.queryByText('Microsoft vs Google Operating Margin')).toBeNull()
-    expect(readPersistedCanvasState().widgets).toEqual([])
+    expect(readPersistedCanvasState(TEST_SESSION).widgets).toEqual([])
   })
 
   it('confirm adds the widget, uses preferred placement, and selects it', async () => {
     const { default: Preview } = await import('./ResearchWidgetPreviewCard')
     function Bound() {
-      useResearchCanvas()
-      return <Preview step={step()} />
+      useResearchCanvas(TEST_SESSION)
+      return <Preview step={step()} sessionId={TEST_SESSION} />
     }
     renderWithProviders(<Bound />)
     fireEvent.click(screen.getByRole('button', { name: '添加到画布' }))
-    const persisted = readPersistedCanvasState()
+    const persisted = readPersistedCanvasState(TEST_SESSION)
     expect(persisted.widgets).toHaveLength(1)
     expect(persisted.widgets[0]?.title).toBe('Microsoft vs Google Operating Margin')
     expect(persisted.widgets[0]?.sourceProposalId).toBe('call_compare_google')
@@ -114,8 +117,8 @@ describe('create widget proposal card', () => {
   it('carries preview style to canvas on adopt', async () => {
     const { default: Preview } = await import('./ResearchWidgetPreviewCard')
     function Bound() {
-      useResearchCanvas()
-      return <Preview step={step()} />
+      useResearchCanvas(TEST_SESSION)
+      return <Preview step={step()} sessionId={TEST_SESSION} />
     }
     renderWithProviders(<Bound />)
     await act(async () => {
@@ -132,12 +135,12 @@ describe('create widget proposal card', () => {
       })
     })
     fireEvent.click(screen.getByRole('button', { name: '添加到画布' }))
-    expect(readPersistedCanvasState().widgets[0]?.style?.series?.['CN:SH.601058']?.color).toBe('#EA580C')
+    expect(readPersistedCanvasState(TEST_SESSION).widgets[0]?.style?.series?.['CN:SH.601058']?.color).toBe('#EA580C')
   })
 
   it('applies preview style updates from update_proposal without adopt', async () => {
     const { default: Preview } = await import('./ResearchWidgetPreviewCard')
-    renderWithProviders(<Preview step={step()} />)
+    renderWithProviders(<Preview step={step()} sessionId={TEST_SESSION} />)
     await act(async () => {
       publishResearchCanvasEvent({
         type: 'widget_proposed',
@@ -161,17 +164,17 @@ describe('create widget proposal card', () => {
       series?: Record<string, { color?: string }>
     }
     expect(style.series?.['CN:SH.601058']?.color).toBe('#2563EB')
-    expect(readPersistedCanvasState().widgets).toEqual([])
+    expect(readPersistedCanvasState(TEST_SESSION).widgets).toEqual([])
   })
 
   it('shows add again after the canvas widget is deleted', async () => {
     const { default: Preview } = await import('./ResearchWidgetPreviewCard')
     function Bound() {
-      const { handleDeleteWidget } = useResearchCanvas()
+      const { handleDeleteWidget } = useResearchCanvas(TEST_SESSION)
       return (
         <>
-          <Preview step={step()} />
-          <button type="button" onClick={() => handleDeleteWidget(readPersistedCanvasState().widgets[0]?.id ?? '')}>
+          <Preview step={step()} sessionId={TEST_SESSION} />
+          <button type="button" onClick={() => handleDeleteWidget(readPersistedCanvasState(TEST_SESSION).widgets[0]?.id ?? '')}>
             删除画布图
           </button>
         </>
@@ -181,10 +184,10 @@ describe('create widget proposal card', () => {
     fireEvent.click(screen.getByRole('button', { name: '添加到画布' }))
     expect(screen.getByText('已添加到画布')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '删除画布图' }))
-    expect(readPersistedCanvasState().widgets).toHaveLength(0)
+    expect(readPersistedCanvasState(TEST_SESSION).widgets).toHaveLength(0)
     expect(screen.getByRole('button', { name: '添加到画布' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '添加到画布' }))
-    expect(readPersistedCanvasState().widgets).toHaveLength(1)
+    expect(readPersistedCanvasState(TEST_SESSION).widgets).toHaveLength(1)
     expect(screen.getByText('已添加到画布')).toBeTruthy()
   })
 })

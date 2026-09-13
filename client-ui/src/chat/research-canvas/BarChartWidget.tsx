@@ -1,11 +1,13 @@
-import { memo, useMemo, useState } from 'react'
+import { memo, useCallback, useMemo, useState } from 'react'
+import type { CallbackDataParams } from 'echarts/types/dist/shared'
 import { useTheme } from '../../theme/ThemeContext'
 import { buildBarChartOption } from './chartOptions'
 import { getResearchChartTheme } from './chartTheme'
 import type { ChartContentMode } from './chartResponsive'
 import { resolveChartStyleAgainstEntities, type ChartStyle } from '@opptrix/shared/research-chart-style'
 import type { Dataset } from './types'
-import EchartsFill from './EchartsFill'
+import ChartWithSourceSelection from './ChartWithSourceSelection'
+import { resolveBarChartCell } from './chartSourceClick'
 import { buildBarChartView } from './views'
 
 interface Props {
@@ -27,8 +29,19 @@ function BarChartWidget({ dataset, period, style }: Props) {
     () => buildBarChartOption(view, theme, mode, boundStyle),
     [theme, view, mode, boundStyle],
   )
+  const resolveCell = useCallback(
+    (params: CallbackDataParams) => resolveBarChartCell(view, params),
+    [view],
+  )
 
-  return <EchartsFill option={option} onContentModeChange={setMode} />
+  return (
+    <ChartWithSourceSelection
+      dataset={dataset}
+      option={option}
+      onContentModeChange={setMode}
+      resolveCell={resolveCell}
+    />
+  )
 }
 
 export default memo(BarChartWidget)

@@ -10,11 +10,13 @@ import { applyResearchCanvasEvent } from './canvasController'
 import { findAddedWidgetId } from './activeWidgetContext'
 import {
   readPersistedCanvasState,
-  RESEARCH_CANVAS_STORAGE_KEY,
+  researchCanvasStorageKey,
   writePersistedCanvasState,
 } from './layoutStorage'
 import { WIDGET_SIZE_PRESETS } from './widgetSizePresets'
 import type { Dataset, PersistedCanvasState } from './types'
+
+const TEST_SESSION = 'sess-test-canvas'
 
 const DATASET_ID = 'research-ds-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 
@@ -37,6 +39,7 @@ function researchDataset(): Dataset {
       provider: 'tushare',
       entityId: 'US:MSFT',
       metric: 'operating_margin',
+      period: '2022',
       fetchedAt: '2026-09-10T00:00:00.000Z',
     }],
   }
@@ -68,24 +71,24 @@ describe('active widget selection', () => {
 
   it('does not persist selection', () => {
     setActiveWidget({ id: 'rc-line', title: '趋势' })
-    writePersistedCanvasState({
+    writePersistedCanvasState(TEST_SESSION, {
       version: 2,
       widgets: [{ id: 'rc-line', type: 'line_chart', title: '趋势', datasetId: DATASET_ID }],
       layout: [{ i: 'rc-line', x: 0, y: 0, w: 8, h: 6 }],
       datasets: [researchDataset()],
     })
-    const raw = window.localStorage.getItem(RESEARCH_CANVAS_STORAGE_KEY) ?? ''
+    const raw = window.localStorage.getItem(researchCanvasStorageKey(TEST_SESSION)) ?? ''
     expect(raw).not.toContain('activeWidget')
     expect(JSON.parse(raw)).not.toHaveProperty('activeWidgetId')
     resetActiveWidgetForTests()
-    const restored = readPersistedCanvasState()
+    const restored = readPersistedCanvasState(TEST_SESSION)
     expect(restored.widgets).toHaveLength(1)
     expect(getActiveWidgetId()).toBeNull()
   })
 
   it('keeps selection across layout-only commits', () => {
     setActiveWidget({ id: 'rc-line', title: '趋势' })
-    writePersistedCanvasState({
+    writePersistedCanvasState(TEST_SESSION, {
       version: 2,
       widgets: [{ id: 'rc-line', type: 'line_chart', title: '趋势', datasetId: DATASET_ID }],
       layout: [{ i: 'rc-line', x: 1, y: 2, w: 8, h: 6 }],
@@ -140,9 +143,9 @@ describe('create widget proposal adopt', () => {
     })
     expect(getActiveWidgetId()).toBe(addedId)
 
-    writePersistedCanvasState(adopted!)
+    writePersistedCanvasState(TEST_SESSION, adopted!)
     resetActiveWidgetForTests()
-    const restored = readPersistedCanvasState()
+    const restored = readPersistedCanvasState(TEST_SESSION)
     expect(restored.widgets).toHaveLength(1)
     expect(restored.widgets[0]?.title).toBe('Microsoft vs Google Operating Margin')
     expect(getActiveWidgetId()).toBeNull()

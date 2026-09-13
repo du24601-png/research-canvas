@@ -103,6 +103,8 @@ export function ChatWorkspace({
                 previewMode={ui.mobileRightSheet === 'preview'}
                 preview={ui.previewTarget}
                 previewSessionId={previewSessionId}
+                canvasSessionId={chat.sessionId}
+                canvasTitle={chat.title}
                 onSelectAttachment={onSelectPreviewAttachment}
                 onClosePreview={ui.closeMobileRightSheet}
               />
@@ -111,7 +113,7 @@ export function ChatWorkspace({
         </div>
       ) : (
         <>
-          {ui.chatVisible && (
+          {ui.chatVisible && !ui.presentMode && (
             <div
               className={mergeClasses(
                 s.chatColumn,
@@ -152,7 +154,7 @@ export function ChatWorkspace({
             </div>
           )}
 
-          {ui.showSplitter && (
+          {ui.showSplitter && !ui.presentMode && (
             <WorkspaceSplitDivider
               electronChrome={ui.electronChrome}
               extendIntoSecondaryChrome={ui.electronChrome}
@@ -164,7 +166,7 @@ export function ChatWorkspace({
           <RightPanel
             visible={ui.rightPanelVisible}
             width={ui.rightPanelWidth}
-            fullWidth={!ui.chatVisible}
+            fullWidth={!ui.chatVisible || ui.presentMode}
             transitionEnabled={!ui.isSplitDragging}
             electronChrome={ui.electronChrome}
             chatColumnVisible={ui.chatVisible}
@@ -174,6 +176,8 @@ export function ChatWorkspace({
             previewMode={ui.paneMode === 'preview'}
             preview={ui.previewTarget}
             previewSessionId={previewSessionId}
+            canvasSessionId={chat.sessionId}
+            canvasTitle={chat.title}
             onSelectAttachment={onSelectPreviewAttachment}
             onClosePreview={ui.closePreview}
             onSlideTransitionEnd={ui.onPeerSlideSettled}

@@ -142,6 +142,11 @@ export function useChatSessionFlow(ports: ChatSessionFlowPorts, domain: ChatDoma
     handleDelete,
     setSessions,
     setActiveSessionMeta,
+    sessions,
+    onSelectSession: handleSelect,
+    onOpenSearch: chrome.handleOpenSearch,
+    onOpenSettings: chrome.openSystemSettings,
+    onNewChat: handleNew,
   })
   const { titleTools } = titleActions
 

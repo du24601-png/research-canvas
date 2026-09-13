@@ -16,11 +16,21 @@ npm run dev
 
 ```bash
 npm run test:gate    # 主路径 + 文档 + 缓存门禁（PR 必绿）
+npm run test:ui      # client-ui vitest（PR 必绿）
 npm run test:ci      # 全量 node 测试（较慢）
-npm run test:ui      # client-ui vitest
+npm run test:e2e:smoke  # 浏览器主路径烟测；需本机 :8711 + :5173，并已安装 Playwright Chromium
 ```
 
-Windows 上全量 `test:ci` 仍可能有环境相关失败；以 Linux CI 的 `test:gate` 为准。已知能力矩阵用例见 `AGENTS.md`。
+Windows 上全量 `test:ci` 仍可能有环境相关失败；以 Linux CI 的 `test:gate` + `test:ui` 为准。已知能力矩阵用例见 `AGENTS.md`。
+
+主路径烟测不进每次 PR（需本机模型与财报源）。本地验收：
+
+```bash
+npm run start -w @opptrix/server
+WEB_HTTPS=0 npm run dev
+npx playwright install chromium
+npm run test:e2e:smoke
+```
 
 ## 约定
 
@@ -31,4 +41,4 @@ Windows 上全量 `test:ci` 仍可能有环境相关失败；以 Linux CI 的 `t
 
 ## Pull Request
 
-请用仓库模板：改了什么、如何验证。CI 跑构建、`check:ui` 与 `test:gate`。
+请用仓库模板：改了什么、如何验证。CI 跑构建、`check:ui`、`test:ui` 与 `test:gate`。

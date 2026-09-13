@@ -111,18 +111,23 @@ function parentDataset() {
   const data = []
   const sources = []
   for (const entity of ENTITIES) {
-    sources.push({
-      provider: 'tushare',
-      entityId: entity.id,
-      metric: 'gross_margin',
-      fetchedAt: PARENT_FETCHED,
-    })
     for (const period of periods) {
+      const value = period === '2022' && entity.id === 'CN:SH.601966' ? null : 18.2
       data.push({
         entityId: entity.id,
         period,
-        value: period === '2022' && entity.id === 'CN:SH.601966' ? null : 18.2,
+        value,
       })
+      if (value != null) {
+        sources.push({
+          provider: 'tushare',
+          entityId: entity.id,
+          metric: 'gross_margin',
+          period,
+          fetchedAt: PARENT_FETCHED,
+          fieldLabel: '毛利率',
+        })
+      }
     }
   }
   return {
@@ -157,7 +162,9 @@ function unrelatedDataset() {
       provider: 'tushare',
       entityId: ENTITIES[0].id,
       metric: 'roe',
+      period: '2024',
       fetchedAt: PARENT_FETCHED,
+      fieldLabel: '净资产收益率',
     }],
   }
 }

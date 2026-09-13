@@ -202,7 +202,7 @@ export function buildResearchCanvasTools(hub?: ResearchDataHub | null): Research
     {
       name: 'query_data',
       category: '研究画布',
-      description: '按公司与指标查询真实财务或日K数据，生成数据集。只返回 datasetId、覆盖度、intent 与 view.recommended / suggestedTitle，不返回明细数字。比较/看看/分析后应再调用 propose_widget。K 线用 metric=kline。最多 20 家；行业对比须先经 resolve_industry_universe 并经用户确认。',
+      description: '按公司与指标查询真实财务或日K数据，生成数据集。点名不超过 3 家时直接取数；超过 3 家须先返回 plan_preview，用户确认后再传 confirmed:true。只返回 datasetId、覆盖度、intent 与 view.recommended / suggestedTitle，不返回明细数字。比较/看看/分析后应再调用 propose_widget。K 线用 metric=kline。最多 20 家；行业对比须先经 resolve_industry_universe 并经用户确认。',
       parameters: S({
         entities: {
           type: 'array',
@@ -215,11 +215,18 @@ export function buildResearchCanvasTools(hub?: ResearchDataHub | null): Research
         },
         start: { type: 'string', description: '起始年份，如 2021' },
         end: { type: 'string', description: '结束年份，如 2025' },
+        confirmed: {
+          type: 'boolean',
+          description: '用户或界面确认取数计划后为 true；首次预览计划时不要传',
+        },
       }, ['entities', 'metric', 'start', 'end']),
       handler: async (args: Record<string, unknown>) => {
         if (!hub) return { error: '数据层不可用' }
         if (!isRecord(args)) return { error: '参数无效' }
-        const forbidden = rejectUnknownKeys(args, new Set(['entities', 'metric', 'start', 'end']))
+        const forbidden = rejectUnknownKeys(
+          args,
+          new Set(['entities', 'metric', 'start', 'end', 'confirmed']),
+        )
         if (forbidden) return { error: forbidden }
         return executeQueryData(hub, args)
       },

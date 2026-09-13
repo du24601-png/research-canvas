@@ -1214,6 +1214,17 @@ function summarizeToolResult(tool: string, result: unknown): string | null {
     case 'search_us_stocks':
     case 'search_crypto_pairs':
       return summarizeInstrumentSearch(data, message)
+    case 'query_data': {
+      if (!result || typeof result !== 'object') return null
+      const r = result as Record<string, unknown>
+      if (r.status === 'plan_preview' && r.plan && typeof r.plan === 'object') {
+        const statement = (r.plan as { statement?: unknown }).statement
+        if (typeof statement === 'string' && statement.trim()) return statement.trim()
+        return '取数计划已生成'
+      }
+      if (typeof r.datasetId === 'string' && r.datasetId.trim()) return '研究数据已就绪'
+      return null
+    }
     case 'ask_user': {
       if (!result || typeof result !== 'object') return null
       const r = result as Record<string, unknown>

@@ -55,8 +55,8 @@ export function useComposerMobileHoldSpeech({
     && !speechBusy
     && (!inputExpanded || !editorFocused)
 
-  /** 工具栏「按住说话」控件可见 */
-  const holdControlActive = (gestureEligible || holdPending) && (!inputExpanded || !editorFocused)
+  /** 工具栏「按住说话」：输入模式展开后不再占位，避免与 editor / placeholder 叠字 */
+  const holdControlActive = (gestureEligible || holdPending) && !inputExpanded
 
   const clearGestureCleanup = useCallback(() => {
     cleanupRef.current?.()

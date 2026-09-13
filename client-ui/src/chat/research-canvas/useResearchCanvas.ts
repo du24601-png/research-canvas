@@ -19,8 +19,13 @@ import {
 } from './layoutStorage'
 import type { CanvasLayoutItem, Dataset, PersistedCanvasState, Widget } from './types'
 
-function persistState(state: PersistedCanvasState): void {
-  writePersistedCanvasState({
+export interface UseResearchCanvasOptions {
+  readonly?: boolean
+  frozenState?: PersistedCanvasState
+}
+
+function persistState(sessionId: string | null | undefined, state: PersistedCanvasState): void {
+  writePersistedCanvasState(sessionId, {
     version: 2,
     widgets: state.widgets.map(widget => ({ ...widget })),
     layout: state.layout.map(item => ({ ...item })),
@@ -45,8 +50,15 @@ function fromRglLayout(layout: Layout): CanvasLayoutItem[] {
   }))
 }
 
-export function useResearchCanvas() {
-  const initial = useMemo(() => readPersistedCanvasState(), [])
+export function useResearchCanvas(
+  sessionId?: string | null,
+  options?: UseResearchCanvasOptions,
+) {
+  const readonly = options?.readonly ?? false
+  const initial = useMemo(() => {
+    if (options?.frozenState) return options.frozenState
+    return readPersistedCanvasState(sessionId)
+  }, [options?.frozenState, sessionId])
   const [widgets, setWidgets] = useState<Widget[]>(() => initial.widgets.map(widget => ({ ...widget })))
   const [layout, setLayout] = useState<CanvasLayoutItem[]>(() => (
     applyPresetConstraints(initial.layout, initial.widgets)
@@ -63,7 +75,30 @@ export function useResearchCanvas() {
   datasetsRef.current = datasets
   const acceptedRef = useRef(acceptedProposalIds)
   acceptedRef.current = acceptedProposalIds
+  const sessionIdRef = useRef(sessionId)
+  sessionIdRef.current = sessionId
   const interactionRef = useRef(false)
+  const persistLive = useCallback((state: PersistedCanvasState) => {
+    if (readonly) return
+    persistState(sessionIdRef.current, state)
+  }, [readonly])
+
+  useEffect(() => {
+    if (options?.frozenState) return
+    const next = readPersistedCanvasState(sessionId)
+    const nextLayout = applyPresetConstraints(next.layout, next.widgets)
+    widgetsRef.current = next.widgets.map(widget => ({ ...widget }))
+    layoutRef.current = nextLayout
+    datasetsRef.current = next.datasets
+    acceptedRef.current = [...(next.acceptedProposalIds ?? [])]
+    setWidgets(widgetsRef.current)
+    setLayout(nextLayout)
+    setDatasets(next.datasets)
+    setAcceptedProposalIds(acceptedRef.current)
+    if (getActiveWidgetId() && !next.widgets.some(widget => widget.id === getActiveWidgetId())) {
+      setActiveWidget(null)
+    }
+  }, [sessionId, options?.frozenState])
   const activeWidgetId = useSyncExternalStore(
     subscribeActiveWidget,
     getActiveWidgetId,
@@ -88,11 +123,11 @@ export function useResearchCanvas() {
     layoutRef.current = saved.layout
     setWidgets(saved.widgets)
     setLayout(saved.layout)
-    persistState(snapshotState(saved.widgets, saved.layout))
+    persistLive(snapshotState(saved.widgets, saved.layout))
     const restored = saved.widgets.find(widget => widget.id === saved.widgetId)
     if (restored) setActiveWidget({ id: restored.id, title: restored.title })
     publishResearchCanvasEvent({ type: 'canvas_restored' })
-  }, [snapshotState])
+  }, [snapshotState, persistLive])
   const { removedTitle, rememberRemoval, clearUndo, undoRemoval } = useCanvasRemovalUndo(restoreRemoval)
 
   const commitLayout = useCallback((nextLayout: Layout) => {
@@ -102,7 +137,7 @@ export function useResearchCanvas() {
       if (layoutRef.current.length === 0) return
       layoutRef.current = []
       setLayout([])
-      persistState(snapshotState([], []))
+      persistLive(snapshotState([], []))
       return
     }
 
@@ -119,10 +154,11 @@ export function useResearchCanvas() {
     if (!committed) return
     layoutRef.current = committed
     setLayout(committed)
-    persistState(snapshotState(currentWidgets, committed))
-  }, [snapshotState])
+    persistLive(snapshotState(currentWidgets, committed))
+  }, [snapshotState, persistLive])
 
   useEffect(() => {
+    if (readonly) return () => {}
     return subscribeResearchCanvasEvents((event) => {
       const applied = applyResearchCanvasEvent({
         version: 2,
@@ -144,7 +180,7 @@ export function useResearchCanvas() {
       setLayout(nextLayout)
       setDatasets(applied.datasets)
       setAcceptedProposalIds(applied.acceptedProposalIds ?? [])
-      persistState({ ...applied, layout: nextLayout })
+      persistLive({ ...applied, layout: nextLayout })
       if (addedId) {
         const added = applied.widgets.find(widget => widget.id === addedId)
         if (added) setActiveWidget({ id: added.id, title: added.title })
@@ -152,7 +188,7 @@ export function useResearchCanvas() {
         setActiveWidget(null)
       }
     })
-  }, [clearUndo])
+  }, [clearUndo, persistLive, readonly])
 
   const handleLayoutChange = useCallback((nextLayout: Layout) => {
     commitLayout(nextLayout)
@@ -212,20 +248,29 @@ export function useResearchCanvas() {
     })
     widgetsRef.current = widgets
     setWidgets(widgets)
-    persistState(snapshotState(widgets, layoutRef.current))
-  }, [snapshotState, clearUndo])
+    persistLive(snapshotState(widgets, layoutRef.current))
+  }, [snapshotState, clearUndo, persistLive])
 
   const rglLayout = useMemo(() => toRglLayout(layout), [layout])
   const getDataset = useCallback((datasetId: string) => (
     resolveDatasetFromState({ datasets: datasetsRef.current }, datasetId)
   ), [])
 
+  const buildPublishPayload = useCallback((title: string) => ({
+    title,
+    widgets: widgetsRef.current.map(widget => ({ ...widget })),
+    layout: layoutRef.current.map(item => ({ ...item })),
+    datasets: datasetsRef.current,
+  }), [])
+
   return {
     widgets,
     layout: rglLayout,
     datasets,
+    readonly,
     activeWidgetId,
     getDataset,
+    buildPublishPayload,
     handleSelectWidget,
     canvasSnapshot: {
       widgets: widgets.map(widget => ({

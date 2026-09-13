@@ -1,11 +1,14 @@
-import { memo, useMemo, useState } from 'react'
+import { memo, useCallback, useMemo, useState } from 'react'
+import type { CallbackDataParams } from 'echarts/types/dist/shared'
 import { resolveChartStyleAgainstEntities, type ChartStyle } from '@opptrix/shared/research-chart-style'
 import { useTheme } from '../../theme/ThemeContext'
 import { buildGroupedBarOption } from './chartOptionsGrouped'
 import { getResearchChartTheme } from './chartTheme'
 import type { ChartContentMode } from './chartResponsive'
 import type { Dataset } from './types'
-import EchartsFill from './EchartsFill'
+import ChartWithSourceSelection from './ChartWithSourceSelection'
+import { resolveGroupedBarCell } from './chartSourceClick'
+import { isSeriesVisible } from './chartStyleApply'
 import { buildGroupedBarView } from './views'
 
 interface Props {
@@ -22,11 +25,27 @@ function GroupedBarChartWidget({ dataset, style }: Props) {
     () => resolveChartStyleAgainstEntities(style, dataset.entities),
     [style, dataset.entities],
   )
+  const visibleEntityIds = useMemo(
+    () => view.series.filter(item => isSeriesVisible(item.entityId, boundStyle)).map(item => item.entityId),
+    [view.series, boundStyle],
+  )
   const option = useMemo(
     () => buildGroupedBarOption(view, theme, mode, boundStyle),
     [theme, view, mode, boundStyle],
   )
-  return <EchartsFill option={option} onContentModeChange={setMode} />
+  const resolveCell = useCallback(
+    (params: CallbackDataParams) => resolveGroupedBarCell(dataset, view.periods, visibleEntityIds, params),
+    [dataset, view.periods, visibleEntityIds],
+  )
+
+  return (
+    <ChartWithSourceSelection
+      dataset={dataset}
+      option={option}
+      onContentModeChange={setMode}
+      resolveCell={resolveCell}
+    />
+  )
 }
 
 export default memo(GroupedBarChartWidget)

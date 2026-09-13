@@ -2,16 +2,20 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { DEFAULT_CANVAS_STATE } from './defaultCanvasState'
 import {
   createDefaultCanvasState,
+  LEGACY_RESEARCH_CANVAS_STORAGE_KEY,
   normalizePersistedCanvasState,
   readPersistedCanvasState,
   removeWidgetFromState,
-  RESEARCH_CANVAS_STORAGE_KEY,
+  researchCanvasStorageKey,
   resolveLiveResearchDataset,
   syncLayoutItems,
   writePersistedCanvasState,
 } from './layoutStorage'
 import { buildBarChartView, buildCandlestickView, buildComboChartView, buildGroupedBarView, buildHeatmapView, buildLineChartView, buildPieChartView, buildStackedBarView, buildTableView } from './views'
 import { MOCK_GROSS_MARGIN_DATASET } from './mockGrossMarginDataset'
+
+const SESSION_A = 'sess-layout-test-a'
+const SESSION_B = 'sess-layout-test-b'
 
 describe('research-canvas layoutStorage', () => {
   beforeEach(() => {
@@ -29,9 +33,9 @@ describe('research-canvas layoutStorage', () => {
   it('persists widgets and layout independently', () => {
     const initial = DEFAULT_CANVAS_STATE
     const next = removeWidgetFromState(initial, 'rc-sources-gross-margin')
-    writePersistedCanvasState(next)
+    writePersistedCanvasState(SESSION_A, next)
 
-    const restored = readPersistedCanvasState()
+    const restored = readPersistedCanvasState(SESSION_A)
     expect(restored.widgets).toHaveLength(3)
     expect(restored.layout).toHaveLength(3)
     expect(restored.layout.some(item => item.i === 'rc-sources-gross-margin')).toBe(false)
@@ -46,9 +50,9 @@ describe('research-canvas layoutStorage', () => {
       acceptedProposalIds: [],
     }
     expect(normalizePersistedCanvasState(empty)).toEqual(empty)
-    writePersistedCanvasState(empty)
+    writePersistedCanvasState(SESSION_A, empty)
 
-    const restored = readPersistedCanvasState()
+    const restored = readPersistedCanvasState(SESSION_A)
     expect(restored).toEqual(empty)
     expect(restored.widgets).toHaveLength(0)
     expect(restored.layout).toHaveLength(0)
@@ -97,6 +101,7 @@ describe('research-canvas layoutStorage', () => {
             provider: 'tushare',
             entityId: 'CN:SH.601058',
             metric: 'gross_margin',
+            period: '2021',
             fetchedAt: '2026-09-10T00:00:00.000Z',
           }],
         },
@@ -143,12 +148,22 @@ describe('research-canvas layoutStorage', () => {
           { entityId: 'CN:SH.601058', period: '2024', value: null },
           { entityId: 'CN:SH.601058', period: '2025', value: 19 },
         ],
-        sources: [{
-          provider: 'tushare',
-          entityId: 'CN:SH.601058',
-          metric: 'gross_margin',
-          fetchedAt: '2026-09-10T00:00:00.000Z',
-        }],
+        sources: [
+          {
+            provider: 'tushare',
+            entityId: 'CN:SH.601058',
+            metric: 'gross_margin',
+            period: '2023',
+            fetchedAt: '2026-09-10T00:00:00.000Z',
+          },
+          {
+            provider: 'tushare',
+            entityId: 'CN:SH.601058',
+            metric: 'gross_margin',
+            period: '2025',
+            fetchedAt: '2026-09-10T00:00:00.000Z',
+          },
+        ],
         query: {
           entities: ['601058.SH'],
           metric: 'gross_margin',
@@ -161,8 +176,8 @@ describe('research-canvas layoutStorage', () => {
       }],
       acceptedProposalIds: [],
     }
-    writePersistedCanvasState(state)
-    const restored = readPersistedCanvasState()
+    writePersistedCanvasState(SESSION_A, state)
+    const restored = readPersistedCanvasState(SESSION_A)
     expect(restored.version).toBe(2)
     expect(restored.datasets[0]?.parentDatasetId).toBe(parentId)
     expect(restored.datasets[0]?.query?.start).toBe('2023')
@@ -172,18 +187,18 @@ describe('research-canvas layoutStorage', () => {
   })
 
   it('rejects invalid persisted payloads', () => {
-    window.localStorage.setItem(RESEARCH_CANVAS_STORAGE_KEY, '{broken')
-    expect(readPersistedCanvasState().widgets).toHaveLength(0)
+    window.localStorage.setItem(researchCanvasStorageKey(SESSION_A), '{broken')
+    expect(readPersistedCanvasState(SESSION_A).widgets).toHaveLength(0)
 
-    window.localStorage.setItem(RESEARCH_CANVAS_STORAGE_KEY, JSON.stringify({ version: 2 }))
-    expect(readPersistedCanvasState().widgets).toHaveLength(0)
+    window.localStorage.setItem(researchCanvasStorageKey(SESSION_A), JSON.stringify({ version: 2 }))
+    expect(readPersistedCanvasState(SESSION_A).widgets).toHaveLength(0)
 
-    window.localStorage.setItem(RESEARCH_CANVAS_STORAGE_KEY, JSON.stringify({
+    window.localStorage.setItem(researchCanvasStorageKey(SESSION_A), JSON.stringify({
       version: 1,
       widgets: DEFAULT_CANVAS_STATE.widgets,
       layout: [],
     }))
-    expect(readPersistedCanvasState().widgets).toHaveLength(0)
+    expect(readPersistedCanvasState(SESSION_A).widgets).toHaveLength(0)
   })
 
   it('syncs layout items to existing widgets only', () => {
@@ -205,8 +220,8 @@ describe('research-canvas layoutStorage', () => {
       datasets: [],
       acceptedProposalIds: ['call_abc12345'],
     }
-    writePersistedCanvasState(state)
-    expect(readPersistedCanvasState().acceptedProposalIds).toEqual(['call_abc12345'])
+    writePersistedCanvasState(SESSION_A, state)
+    expect(readPersistedCanvasState(SESSION_A).acceptedProposalIds).toEqual(['call_abc12345'])
   })
 
   it('rejects persisted state when widget and layout ids do not match', () => {
@@ -255,14 +270,14 @@ describe('research-canvas layoutStorage', () => {
       layout: [{ i: 'rc-k', x: 0, y: 0, w: 8, h: 6 }],
       datasets: [dataset],
     }
-    writePersistedCanvasState(state)
-    const restored = readPersistedCanvasState()
+    writePersistedCanvasState(SESSION_A, state)
+    const restored = readPersistedCanvasState(SESSION_A)
     expect(restored.datasets[0]?.ohlc).toEqual(dataset.ohlc)
     expect(restored.widgets[0]?.type).toBe('candlestick')
   })
 
   it('keeps optional view params on widgets', () => {
-    writePersistedCanvasState({
+    writePersistedCanvasState(SESSION_A, {
       version: 2,
       widgets: [{
         id: 'rc-1',
@@ -274,11 +289,43 @@ describe('research-canvas layoutStorage', () => {
       layout: [{ i: 'rc-1', x: 0, y: 0, w: 4, h: 6 }],
       datasets: [MOCK_GROSS_MARGIN_DATASET],
     })
-    expect(readPersistedCanvasState().widgets[0]?.view).toEqual({
+    expect(readPersistedCanvasState(SESSION_A).widgets[0]?.view).toEqual({
       intent: 'rank',
       period: '2024',
       topN: 6,
     })
+  })
+
+  it('keeps canvas state isolated per session', () => {
+    const widgetA = {
+      id: 'rc-a',
+      type: 'line_chart' as const,
+      title: 'Session A',
+      datasetId: MOCK_GROSS_MARGIN_DATASET.id,
+    }
+    writePersistedCanvasState(SESSION_A, {
+      version: 2,
+      widgets: [widgetA],
+      layout: [{ i: 'rc-a', x: 0, y: 0, w: 8, h: 6 }],
+      datasets: [MOCK_GROSS_MARGIN_DATASET],
+    })
+    expect(readPersistedCanvasState(SESSION_B).widgets).toHaveLength(0)
+    expect(readPersistedCanvasState(SESSION_A).widgets[0]?.title).toBe('Session A')
+  })
+
+  it('migrates legacy global v1 storage into the first session read once', () => {
+    window.localStorage.setItem(LEGACY_RESEARCH_CANVAS_STORAGE_KEY, JSON.stringify({
+      version: 2,
+      widgets: DEFAULT_CANVAS_STATE.widgets.slice(0, 1),
+      layout: DEFAULT_CANVAS_STATE.layout.slice(0, 1),
+      datasets: [],
+      acceptedProposalIds: [],
+    }))
+    const migrated = readPersistedCanvasState(SESSION_A)
+    expect(migrated.widgets).toHaveLength(1)
+    expect(window.localStorage.getItem(LEGACY_RESEARCH_CANVAS_STORAGE_KEY)).toBeNull()
+    expect(window.localStorage.getItem(researchCanvasStorageKey(SESSION_A))).toBeTruthy()
+    expect(readPersistedCanvasState(SESSION_B).widgets).toHaveLength(0)
   })
 })
 
@@ -378,6 +425,7 @@ describe('research-canvas views', () => {
     const pie = buildPieChartView(MOCK_GROSS_MARGIN_DATASET)
     expect(pie.period).toBe('2025')
     expect(pie.slices[0]?.name).toBe('森麒麟')
+    expect(pie.slices[0]?.entityId).toBe('legacy-sentury')
     expect(pie.slices.every(slice => slice.value > 0)).toBe(true)
 
     const combo = buildComboChartView(MOCK_GROSS_MARGIN_DATASET)

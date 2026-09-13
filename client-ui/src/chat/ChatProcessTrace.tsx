@@ -35,6 +35,8 @@ import {
   isToolStepResultTruncated,
 } from './toolResultTruncation'
 import ResearchWidgetPreviewCard from './research-canvas/ResearchWidgetPreviewCard'
+import ResearchFetchPlanCard from './research-canvas/ResearchFetchPlanCard'
+import { fetchPlanFromToolStep } from './research-canvas/fetchPlanFromToolStep'
 import ChatStreamReceipt from './ChatStreamReceipt'
 import {
   buildThinkingSummary,
@@ -872,6 +874,7 @@ function ReasoningTimeline({ segments, active, constrained }: ReasoningTimelineP
 
 interface Props {
   steps: ChatToolStep[]
+  sessionId?: string | null
   thinkingLabel?: string
   phaseLabel?: string
   estimatedTokens?: number
@@ -885,6 +888,7 @@ interface Props {
 
 export default function ChatProcessTrace({
   steps,
+  sessionId = null,
   thinkingLabel,
   phaseLabel,
   estimatedTokens,
@@ -914,6 +918,8 @@ export default function ChatProcessTrace({
   const previewSteps = steps.filter(step => (
     step.tool === 'propose_widget' && !hiddenPreviewStepIds?.has(step.id)
   ))
+  const planSteps = steps.filter(step => fetchPlanFromToolStep(step) != null)
+  const lastPlanId = planSteps[planSteps.length - 1]?.id
   const otherSteps = steps.filter(step => step.tool !== 'propose_widget')
   const detailStepCount = countHiddenDetailSteps(steps)
   const showDetailsToggle = detailStepCount > 0 || hasThinking
@@ -944,7 +950,8 @@ export default function ChatProcessTrace({
   const showHistoryReceipt = !live && Boolean(receiptText)
 
   const hasPreviews = previewSteps.length > 0
-  if (!live && !showHistoryReceipt && !showDetailsToggle && !hasPreviews) {
+  const hasPlans = planSteps.length > 0
+  if (!live && !showHistoryReceipt && !showDetailsToggle && !hasPreviews && !hasPlans) {
     return null
   }
 
@@ -1034,6 +1041,16 @@ export default function ChatProcessTrace({
         </>
       )}
 
+      {showLivePreviews && planSteps.map(step => (
+        <ResearchFetchPlanCard
+          key={step.id}
+          step={step}
+          sessionId={sessionId}
+          live={live}
+          isLatest={step.id === lastPlanId}
+        />
+      ))}
+
       {showLivePreviews && previewSteps.map(step => (
         <div
           key={step.id}
@@ -1041,12 +1058,22 @@ export default function ChatProcessTrace({
             live && step.id === lastPreviewId && step.status === 'done' && s.previewEmphasis,
           )}
         >
-          <ResearchWidgetPreviewCard step={step} />
+          <ResearchWidgetPreviewCard step={step} sessionId={sessionId} />
         </div>
       ))}
 
+      {!live && planSteps.map(step => (
+        <ResearchFetchPlanCard
+          key={step.id}
+          step={step}
+          sessionId={sessionId}
+          live={false}
+          isLatest={step.id === lastPlanId}
+        />
+      ))}
+
       {!live && previewSteps.map(step => (
-        <ResearchWidgetPreviewCard key={step.id} step={step} />
+        <ResearchWidgetPreviewCard key={step.id} step={step} sessionId={sessionId} />
       ))}
 
       {showDetailsToggle && (
