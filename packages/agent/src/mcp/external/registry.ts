@@ -1,0 +1,700 @@
+/**
+ * 外部 MCP Server 注册表：连接池、工具 catalog、绑定解析。
+ */
+
+import {
+  isMcpServerFailoverError,
+  parseNamespacedMcpTool,
+  type McpServerCreateInput,
+  type McpServerPatch,
+  type McpServerRecord,
+  type PublicMcpServer,
+} from '@opptrix/shared'
+import { getUserDataStore } from '@opptrix/user-store'
+import type { JsonSchema, OpenAiTool } from '../../tools.js'
+import {
+  createSdkConnection,
+  parseToolResult,
+  toOpenAiTool,
+  type ExternalToolDef,
+  type SdkConnection,
+} from './connection.js'
+import { resolveToolCapability, type McpCapability } from './capability-catalog.js'
+import { ExternalMcpHealth } from './health.js'
+import { ensureDefaultKeylessMcpServers } from './ensure-default-keyless.js'
+import { mapPool, resolveMcpHydrateConcurrency } from './pool.js'
+import { clearServer as clearSessionQuarantineServer } from './session-quarantine.js'
+
+export interface BindingCandidate {
+  serverId: string
+  remoteTool: string
+}
+
+export interface CapabilityCandidate {
+  serverId: string
+  remoteTool: string
+  sortOrder: number
+}
+
+type ListedMcpTool = {
+  name: string
+  description?: string
+  inputSchema?: unknown
+}
+
+export class ExternalMcpRegistry {
+  private connections = new Map<string, SdkConnection>()
+  private toolCounts = new Map<string, number>()
+  private toolNames = new Map<string, Set<string>>()
+  /** hydrate / 连接时缓存的 tools schema，供 listNamespacedOpenAiTools 避免每轮 listTools RPC */
+  private toolSchemas = new Map<string, ExternalToolDef[]>()
+  readonly health = new ExternalMcpHealth()
+  private hydratePromise: Promise<void> | null = null
+
+  private get repo() {
+    return getUserDataStore().mcpServers
+  }
+
+  private clearServerCaches(id: string): void {
+    this.toolCounts.delete(id)
+    this.toolNames.delete(id)
+    this.toolSchemas.delete(id)
+  }
+
+  private dropConnection(id: string): void {
+    this.connections.delete(id)
+    this.clearServerCaches(id)
+  }
+
+  private cacheTools(serverId: string, tools: ListedMcpTool[]): void {
+    const defs: ExternalToolDef[] = tools.map(t => ({
+      name: t.name,
+      description: t.description ?? '',
+      inputSchema: (t.inputSchema ?? { type: 'object', properties: {} }) as JsonSchema,
+    }))
+    this.toolCounts.set(serverId, defs.length)
+    this.toolNames.set(serverId, new Set(defs.map(t => t.name)))
+    this.toolSchemas.set(serverId, defs)
+  }
+
+  private async refreshToolSchemas(serverId: string, conn: SdkConnection): Promise<void> {
+    const { tools } = await conn.client.listTools()
+    this.cacheTools(serverId, tools)
+  }
+
+  listRecords(): McpServerRecord[] {
+    return this.repo.listAll()
+  }
+
+  getRecord(id: string): McpServerRecord | null {
+    return this.repo.get(id)
+  }
+
+  async hydrate(): Promise<void> {
+    if (this.hydratePromise) return this.hydratePromise
+    this.hydratePromise = this.doHydrate()
+    try {
+      await this.hydratePromise
+    } finally {
+      this.hydratePromise = null
+    }
+  }
+
+  private async doHydrate(): Promise<void> {
+    // 先落库再连，GET /presets 才能立刻看到默认已开
+    ensureDefaultKeylessMcpServers({
+      get: id => this.repo.get(id),
+      create: input => this.create(input),
+    })
+    const rows = this.repo.listAll().filter(r => r.enabled && !r.paused)
+    const want = new Set(rows.map(r => r.id))
+    for (const id of [...this.connections.keys()]) {
+      if (!want.has(id)) {
+        await this.connections.get(id)?.client.close().catch(() => {})
+        this.dropConnection(id)
+      }
+    }
+    const concurrency = resolveMcpHydrateConcurrency()
+    await mapPool(rows, concurrency, 0, async (row) => {
+      const reused = this.connections.has(row.id)
+      const conn = await this.ensureConnected(row)
+      if (!conn) return
+      // 复用连接时仍刷新 schema（新连接已在 ensureConnected 内 listTools + 缓存）
+      if (reused && this.connections.get(row.id) === conn) {
+        try {
+          await this.refreshToolSchemas(row.id, conn)
+        } catch (e) {
+          this.health.recordFailure(row.id, e)
+        }
+      }
+    })
+  }
+
+  private async ensureConnected(row: McpServerRecord): Promise<SdkConnection | null> {
+    let entry = this.connections.get(row.id)
+    if (entry) {
+      const prev = this.repo.get(row.id)
+      const same = prev
+        && JSON.stringify(prev.transportConfig) === JSON.stringify(row.transportConfig)
+        && JSON.stringify(prev.secrets) === JSON.stringify(row.secrets)
+      if (same) return entry
+      await entry.client.close().catch(() => {})
+      this.dropConnection(row.id)
+    }
+    const conn = await createSdkConnection(row)
+    try {
+      await conn.client.connect(conn.transport)
+      this.connections.set(row.id, conn)
+      this.health.recordSuccess(row.id)
+      const { tools } = await conn.client.listTools()
+      this.cacheTools(row.id, tools)
+      const cur = this.repo.get(row.id)
+      if (cur) {
+        getUserDataStore().setDocument('mcp_servers', row.id, {
+          ...cur,
+          lastError: undefined,
+          lastHealthyAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        })
+      }
+      return conn
+    } catch (e) {
+      this.health.recordFailure(row.id, e)
+      const msg = e instanceof Error ? e.message : String(e)
+      const cur = this.repo.get(row.id)
+      if (cur) {
+        getUserDataStore().setDocument('mcp_servers', row.id, {
+          ...cur,
+          lastError: msg.slice(0, 200),
+          updatedAt: new Date().toISOString(),
+        })
+      }
+      await conn.client.close().catch(() => {})
+      this.dropConnection(row.id)
+      return null
+    }
+  }
+
+  listPublic(): PublicMcpServer[] {
+    return this.repo.listAll().map(row => this.repo.toPublic(row, {
+      health: this.health.getState(row.id, row.paused),
+      toolCount: this.toolCounts.get(row.id) ?? 0,
+    }))
+  }
+
+  /** hydrate 后缓存的裸工具名（非 namespaced）；未缓存返回 []，不触发 listTools RPC */
+  cachedToolNames(serverId: string): string[] {
+    const set = this.toolNames.get(serverId)
+    return set ? [...set] : []
+  }
+
+  create(input: McpServerCreateInput): McpServerRecord {
+    return this.repo.create(input)
+  }
+
+  save(id: string, patch: McpServerPatch): McpServerRecord {
+    const prev = this.repo.get(id)
+    const row = this.repo.save(id, patch)
+    const secretsChanged =
+      Boolean(prev)
+      && JSON.stringify(prev?.secrets) !== JSON.stringify(row.secrets)
+    const enabledPausedChanged =
+      Boolean(prev)
+      && (prev?.enabled !== row.enabled || prev?.paused !== row.paused)
+
+    if (secretsChanged || enabledPausedChanged) {
+      this.health.reset(id)
+      clearSessionQuarantineServer(id)
+    }
+
+    if (!row.enabled || row.paused) {
+      void this.connections.get(id)?.client.close().then(() => {
+        this.dropConnection(id)
+      })
+    } else if (secretsChanged) {
+      // 仍启用但密钥变更：丢连接，下次用新密钥重连
+      void this.connections.get(id)?.client.close().then(() => {
+        this.dropConnection(id)
+      })
+    }
+    return row
+  }
+
+  /**
+   * 按能力列出外部候选（enabled && !paused，按 sortOrder）。
+   * 含缓存工具名启发式 + `capabilityBindings`（localTool → remoteTool）。
+   * 不在此做 health.shouldSkip（交给编排器）。
+   */
+  listCapabilityCandidates(capability: McpCapability): CapabilityCandidate[] {
+    const rows = this.repo.listAll()
+      .filter(r => r.enabled && !r.paused)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+    const out: CapabilityCandidate[] = []
+    const seen = new Set<string>()
+    const push = (serverId: string, remoteTool: string, sortOrder: number) => {
+      const key = `${serverId}::${remoteTool}`
+      if (seen.has(key) || !remoteTool) return
+      seen.add(key)
+      out.push({ serverId, remoteTool, sortOrder })
+    }
+    for (const row of rows) {
+      const schemas = this.toolSchemas.get(row.id)
+      const names = this.cachedToolNames(row.id)
+      for (const toolName of names) {
+        const desc = schemas?.find(t => t.name === toolName)?.description
+        const cap = resolveToolCapability(toolName, desc)
+        if (cap !== capability) continue
+        push(row.id, toolName, row.sortOrder)
+      }
+      for (const [localTool, remoteTool] of Object.entries(row.capabilityBindings ?? {})) {
+        if (resolveToolCapability(localTool) !== capability) continue
+        push(row.id, remoteTool, row.sortOrder)
+      }
+    }
+    return out
+  }
+
+  delete(id: string): boolean {
+    void this.connections.get(id)?.client.close()
+    this.dropConnection(id)
+    this.health.reset(id)
+    clearSessionQuarantineServer(id)
+    return this.repo.delete(id)
+  }
+
+  reorder(ids: string[]): McpServerRecord[] {
+    return this.repo.reorder(ids)
+  }
+
+  /**
+   * 已启用且未暂停的服务器上的 namespaced 独有工具（未出现在 bindings 值中的）。
+   * 隔离/熔断只在调用时 skip，不从 catalog 摘工具；未连上则无法拿 schema。
+   * 优先读 hydrate 缓存的 tools schema，仅缓存未命中时才 listTools RPC。
+   */
+  async listNamespacedOpenAiTools(): Promise<OpenAiTool[]> {
+    const out: OpenAiTool[] = []
+    const rows = this.repo.listAll()
+      .filter(r => r.enabled && !r.paused)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+
+    for (const row of rows) {
+      const conn = this.connections.get(row.id)
+      if (!conn) continue
+      const boundRemotes = new Set(Object.values(row.capabilityBindings))
+      let tools = this.toolSchemas.get(row.id)
+      if (!tools) {
+        const listed = await conn.client.listTools()
+        this.cacheTools(row.id, listed.tools)
+        tools = this.toolSchemas.get(row.id) ?? []
+      }
+      for (const t of tools) {
+        if (boundRemotes.has(t.name)) continue
+        out.push(toOpenAiTool(row.id, t.name, t.description, t.inputSchema, true))
+      }
+    }
+    return out
+  }
+
+  /** 本地工具名 → 按优先级的外部候选链 */
+  resolveBindingChain(localToolName: string): BindingCandidate[] {
+    const rows = this.repo.listAll()
+      .filter(r => r.enabled && !r.paused)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+    const out: BindingCandidate[] = []
+    for (const row of rows) {
+      if (this.health.shouldSkip(row.id, row.paused)) continue
+      const remote = row.capabilityBindings[localToolName]
+      if (!remote) continue
+      if (!this.connections.has(row.id)) continue
+      out.push({ serverId: row.id, remoteTool: remote })
+    }
+    return out
+  }
+
+  /**
+   * 自动绑定链：查找外部服务器提供的、与本地工具同名但未在 capabilityBindings 中显式绑定的工具。
+   * 优先级低于显式绑定链（在 tryExternalChain 之后尝试）。
+   * 返回远程工具名与 localToolName 相同的候选，按 sortOrder 排序。
+   */
+  resolveAutoBindChain(localToolName: string): BindingCandidate[] {
+    const rows = this.repo.listAll()
+      .filter(r => r.enabled && !r.paused)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+    const out: BindingCandidate[] = []
+    for (const row of rows) {
+      if (this.health.shouldSkip(row.id, row.paused)) continue
+      // 仅处理未在 capabilityBindings 中显式绑定的
+      if (row.capabilityBindings[localToolName]) continue
+      const conn = this.connections.get(row.id)
+      if (!conn) continue
+      // 使用缓存的工具名集合做精确匹配
+      const names = this.toolNames.get(row.id)
+      if (names && names.has(localToolName)) {
+        out.push({ serverId: row.id, remoteTool: localToolName })
+      }
+    }
+    return out
+  }
+
+  async callExternal(
+    serverId: string,
+    toolName: string,
+    args: Record<string, unknown>,
+    opts?: { signal?: AbortSignal; timeoutMs?: number },
+  ): Promise<unknown> {
+    const row = this.repo.get(serverId)
+    if (!row) throw new Error(`未知 MCP Server: ${serverId}`)
+    if (!row.enabled || row.paused) throw new Error(`MCP Server ${serverId} 未启用或已暂停`)
+    if (this.health.shouldSkip(serverId, row.paused)) {
+      throw new Error(`MCP Server ${serverId} 熔断冷却中: ${this.health.lastError(serverId)}`)
+    }
+    let entry = this.connections.get(serverId) ?? null
+    if (!entry) {
+      entry = await this.ensureConnected(row)
+      if (!entry) {
+        const last = this.health.lastError(serverId)
+        throw new Error(last || `无法连接 MCP Server ${serverId}`)
+      }
+    }
+    const timeout = opts?.timeoutMs ?? 120_000
+    try {
+      const result = await entry.client.callTool(
+        { name: toolName, arguments: args },
+        undefined,
+        { timeout, maxTotalTimeout: timeout * 2, signal: opts?.signal },
+      )
+      const parsed = parseToolResult(serverId, toolName, result)
+      this.health.recordSuccess(serverId)
+      return parsed
+    } catch (e) {
+      this.health.recordFailure(serverId, e)
+      throw e
+    }
+  }
+
+  async callNamespaced(
+    name: string,
+    args: Record<string, unknown>,
+    opts?: { signal?: AbortSignal; timeoutMs?: number },
+  ): Promise<unknown> {
+    const parsed = parseNamespacedMcpTool(name)
+    if (!parsed) throw new Error(`非命名空间 MCP 工具: ${name}`)
+    return this.callExternal(parsed.serverId, parsed.toolName, args, opts)
+  }
+
+  async testConnection(id: string): Promise<{
+    ok: boolean
+    message: string
+    tools?: string[]
+    toolsCount?: number
+    serverVersion?: { name: string; version: string } | null
+    capabilities?: { [key: string]: unknown } | null
+  }> {
+    const row = this.repo.get(id)
+    if (!row) return { ok: false, message: `未知服务器: ${id}` }
+    const { client, transport } = await createSdkConnection(row)
+    try {
+      await client.connect(transport)
+      const caps = client.getServerCapabilities()
+      const [version, tools] = await Promise.all([
+        Promise.resolve(client.getServerVersion() ?? null),
+        client.listTools(),
+      ])
+      this.health.recordSuccess(id)
+      await client.close().catch(() => {})
+      const names = tools.tools.map(t => t.name)
+      return {
+        ok: true,
+        message: `连接成功，发现 ${names.length} 个工具`,
+        tools: names,
+        toolsCount: names.length,
+        serverVersion: version ? { name: version.name, version: version.version } : null,
+        capabilities: caps ? { ...caps } : null,
+      }
+    } catch (e) {
+      this.health.recordFailure(id, e)
+      const msg = e instanceof Error ? e.message : String(e)
+      await client.close().catch(() => {})
+      return { ok: false, message: msg }
+    }
+  }
+
+  async getServerInfo(id: string): Promise<{
+    version: { name: string; version: string } | null
+    capabilities: { [key: string]: unknown } | null
+    instructions: string | null
+  }> {
+    const row = this.repo.get(id)
+    if (!row) return { version: null, capabilities: null, instructions: null }
+    let entry = this.connections.get(id) ?? null
+    if (!entry) {
+      entry = await this.ensureConnected(row)
+      if (!entry) return { version: null, capabilities: null, instructions: null }
+    }
+    const client = entry.client
+    const caps = client.getServerCapabilities()
+    return {
+      version: client.getServerVersion() ?? null,
+      capabilities: caps ? { ...caps } : null,
+      instructions: client.getInstructions() ?? null,
+    }
+  }
+
+  async ping(id: string): Promise<{ ok: boolean; message: string }> {
+    const row = this.repo.get(id)
+    if (!row) return { ok: false, message: `未知服务器: ${id}` }
+    const { client, transport } = await createSdkConnection(row)
+    const start = Date.now()
+    try {
+      await client.connect(transport)
+      await client.ping()
+      const ms = Date.now() - start
+      this.health.recordSuccess(id)
+      await client.close().catch(() => {})
+      return { ok: true, message: `pong (${ms}ms)` }
+    } catch (e) {
+      this.health.recordFailure(id, e)
+      const msg = e instanceof Error ? e.message : String(e)
+      await client.close().catch(() => {})
+      return { ok: false, message: msg }
+    }
+  }
+
+  async listPrompts(id: string): Promise<{ prompts: Array<{ name: string; description?: string; arguments?: unknown[] }> }> {
+    const row = this.repo.get(id)
+    if (!row || !row.enabled || row.paused) return { prompts: [] }
+    let entry = this.connections.get(id) ?? null
+    if (!entry) {
+      entry = await this.ensureConnected(row)
+      if (!entry) return { prompts: [] }
+    }
+    try {
+      const { prompts } = await entry.client.listPrompts()
+      return { prompts: prompts.map(p => ({ name: p.name, description: p.description })) }
+    } catch {
+      return { prompts: [] }
+    }
+  }
+
+  async getPrompt(id: string, name: string, args?: Record<string, string>): Promise<{ messages?: unknown[] }> {
+    const row = this.repo.get(id)
+    if (!row || !row.enabled || row.paused) return {}
+    let entry = this.connections.get(id) ?? null
+    if (!entry) {
+      entry = await this.ensureConnected(row)
+      if (!entry) return {}
+    }
+    try {
+      const params: { name: string; arguments?: Record<string, string> } = { name }
+      if (args) params.arguments = args
+      const result = await entry.client.getPrompt(params)
+      return { messages: result.messages }
+    } catch {
+      return {}
+    }
+  }
+
+  async listResources(id: string): Promise<{ resources: Array<{ uri: string; name: string; description?: string; mimeType?: string }> }> {
+    const row = this.repo.get(id)
+    if (!row || !row.enabled || row.paused) return { resources: [] }
+    let entry = this.connections.get(id) ?? null
+    if (!entry) {
+      entry = await this.ensureConnected(row)
+      if (!entry) return { resources: [] }
+    }
+    try {
+      const { resources } = await entry.client.listResources()
+      return { resources: resources.map(r => ({ uri: r.uri, name: r.name, description: r.description, mimeType: r.mimeType })) }
+    } catch {
+      return { resources: [] }
+    }
+  }
+
+  async readResource(id: string, uri: string): Promise<{ contents?: unknown[] }> {
+    const row = this.repo.get(id)
+    if (!row || !row.enabled || row.paused) return {}
+    let entry = this.connections.get(id) ?? null
+    if (!entry) {
+      entry = await this.ensureConnected(row)
+      if (!entry) return {}
+    }
+    try {
+      const result = await entry.client.readResource({ uri })
+      return { contents: result.contents }
+    } catch {
+      return {}
+    }
+  }
+
+  async listResourceTemplates(id: string): Promise<{ templates: Array<{ uriTemplate: string; name: string; description?: string }> }> {
+    const row = this.repo.get(id)
+    if (!row || !row.enabled || row.paused) return { templates: [] }
+    let entry = this.connections.get(id) ?? null
+    if (!entry) {
+      entry = await this.ensureConnected(row)
+      if (!entry) return { templates: [] }
+    }
+    try {
+      const { resourceTemplates } = await entry.client.listResourceTemplates()
+      return { templates: resourceTemplates.map(t => ({ uriTemplate: t.uriTemplate, name: t.name, description: t.description })) }
+    } catch {
+      return { templates: [] }
+    }
+  }
+
+  async complete(id: string, ref: unknown, argument: { name: string; value: string }): Promise<{ completion?: { values: string[] } }> {
+    const row = this.repo.get(id)
+    if (!row || !row.enabled || row.paused) return {}
+    let entry = this.connections.get(id) ?? null
+    if (!entry) {
+      entry = await this.ensureConnected(row)
+      if (!entry) return {}
+    }
+    try {
+      const result = await entry.client.complete({ ref, argument } as never)
+      return { completion: result.completion }
+    } catch {
+      return {}
+    }
+  }
+
+  async setLoggingLevel(id: string, level: string): Promise<{ ok: boolean; message?: string }> {
+    const row = this.repo.get(id)
+    if (!row || !row.enabled || row.paused) return { ok: false, message: '未启用或已暂停' }
+    let entry = this.connections.get(id) ?? null
+    if (!entry) {
+      entry = await this.ensureConnected(row)
+      if (!entry) return { ok: false, message: '无法连接' }
+    }
+    try {
+      await entry.client.setLoggingLevel(level as never)
+      return { ok: true, message: `日志级别已设为 ${level}` }
+    } catch (e) {
+      return { ok: false, message: e instanceof Error ? e.message : String(e) }
+    }
+  }
+
+  async subscribeResource(id: string, uri: string): Promise<{ ok: boolean; message?: string }> {
+    const row = this.repo.get(id)
+    if (!row || !row.enabled || row.paused) return { ok: false, message: '未启用或已暂停' }
+    let entry = this.connections.get(id) ?? null
+    if (!entry) {
+      entry = await this.ensureConnected(row)
+      if (!entry) return { ok: false, message: '无法连接' }
+    }
+    try {
+      await entry.client.subscribeResource({ uri })
+      return { ok: true }
+    } catch (e) {
+      return { ok: false, message: e instanceof Error ? e.message : String(e) }
+    }
+  }
+
+  async unsubscribeResource(id: string, uri: string): Promise<{ ok: boolean; message?: string }> {
+    const row = this.repo.get(id)
+    if (!row || !row.enabled || row.paused) return { ok: false, message: '未启用或已暂停' }
+    let entry = this.connections.get(id) ?? null
+    if (!entry) {
+      entry = await this.ensureConnected(row)
+      if (!entry) return { ok: false, message: '无法连接' }
+    }
+    try {
+      await entry.client.unsubscribeResource({ uri })
+      return { ok: true }
+    } catch (e) {
+      return { ok: false, message: e instanceof Error ? e.message : String(e) }
+    }
+  }
+
+  async closeAll(): Promise<void> {
+    await Promise.all(
+      [...this.connections.values()].map(c => c.client.close().catch(() => {})),
+    )
+    this.connections.clear()
+    this.toolCounts.clear()
+    this.toolNames.clear()
+    this.toolSchemas.clear()
+  }
+
+  /**
+   * 测试钩子：注入已连接 server + schema 缓存（不走真实 transport）。
+   * @internal
+   */
+  seedConnectedServerForTest(
+    serverId: string,
+    tools: ExternalToolDef[],
+    listToolsFn?: () => Promise<{ tools: ListedMcpTool[] }>,
+  ): { listToolsCalls: () => number } {
+    let listToolsCalls = 0
+    const client = {
+      listTools: async () => {
+        listToolsCalls++
+        if (listToolsFn) return listToolsFn()
+        return {
+          tools: tools.map(t => ({
+            name: t.name,
+            description: t.description,
+            inputSchema: t.inputSchema,
+          })),
+        }
+      },
+      close: async () => {},
+    }
+    this.connections.set(serverId, { client, transport: {} } as unknown as SdkConnection)
+    this.cacheTools(serverId, tools)
+    this.health.recordSuccess(serverId)
+    return { listToolsCalls: () => listToolsCalls }
+  }
+}
+
+let sharedRegistry: ExternalMcpRegistry | null = null
+
+export function getExternalMcpRegistry(): ExternalMcpRegistry {
+  if (!sharedRegistry) sharedRegistry = new ExternalMcpRegistry()
+  return sharedRegistry
+}
+
+export function resetExternalMcpRegistry(): void {
+  void sharedRegistry?.closeAll()
+  sharedRegistry = null
+}
+
+export function annotateMcpResult(
+  data: unknown,
+  source: string,
+  opts?: {
+    degraded?: boolean
+    sufficient?: boolean
+    supplemented?: boolean
+    supplementReason?: string
+    externalSource?: string
+    missingFields?: string[]
+    supplementError?: string
+    configHint?: string
+  },
+): unknown {
+  const mcpMeta: Record<string, unknown> = {
+    source,
+    degraded: Boolean(opts?.degraded),
+    sufficient: opts?.sufficient,
+    supplemented: opts?.supplemented,
+    supplementReason: opts?.supplementReason,
+    externalSource: opts?.externalSource,
+    missingFields: opts?.missingFields,
+    supplementError: opts?.supplementError,
+  }
+  if (opts?.configHint) mcpMeta.configHint = opts.configHint
+
+  if (data && typeof data === 'object' && !Array.isArray(data)) {
+    return {
+      ...(data as Record<string, unknown>),
+      _mcp: mcpMeta,
+    }
+  }
+  return {
+    data,
+    _mcp: mcpMeta,
+  }
+}
+
+export { isMcpServerFailoverError }

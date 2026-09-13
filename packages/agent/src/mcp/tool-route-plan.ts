@@ -1,0 +1,1672 @@
+/**
+ * 分层 MCP 工具路由计划 — 意图 → 首选工具 + 必需 pack。
+ *
+ * 设计对齐常见领先做法（分层路由 + 消歧，非向量检索）：
+ * 1. Stage A：用户意图 → 首选/次选工具（精排）
+ * 2. Stage B：工具 → 所属 pack（保证可见）
+ * 3. Stage C：提示词注入「本轮选型卡」+ 易混对消歧（降低错选）
+ *
+ * 可审计、确定性；与 ToolPackResolver 播种互补：播种管召回，本模块管精确选型。
+ */
+
+import {
+  type ToolPackId,
+  packIdForTool,
+  alwaysOnPackIds,
+  type ResearchTier,
+  parseNamespacedMcpTool,
+} from '@opptrix/shared'
+import type { SessionContextRef } from '../sessions.js'
+import { resolveSeedPacks, MAX_SEEDED_BUSINESS_PACKS } from './tool-pack-resolver.js'
+
+export type RouteConfidence = 'high' | 'medium' | 'low'
+
+export interface ToolRoutePlan {
+  /** 本轮建议优先调用的工具（有序；越靠前越优先） */
+  preferredTools: string[]
+  /** 易与首选混淆、应避免优先的工具 */
+  avoidTools: string[]
+  /** 为保证首选可见而必须加载的业务 pack（不含 always-on） */
+  requiredPacks: ToolPackId[]
+  /** 最终建议加载的业务 pack（required ∪ 播种，≤ max） */
+  seedPacks: ToolPackId[]
+  confidence: RouteConfidence
+  /** 短标签：price | depth_analysis | etf_nav | ... */
+  intent: string
+  /** 注入 system 的选型说明 */
+  routeHint: string
+  /** 投研答复档位 */
+  researchTier: ResearchTier
+}
+
+export interface ToolRouteResolveInput {
+  message: string
+  contextRef?: SessionContextRef | null
+}
+
+interface IntentRule {
+  intent: string
+  patterns: RegExp[]
+  /** 越高越优先匹配 */
+  priority: number
+  preferredTools: string[]
+  avoidTools?: string[]
+  confidence: RouteConfidence
+  hint: string
+}
+
+/**
+ * 意图规则表：从具体到宽泛排序（同 message 取最高 priority 命中）。
+ * preferredTools[0] 为「尽可能最正确」的首推工具。
+ */
+const INTENT_RULES: IntentRule[] = [
+  {
+    intent: 'run_subagent',
+    priority: 72,
+    patterns: [
+      /委派.*(?:子任务|子代理|subagent)/i,
+      /(?:并行|分开).*(?:调研|分析).*(?:子任务|子代理)/,
+      /run_subagent/i,
+    ],
+    preferredTools: ['run_subagent', 'list_subagents', 'get_subagent'],
+    avoidTools: ['ask_user'],
+    confidence: 'medium',
+    hint: '可独立完成的子任务 → run_subagent（role+task+result_schema，schema 须含 summary）；等终态续跑勿 poll；勿让子再委派',
+  },
+  {
+    intent: 'session_documents',
+    priority: 97,
+    patterns: [
+      /(?:这份|这两份|附件|本会话|本对话|刚上传|拖入).*(?:研报|研究报告|PDF|报告)/,
+      /(?:研报|研究报告|PDF|报告).*(?:这份|这两份|附件|本会话|本对话|刚上传|拖入)/,
+      /对比.*(?:PDF|研报|报告)|(?:PDF|研报|报告).*对比/,
+      /(?:评级|目标价).*(?:这份|附件).*(?:研报|报告|PDF)|(?:这份|附件).*(?:研报|报告|PDF).*(?:评级|目标价)/,
+      /(?:阅读|分析|解读).*(?:这份|这两份|附件).*(?:研报|PDF|报告)/,
+      /list_session_documents|search_document|read_document/i,
+    ],
+    preferredTools: ['list_session_documents', 'search_document', 'read_document'],
+    avoidTools: ['workspace_read', 'browser_navigate', 'get_instrument_institution_report', 'search_library', 'web_search'],
+    confidence: 'high',
+    hint: '分析/对比本会话附件研报 → 先 list_session_documents，再 search_document / read_document；引用时带文件名与页码；勿灌全文',
+  },
+  {
+    intent: 'library_search',
+    priority: 98,
+    patterns: [
+      /主题摘要|相关主题|知识关联|关联主题|主题关联/,
+      /跨.*(?:研报|资讯|文档)|(?:研报|资讯).*(?:关联|串联|打通)/,
+      /全库|知识库.*(?:检索|搜索|找)/,
+      /哪些(?:研报|报告|文档).*(?:提到|涉及|谈到|关于)/,
+      /(?:提到|涉及|谈到).*(?:哪些|哪些份).*(?:研报|报告|文档)/,
+      /关联(?:公司|标的|股票|主题)/,
+      /同主题|相同主题/,
+      /(?:实体|知识图谱|主题图谱)/,
+      /search_library/i,
+    ],
+    preferredTools: ['search_library', 'read_document'],
+    avoidTools: ['list_news_articles', 'workspace_read', 'list_session_documents', 'search_document', 'web_search'],
+    confidence: 'high',
+    hint: '跨会话/跨研报 → 先 namespaced MCP 研报检索（若有），不足再用 search_library 找片段；查资讯用 source_type=news + 多具体关键词（代码/公司/主题/事件），走本机资讯全文检索非语义向量，以摘录为准；研报命中后 read_document(document_id) 精读；可换关键词多跳；勿灌全文',
+  },
+  {
+    intent: 'etf_profile',
+    priority: 99,
+    patterns: [/ETF.*(?:档案|概况|费率|跟踪指数|规模)|(?:档案|费率|跟踪指数).*ETF|ETF.*(?:是什么|简介)/i],
+    preferredTools: ['get_etf_profile', 'get_etf_nav', 'get_instrument_snapshot'],
+    avoidTools: ['get_etf_holdings', 'get_instrument_profile', 'get_fund_profile'],
+    confidence: 'high',
+    hint: '问 ETF 档案/跟踪指数/费率 → 先 namespaced MCP 问数/概况（若有），不足再用 get_etf_profile；净值用 get_etf_nav，成分用 get_etf_holdings',
+  },
+  {
+    intent: 'otc_fund_profile',
+    priority: 103,
+    patterns: [
+      /(?:公募|场外)基金.*(?:档案|概况|费率|规模|经理)|(?:档案|概况|费率).*(?:公募|场外)基金/,
+      /开放式基金.*(?:档案|概况|费率|经理)/,
+      /CN:PF|CN:OF|assetClass.*FUND/i,
+    ],
+    preferredTools: ['get_fund_profile', 'get_fund_nav', 'get_fund_list'],
+    avoidTools: ['get_etf_profile', 'get_instrument_profile', 'get_etf_nav'],
+    confidence: 'high',
+    hint: '问公募基金档案 → get_fund_profile；净值用 get_fund_nav；勿用 ETF 工具或股票概况',
+  },
+  {
+    intent: 'otc_fund_nav',
+    priority: 102,
+    patterns: [
+      /(?:公募|场外)基金.*(?:净值|走势)|(?:净值|走势).*(?:公募|场外)基金/,
+      /开放式基金.*净值/,
+      /货币基金.*净值/,
+      /债券基金.*净值/,
+    ],
+    preferredTools: ['get_fund_nav', 'get_fund_profile'],
+    avoidTools: ['get_etf_nav', 'get_instrument_quotes', 'get_etf_holdings'],
+    confidence: 'high',
+    hint: '问公募基金净值 → get_fund_nav；勿用实时价或 ETF 净值工具',
+  },
+  {
+    intent: 'otc_fund_holdings',
+    priority: 101,
+    patterns: [
+      /(?:公募|场外)基金.*(?:持仓|重仓|资产配置)|(?:持仓|重仓).*(?:公募|场外)基金/,
+      /开放式基金.*(?:持仓|重仓)/,
+    ],
+    preferredTools: ['get_fund_holdings', 'get_fund_list'],
+    avoidTools: ['get_etf_holdings', 'get_portfolio_holdings', 'get_fund_nav'],
+    confidence: 'high',
+    hint: '问公募基金季报重仓 → get_fund_holdings；勿与 ETF 成分或个人持仓混淆',
+  },
+  {
+    intent: 'etf_nav',
+    priority: 100,
+    patterns: [/净值|溢价率|折价率|IOPV/i],
+    preferredTools: ['get_etf_nav', 'get_instrument_snapshot'],
+    avoidTools: ['get_etf_holdings', 'evaluate_instrument', 'get_instrument_quotes'],
+    confidence: 'high',
+    hint: '问净值/溢价 → 先 namespaced MCP 问数/概况（若有），不足再用 get_etf_nav；勿用持仓权重或仅用实时价代替净值序列',
+  },
+  {
+    intent: 'etf_holdings',
+    priority: 98,
+    patterns: [/ETF.*(?:持仓|成分|权重)|(?:持仓|成分|权重).*ETF|基金持仓|跟踪指数成分/i],
+    preferredTools: ['get_etf_holdings', 'get_etf_list'],
+    avoidTools: ['get_portfolio_holdings', 'get_etf_nav'],
+    confidence: 'high',
+    hint: '问 ETF 成分/权重 → 先 namespaced MCP 问数/概况（若有），不足再用 get_etf_holdings；勿与用户个人持仓 get_portfolio_holdings 混淆',
+  },
+  {
+    intent: 'portfolio_holdings',
+    priority: 96,
+    patterns: [/我的持仓|实盘持仓|持仓明细|仓位盈亏|持仓成本|浮盈|浮动盈亏/],
+    preferredTools: ['get_portfolio_holdings', 'portfolio_summary'],
+    avoidTools: ['get_etf_holdings', 'get_watchlist', 'analyze_portfolio'],
+    confidence: 'high',
+    hint: '问个人持仓/浮盈 → 首选 get_portfolio_holdings；勿调 ETF 成分或仅读关注列表',
+  },
+  {
+    intent: 'watchlist',
+    priority: 94,
+    patterns: [/关注列表|自选股|我的自选|watchlist/i],
+    preferredTools: ['get_watchlist', 'batch_instrument_snapshots'],
+    avoidTools: ['get_portfolio_holdings'],
+    confidence: 'high',
+    hint: '问关注/自选 → 首选 get_watchlist；需要行情时再 batch_instrument_snapshots',
+  },
+  {
+    intent: 'portfolio_trades',
+    priority: 92,
+    patterns: [/交易流水|买卖记录|成交记录|账本/],
+    preferredTools: ['portfolio_trades', 'portfolio_summary'],
+    avoidTools: ['get_portfolio_holdings'],
+    confidence: 'high',
+    hint: '问买卖流水 → 首选 portfolio_trades',
+  },
+  {
+    intent: 'portfolio_analysis',
+    priority: 90,
+    patterns: [/组合分析|组合暴露|持仓分析|因子分析.*组合/],
+    preferredTools: ['analyze_portfolio', 'get_portfolio_holdings'],
+    avoidTools: ['evaluate_instrument'],
+    confidence: 'high',
+    hint: '问组合暴露/因子分析 → 首选 analyze_portfolio',
+  },
+  {
+    intent: 'create_skill',
+    priority: 94,
+    patterns: [
+      /(?:创建|新建|建|写|定制|制作).*(?:工作流)?技能/,
+      /(?:工作流)?技能.*(?:创建|新建|建|写|定制)/,
+      /帮我.*(?:一个|个)?(?:工作流)?技能/,
+      /create[-\s]?skill/i,
+    ],
+    preferredTools: ['activate_agent_skill', 'get_agent_skill', 'create_agent_skill'],
+    avoidTools: ['list_tool_packs', 'activate_tool_pack', 'import_agent_skill'],
+    confidence: 'high',
+    hint: '创建工作流技能 → 先 activate_agent_skill(create-skill)；再按技能步骤 create_agent_skill（ask_user + confirmed=true）',
+  },
+  {
+    intent: 'agent_skills',
+    priority: 91,
+    patterns: [
+      /工作流技能|技能目录|激活.*(?:工作流)?技能/,
+      /用(?:一下)?工作流/,
+      /list_agent_skills|activate_agent_skill/i,
+      /agent\s*skills?/i,
+    ],
+    preferredTools: ['list_agent_skills', 'activate_agent_skill', 'get_agent_skill'],
+    avoidTools: ['list_tool_packs', 'activate_tool_pack'],
+    confidence: 'high',
+    hint: '工作流技能 → list_agent_skills 再 activate_agent_skill；勿与工具包、专家「技能专长」混淆',
+  },
+  {
+    intent: 'multi_role_research',
+    // 高于 news_browse(86) 等宽泛规则；patterns 足够具体，避免与资讯浏览冲突
+    priority: 91,
+    patterns: [
+      /投资研讨团|多角色研讨|多空辩论|研究委员会|研讨链/,
+      /TradingAgents/i,
+      /multi-role-research-council/i,
+      /\/投资研讨团/,
+      /\/多角色研讨/,
+    ],
+    preferredTools: [
+      'activate_agent_skill',
+      'run_subagent',
+      'update_research_checklist',
+      'create_web',
+    ],
+    avoidTools: ['evaluate_instrument', 'list_news_articles'],
+    confidence: 'high',
+    hint: '投资研讨团/多空辩论 → 先 activate_agent_skill(multi-role-research-council)，再 run_subagent（result_schema 须含 summary）编排角色链；报告署名投资研讨团流程；勿用评分卡或仅刷资讯代替',
+  },
+  {
+    intent: 'news_article',
+    priority: 88,
+    patterns: [/读.*(?:新闻|资讯|文章)|资讯正文|这篇(新闻|资讯)|公告全文|年报正文/],
+    preferredTools: ['get_news_article', 'get_notice_content', 'list_news_articles'],
+    avoidTools: ['get_instrument_snapshot', 'web_search'],
+    confidence: 'high',
+    hint: '要正文 → list 拿到 id 后 get_news_article / get_notice_content；勿只用 snapshot 新闻字段敷衍',
+  },
+  {
+    intent: 'news_source_delete',
+    // 高于 news_browse(86)；与分组删除区分
+    priority: 93,
+    patterns: [
+      /(?:删除|移除).*(?:订阅源|资讯订阅|RSS\s*订阅)/i,
+      /(?:订阅源|资讯订阅|RSS\s*订阅).*(?:删除|移除)/i,
+      /删除(?:这个|该)?订阅(?!.*分组)/,
+      /取消订阅/,
+    ],
+    preferredTools: ['delete_news_source', 'list_news_sources', 'ask_user'],
+    avoidTools: ['delete_news_group', 'list_news_articles', 'get_instrument_snapshot'],
+    confidence: 'high',
+    hint: '删除订阅 → delete_news_source；须 ask_user 后 confirmed=true；勿删分组',
+  },
+  {
+    intent: 'news_group_delete',
+    priority: 93,
+    patterns: [
+      /(?:删除|移除).*(?:资讯)?分组/,
+      /(?:资讯)?分组.*(?:删除|移除)/,
+    ],
+    preferredTools: ['delete_news_group', 'list_news_groups', 'ask_user'],
+    avoidTools: ['delete_news_source', 'list_news_articles'],
+    confidence: 'high',
+    hint: '删除分组 → delete_news_group；须 ask_user 后 confirmed=true；组内订阅变未分组',
+  },
+  {
+    intent: 'news_sources_import',
+    priority: 92,
+    patterns: [
+      /(?:导入).*(?:订阅|RSS)/i,
+      /(?:订阅).*(?:导入)/,
+      /批量.*(?:添加|导入).*(?:订阅|RSS)/i,
+    ],
+    preferredTools: ['import_news_sources', 'list_news_sources', 'ask_user'],
+    avoidTools: ['add_news_source', 'list_news_articles'],
+    confidence: 'high',
+    hint: '批量导入订阅 → import_news_sources；须 ask_user 后 confirmed=true',
+  },
+  {
+    intent: 'news_group_create',
+    priority: 91,
+    patterns: [
+      /(?:创建|新建).*(?:资讯)?分组/,
+      /(?:资讯)?分组.*(?:创建|新建)/,
+    ],
+    preferredTools: ['create_news_group', 'list_news_groups', 'move_news_source'],
+    avoidTools: ['add_news_source', 'list_news_articles'],
+    confidence: 'high',
+    hint: '新建资讯分组 → create_news_group；随后可用 move_news_source 归类',
+  },
+  {
+    intent: 'news_group_update',
+    priority: 91,
+    patterns: [
+      /(?:重命名|改名).*(?:资讯)?分组/,
+      /(?:资讯)?分组.*(?:重命名|改名|改叫)/,
+      /调整.*(?:资讯)?分组.*排序/,
+    ],
+    preferredTools: ['update_news_group', 'list_news_groups'],
+    avoidTools: ['create_news_group', 'list_news_articles'],
+    confidence: 'high',
+    hint: '改分组名/排序 → update_news_group',
+  },
+  {
+    intent: 'news_source_move',
+    priority: 90,
+    patterns: [
+      /(?:移动|移到|换到).*(?:订阅|来源)/,
+      /(?:订阅|来源).*(?:移动|移到|换组|换到.*分组)/,
+      /把.*订阅.*(?:移|放到).*(?:分组|组)/,
+    ],
+    preferredTools: ['move_news_source', 'list_news_sources', 'list_news_groups'],
+    avoidTools: ['list_news_articles', 'create_news_group'],
+    confidence: 'high',
+    hint: '移动订阅到分组 → move_news_source；先 list 拿到 id',
+  },
+  {
+    intent: 'rsshub_catalog',
+    // 高于 news_source_add(90)：问「有哪些 RSS / 路由目录」先查内置目录
+    priority: 91,
+    patterns: [
+      /RSSHub/i,
+      /路由目录/,
+      /有哪些.*(?:RSSHub|订阅源|RSS\s*源)/i,
+      /财联社.*RSS/i,
+      /(?:搜|查|找).*(?:RSSHub|路由).*(?:订阅|源|path)/i,
+    ],
+    preferredTools: [
+      'list_rsshub_categories',
+      'list_rsshub_domains',
+      'get_rsshub_domain_routes',
+      'search_rsshub_routes',
+    ],
+    avoidTools: ['list_news_articles', 'browser_navigate', 'get_instrument_snapshot'],
+    confidence: 'high',
+    hint: '查 RSS 路由 → 三级漏斗 list_rsshub_categories → list_rsshub_domains → get_rsshub_domain_routes（拉平叶子多选）；用户已点名媒体才用 search_rsshub_routes',
+  },
+  {
+    intent: 'news_source_add',
+    priority: 90,
+    patterns: [
+      /(?:添加|新增|加入).*(?:订阅|RSS|Atom)/i,
+      /(?:订阅|RSS).*(?:添加|新增)/i,
+      /订阅.*(?:地址|链接|URL)/i,
+    ],
+    preferredTools: [
+      'list_rsshub_categories',
+      'list_rsshub_domains',
+      'get_rsshub_domain_routes',
+      'add_news_source',
+      'validate_news_source',
+      'list_news_sources',
+    ],
+    avoidTools: ['import_news_sources', 'list_news_articles', 'get_instrument_snapshot'],
+    confidence: 'high',
+    hint: '添加订阅：三级漏斗分类→网站→拉平多选订阅项后再 add_news_source；禁止先选路由再选频道；已知 URL 直接 add；批量用 import_news_sources',
+  },
+  {
+    intent: 'news_source_validate',
+    priority: 89,
+    patterns: [
+      /(?:验证|检查).*(?:RSS|订阅).*(?:地址|链接|源|URL)?/i,
+      /(?:RSS|订阅).*(?:地址|链接).*(?:验证|检查|能不能用)/i,
+    ],
+    preferredTools: ['validate_news_source', 'add_news_source'],
+    avoidTools: ['list_news_articles'],
+    confidence: 'high',
+    hint: '验证订阅地址 → validate_news_source（不写入）；通过后再 add_news_source',
+  },
+  {
+    intent: 'news_manage',
+    // 宽泛兜底，仍高于 news_browse(86)
+    priority: 87,
+    patterns: [
+      /管理.*(?:订阅|资讯分组)/,
+      /(?:订阅源|资讯分组).*(?:管理|设置)/,
+    ],
+    preferredTools: ['list_news_sources', 'list_news_groups', 'add_news_source'],
+    avoidTools: ['list_news_articles', 'get_instrument_snapshot', 'evaluate_instrument'],
+    confidence: 'medium',
+    hint: '管理订阅/分组：先 list_news_sources/list_news_groups，再选 add/create/delete/move/import',
+  },
+  {
+    intent: 'news_browse',
+    priority: 86,
+    patterns: [/资讯|新闻|公告|研报|新闻中心|RSS|订阅源/i],
+    preferredTools: ['list_news_articles', 'list_news_groups', 'get_news_center_status'],
+    avoidTools: ['get_instrument_snapshot', 'evaluate_instrument', 'web_search'],
+    confidence: 'high',
+    hint: '浏览资讯 → 先 namespaced MCP 新闻/公告/研报（若有），不足再用 list_news_groups/list_news_articles；深度分析标的勿替代资讯工具',
+  },
+  {
+    intent: 'schedule_create',
+    priority: 90,
+    patterns: [
+      /(?:创建|新建|添加).*(?:计划任务|定时任务)/,
+      /(?:计划任务|定时任务).*(?:创建|新建|添加)/,
+      /每天.*(?:分析|提醒|运行).*(?:计划|定时)/,
+    ],
+    preferredTools: ['create_scheduled_job', 'list_scheduled_jobs'],
+    avoidTools: ['get_instrument_snapshot', 'opptrix_run'],
+    confidence: 'high',
+    hint: '新建计划任务 → create_scheduled_job；先确认调度规则与提示词',
+  },
+  {
+    intent: 'schedule_manage',
+    priority: 88,
+    patterns: [
+      /计划任务|定时任务|定时执行|定时分析|定时提醒|自动执行/,
+      /(?:删除|暂停|启用|列出|查看).*(?:计划|定时)/,
+    ],
+    preferredTools: ['list_scheduled_jobs', 'create_scheduled_job', 'get_scheduled_job'],
+    avoidTools: ['get_instrument_snapshot', 'opptrix_run'],
+    confidence: 'high',
+    hint: '计划任务 → list/create/update/enable/disable；立刻执行用 run_scheduled_job_now；勿用 opptrix_run 代替',
+  },
+  {
+    intent: 'schedule_run_now',
+    priority: 89,
+    patterns: [
+      /(?:立刻|马上|现在).*(?:执行|运行).*(?:计划|定时)/,
+      /(?:跑|执行)一次.*计划任务/,
+    ],
+    preferredTools: ['run_scheduled_job_now', 'list_scheduled_jobs'],
+    avoidTools: ['opptrix_run', 'evaluate_instrument'],
+    confidence: 'high',
+    hint: '立即执行计划任务 → run_scheduled_job_now；先 list 拿 job_id',
+  },
+  {
+    intent: 'web_search',
+    // 高于 news_browse(86) / web_browse(87)：非股市公开资料；勿因「搜一下茅台/股价/公告/研报」命中
+    priority: 88,
+    patterns: [
+      /网上搜|网上搜索|网页搜索|网页检索/,
+      /(?:检索|搜索|查找|搜)(?:一下|下)?(?:公开网页|公开资料|网上资料)/,
+      /(?:公开网页|网上资料)(?:检索|搜索)/,
+      /site:\s*\S/i,
+      /filetype:\s*\S/i,
+      /查维基|维基百科|wikipedia/i,
+      /(?:搜一下|搜索|查找|查)\s*.{0,24}(?:官方文档|技术文档|开发文档|MDN)/i,
+      /web_search/i,
+    ],
+    preferredTools: ['web_search'],
+    avoidTools: ['search_instruments', 'query2data', 'list_news_articles', 'browser_navigate', 'http_fetch'],
+    confidence: 'high',
+    hint: '非股市公开资料（百科/文档/政策原文）→ 网页搜索；股市行情/公告/研报/选股先专用工具；仅专用失败后兜底且须免责（可能不真实或过期）；用户已给 URL 时用 browser_navigate',
+  },
+  {
+    intent: 'web_browse',
+    priority: 87,
+    patterns: [
+      /https?:\/\//i,
+      /打开(?:一下|下)?(?:网页|网站|页面|链接)/,
+      /访问(?:网页|网站|页面|链接|这个网址)/,
+      /浏览(?:一下|下)?(?:网页|网站|外部网站)/,
+      /网页截图|页面截图|网站截图/,
+      /去.*(?:官网|网站)看看/,
+    ],
+    preferredTools: ['browser_navigate', 'browser_snapshot'],
+    avoidTools: ['get_news_article', 'get_notice_content', 'list_news_articles', 'web_search'],
+    confidence: 'high',
+    hint: '外部网页 URL → browser_navigate + browser_snapshot；勿用资讯/公告工具代替网页正文',
+  },
+  {
+    intent: 'web_snapshot_only',
+    priority: 86,
+    patterns: [
+      /当前页面|页面快照|网页内容|页面内容|看看这个页面|读取页面/,
+    ],
+    preferredTools: ['browser_snapshot'],
+    avoidTools: ['get_instrument_snapshot'],
+    confidence: 'high',
+    hint: '已打开的外部网页 → browser_snapshot；勿用 get_instrument_snapshot',
+  },
+  {
+    intent: 'research_industry_universe',
+    priority: 99,
+    patterns: [
+      /(?:行业|板块|概念).{0,16}(?:营收|营业收入|毛利率|净利率|净利润|归母净利润|净资产收益率|\bROE\b).{0,12}(?:排名|对比|比较|横比)/,
+      /(?:营收|营业收入|毛利率|净利率|净利润|归母净利润|净资产收益率|\bROE\b).{0,8}(?:排名|对比).{0,12}(?:行业|板块|概念)/,
+      /(?:中国)?.{0,8}(?:行业|板块).{0,8}(?:的)?(?:营收|营业收入|毛利率|净利率|净利润|净资产收益率|\bROE\b)(?:排名)?/,
+    ],
+    preferredTools: ['resolve_industry_universe', 'ask_user', 'query_data', 'propose_widget'],
+    avoidTools: [
+      'search_instruments',
+      'get_instrument_financials',
+      'get_sector_constituents',
+      'activate_agent_skill',
+      'create_canvas',
+      'web_search',
+    ],
+    confidence: 'high',
+    hint: '行业/板块指标对比 → resolve_industry_universe 拿候选，ask_user 确认（默认 8 家，最多 20 家），再 query_data + propose_widget。禁止口播名单，标题禁止写「行业排名」',
+  },
+  {
+    intent: 'research_canvas_query',
+    priority: 97,
+    patterns: [
+      /query_data/i,
+      /比较.+(?:毛利率|营收增速|营业收入|归母净利润|净利率|净资产收益率|\bROE\b|净息差|研发投入|研发费用)/,
+      /对比.+(?:毛利率|营收增速|营业收入|归母净利润|净利率|净资产收益率|\bROE\b|净息差|研发投入|研发费用)/,
+      /(?:看看|看一下|看下|分析|梳理).+(?:毛利率|营收增速|营业收入|归母净利润|净利率|净资产收益率|\bROE\b|净息差|研发投入|研发费用)/,
+      /(?:查询|查一下).{0,24}(?:毛利率|营收增速|归母净利润|净利率|净资产收益率|净息差|研发投入)/,
+      /(?:毛利率|净资产收益率|\bROE\b|净息差|研发投入).{0,12}走势/,
+      /改看\s*(?:毛利率|营收增速|营业收入|归母净利润|净利率|净资产收益率|\bROE\b|净息差)/i,
+      /(?:K线|蜡烛图|日K)(?:走势|图)?/,
+      /(?:看看|看一下|看下).{0,16}(?:K线|蜡烛图|日K)/,
+      /(?:饼图|扇形图|圆环图|堆积柱|百分比堆积|柱线混合|分组柱|并排柱)/,
+    ],
+    preferredTools: ['query_data', 'propose_widget', 'create_widget'],
+    avoidTools: ['get_instrument_financials', 'create_canvas', 'create_web', 'refine_dataset'],
+    confidence: 'high',
+    hint: '比较/看看/看一下财务指标或走势 → query_data 再 propose_widget；K 线用 metric=kline + candlestick；勿自动 create_widget，勿用财务摘要或 create_canvas 代替',
+  },
+  {
+    intent: 'research_canvas_propose',
+    priority: 98,
+    patterns: [
+      /propose_widget/i,
+      /再看看.+(?:排名|毛利率|趋势|图)/,
+      /再看一下.+(?:排名|毛利率|趋势|图)/,
+      /看看.+(?:毛利率)?排名/,
+      /^(?:请)?(?:改成|换成)(?:折线|柱状|柱形|条形|分组柱|并排柱|堆积柱|百分比堆积|饼图|扇形|圆环|柱线混合|K线|蜡烛|表格)/,
+    ],
+    preferredTools: ['propose_widget'],
+    avoidTools: ['query_data', 'refine_dataset', 'update_widget', 'create_canvas', 'get_instrument_financials'],
+    confidence: 'high',
+    hint: '已有数据集后再看排名/趋势，或只改图种 → propose_widget；勿 update_widget，勿再次 query_data / refine_dataset，勿用 create_canvas',
+  },
+  {
+    intent: 'research_canvas_refine',
+    priority: 100,
+    patterns: [
+      /refine_dataset/i,
+      /(?:去掉|不要)(?!评分|现价|分析)[\u4e00-\u9fff]{2,8}(?!.*(?:图|表|组件|排名))/,
+      /只看\s*\d{4}\s*[-–—至到]\s*\d{4}/,
+      /(?:再加|再加上|加上)(?!.*(?:图|表|组件|排名))[\u4e00-\u9fffA-Za-z0-9.]{2,}/,
+      /(?:右边|右侧|画布).*(?:不含|去掉|不要)/,
+    ],
+    preferredTools: ['refine_dataset', 'propose_widget'],
+    avoidTools: ['query_data', 'delete_widget', 'create_canvas', 'get_instrument_financials'],
+    confidence: 'high',
+    hint: '已有数据集上去掉/加上公司或收窄年份 → refine_dataset 生成派生数据集，再 propose_widget；禁止 update_widget，除非用户明确说改右侧已有图；勿覆盖旧数据集，勿用 query_data 重查同一指标子集',
+  },
+  {
+    intent: 'research_canvas_create',
+    priority: 95,
+    patterns: [
+      /create_widget/i,
+      /(?:再)?加一个.+(?:图|表|排名|组件)/,
+      /(?:添加|新增).+(?:趋势图|折线图|柱状图|排名图|表格|来源)/,
+      /(?:在|往).*(?:研究画布|右侧).*(?:加|添加).*(?:图|表|组件)/,
+      /(?:直接)?(?:加入|放进|放到).*(?:右侧|画布)/,
+    ],
+    preferredTools: ['create_widget', 'update_widget', 'delete_widget'],
+    avoidTools: ['create_canvas', 'update_canvas', 'create_web', 'query_data'],
+    confidence: 'high',
+    hint: '明确加入右侧研究画布 → create_widget（只传 type/title）；勿用 create_canvas 或正文插图代替',
+  },
+  {
+    intent: 'research_canvas_proposal_style',
+    priority: 97,
+    patterns: [
+      /update_proposal/i,
+      /(?:预览|这张图|这个图|上面的图).*(?:颜色|图例|橙色|蓝色|红色|绿色|坐标|轴标题|显示名)/,
+      /(?:颜色|图例|坐标轴).*(?:改|换|调)/,
+      /(?:改成|换成|设为).*(?:#|橙色|蓝色|红色|绿色|rgb)/,
+    ],
+    preferredTools: ['update_proposal'],
+    avoidTools: ['update_widget', 'create_canvas', 'query_data'],
+    confidence: 'high',
+    hint: '对话预览尚未 Adopt → update_proposal（style / title）；已加入右侧画布 → update_widget；改图种 → propose_widget',
+  },
+  {
+    intent: 'research_canvas_update',
+    priority: 96,
+    patterns: [
+      /update_widget/i,
+      /改成(?:折线|柱状|柱形|条形|表格)/,
+      /(?:把|将).+(?:图|排名|趋势|表格|组件).*(?:改成|改名)/,
+      /(?:把|将).+改名为/,
+      /(?:右侧|画布).*(?:颜色|图例|橙色|蓝色)/,
+    ],
+    preferredTools: ['update_widget', 'create_widget', 'delete_widget'],
+    avoidTools: ['create_canvas', 'update_canvas', 'create_web', 'update_proposal'],
+    confidence: 'high',
+    hint: '右侧研究画布改类型/样式/改名 → update_widget（按本轮清单 id）；预览未 Adopt 用 update_proposal；改数据范围须先 refine_dataset',
+  },
+  {
+    intent: 'research_canvas_delete',
+    priority: 96,
+    patterns: [
+      /delete_widget/i,
+      /(?:删掉|删除|去掉).+(?:图|表|排名|组件)/,
+    ],
+    preferredTools: ['delete_widget', 'update_widget', 'create_widget'],
+    avoidTools: ['create_canvas', 'update_canvas'],
+    confidence: 'high',
+    hint: '右侧研究画布移除组件 → delete_widget（按本轮清单 id）',
+  },
+  {
+    intent: 'create_canvas',
+    priority: 88,
+    patterns: [
+      /画布|可视化报告|报告可视化|分页报告|投研画布|create_canvas/i,
+      /(?:做成|生成|创建).*(?:可视化|画布|可预览).*(?:报告|版面|卡片)/,
+      /(?:可视化|画布).*(?:做成|生成|创建)/,
+    ],
+    preferredTools: ['create_canvas', 'update_canvas', 'read_canvas'],
+    avoidTools: ['workspace_write', 'create_mindmap'],
+    confidence: 'high',
+    hint: '画布/报告可视化 → create_canvas；勿用 workspace_write 代替；用户可在消息中点击预览；HTML 网页制品用 create_web',
+  },
+  {
+    intent: 'create_mindmap',
+    priority: 88,
+    patterns: [
+      /脑图|思维导图|主题树|知识树|create_mindmap/i,
+      /(?:做成|生成|创建).*(?:脑图|思维导图|关系图|结构图)/,
+      /(?:脑图|思维导图).*(?:做成|生成|创建)/,
+      /关系(?:梳理|图|网络|结构)|(?:产业链|股东|主题).*(?:关系|结构).*(?:图|脑图|梳理)/,
+      /流程示意|组织关系|股权结构图/,
+    ],
+    preferredTools: ['create_mindmap', 'update_mindmap', 'read_mindmap'],
+    avoidTools: ['workspace_write', 'create_canvas'],
+    confidence: 'high',
+    hint: '脑图/思维导图/关系梳理 → create_mindmap；勿用 workspace_write 代替；禁止虚构 knowledge-graph 工具',
+  },
+  {
+    intent: 'create_web',
+    priority: 88,
+    patterns: [
+      /create_web|网页制品|HTML\s*页面|交互网页|离线网页/i,
+      /(?:做成|生成|创建|做个|做一份|做一).*(?:网页|HTML|html)/i,
+      /(?:网页|HTML).*(?:做成|生成|创建|预览|页面|看板)/i,
+      /用\s*(?:Chart\.?js|ECharts|echarts|D3).*(?:做|画|生成).*(?:页|图|看板|网页)/i,
+      /可交互的?\s*HTML/i,
+    ],
+    preferredTools: ['create_web', 'list_web_vendor', 'update_web', 'read_web'],
+    avoidTools: ['workspace_write'],
+    confidence: 'high',
+    hint: 'HTML/网页制品 → create_web；库用 /opptrix-vendor；勿 CDN；与 canvas 并存，报告型 TSX 画布仍用 create_canvas',
+  },
+  {
+    intent: 'python_env',
+    priority: 92,
+    patterns: [
+      /python.*环境|检查.*python|python.*版本|有没有.*python|python.*就绪/i,
+      /ensure_python|python_env_status/i,
+    ],
+    preferredTools: ['python_env_status', 'ensure_python', 'shell_platform_status'],
+    avoidTools: ['get_system_info'],
+    confidence: 'high',
+    hint: '问 Python 环境/版本 → python_env_status；仅用户明确要检查 Python，或 opptrix_run(python/pip) 失败未就绪时再 ensure_python（只读探测 ready|failed，不下载）；编程默认直接 opptrix_run',
+  },
+  {
+    intent: 'turn_wake',
+    priority: 86,
+    patterns: [
+      /定时唤醒|延后(?:检查|续跑|继续)|稍后(?:再|继续)|等一会儿|几分钟后再/i,
+      /schedule_turn_wake/i,
+      /等(?:下载|安装|准备).*(?:完|好|就绪)/,
+    ],
+    preferredTools: ['schedule_turn_wake', 'get_current_time'],
+    avoidTools: [],
+    confidence: 'high',
+    hint: '延后续跑：无任务事件用 schedule_turn_wake（禁止传 job_id）；有 job_id 依赖自动挂起与终态续跑；勿 poll/sleep 查进度',
+  },
+  {
+    intent: 'list_jobs',
+    priority: 87,
+    patterns: [
+      /后台任务|正在跑的任务|任务列表|有哪些.*(?:后台|任务)/,
+      /list_jobs|查看.*job/i,
+      /命令还在(?:跑|执行)|进度怎么样/,
+    ],
+    preferredTools: ['list_jobs', 'cancel_job'],
+    avoidTools: ['schedule_turn_wake', 'list_scheduled_jobs'],
+    confidence: 'high',
+    hint: '查看后台任务 → list_jobs；取消可取消任务用 cancel_job；勿与计划任务 list_scheduled_jobs 混淆',
+  },
+  {
+    intent: 'cancel_job',
+    priority: 88,
+    patterns: [
+      /取消.*(?:后台|命令|任务)|停掉.*(?:后台|命令)/,
+      /cancel_job/i,
+    ],
+    preferredTools: ['cancel_job', 'list_jobs'],
+    avoidTools: ['list_scheduled_jobs', 'delete_scheduled_job'],
+    confidence: 'high',
+    hint: '取消后台任务 → cancel_job（需 job_id）；不可取消时会返回明确错误；先 list_jobs 可查 id',
+  },
+  {
+    intent: 'workspace_network_latency',
+    priority: 91,
+    patterns: [
+      /测一下.*延迟/,
+      /网络延迟/,
+      /(?:网站|站点|服务器).*(?:延迟|连通|可达|快慢)/,
+      /到.*(?:百度|google|网站).*(?:延迟|连通|速度)/i,
+      /连通性(?:测试|检查)?/,
+    ],
+    preferredTools: ['http_fetch', 'opptrix_run', 'shell_platform_status', 'activate_tool_pack'],
+    avoidTools: ['workspace_write', 'get_instrument_quotes'],
+    confidence: 'high',
+    hint: '测网站延迟/连通性 → 优先 http_fetch 测 HTTP 耗时；用户明确要求 ICMP 时用 opptrix_run + ping；先 get_system_info 再按平台组 command',
+  },
+  {
+    intent: 'workspace_shell_network',
+    priority: 91,
+    patterns: [
+      /申请(?:沙盒)?联网|提前(?:授权|确认)联网/i,
+      /允许联网安装|联网安装授权|外网域名授权/,
+      /预估需(?:要)?(?:pip|npm|联网|外网)/i,
+    ],
+    preferredTools: ['opptrix_run', 'shell_platform_status'],
+    avoidTools: ['ask_user', 'request_session_lan_access'],
+    confidence: 'high',
+    hint: '包源网络默认可用 → 直接 opptrix_run；其它域名跑命令时会确认；禁止 ask_user 冒充联网授权',
+  },
+  {
+    intent: 'workspace_shell_install',
+    priority: 90,
+    patterns: [
+      /pip\s+install|npm\s+install|npm\s+ci|安装(?:python|py|node|npm|pip)?(?:包|依赖)/i,
+    ],
+    preferredTools: ['opptrix_run', 'shell_platform_status'],
+    avoidTools: ['ask_user', 'workspace_write', 'http_fetch', 'ensure_python'],
+    confidence: 'high',
+    hint: '安装依赖 → 直接 opptrix_run(command="pip install …" 或 npm)；包源默认已放行；勿先申请联网；勿先 ensure_python（仅失败再兜底）',
+  },
+  {
+    intent: 'workspace_coding',
+    priority: 91,
+    patterns: [
+      /(?:写|新建|创建).*(?:一段|个)?(?:python|py|node|js|ts)?\s*(?:脚本|程序|代码)/i,
+      /(?:脚本|程序|代码).*(?:写|新建|创建|改|修改)/,
+      /帮我.*(?:写|改).*(?:\.py|\.ts|\.js|脚本|代码)/i,
+      /本地编程|沙盒编程|Cursor\s*式|OpenCode/i,
+      /改一下.*(?:工作区|仓库).*(?:文件|脚本|代码)/,
+      /apply_patch|workspace_apply_patch/i,
+    ],
+    preferredTools: [
+      'workspace_glob',
+      'workspace_read',
+      'workspace_replace_lines',
+      'workspace_apply_patch',
+      'workspace_write',
+      'opptrix_run',
+      'code_preflight',
+      'activate_tool_pack',
+    ],
+    avoidTools: ['ensure_python', 'ask_user'],
+    confidence: 'high',
+    hint: '编程/写改脚本 → 优先 workspace_* + opptrix_run（+ 可选 code_preflight / apply_patch）；可与投研工具并用，勿用行情/财务代替文件操作；勿先 ensure_python',
+  },
+  {
+    intent: 'workspace_code_preflight',
+    priority: 90,
+    patterns: [
+      /检查(?:脚本|代码)?语法|语法检查|preflight|code_preflight/i,
+      /写完.*(?:先)?检查|跑之前.*检查/,
+    ],
+    preferredTools: ['code_preflight', 'workspace_replace_lines', 'workspace_write', 'opptrix_run', 'activate_tool_pack'],
+    avoidTools: ['ask_user'],
+    confidence: 'high',
+    hint: '检查脚本 → code_preflight（diagnostics 带 L 行号）→ workspace_replace_lines 定点修 → 再 preflight → opptrix_run；可与投研工具并用，勿用行情代替读文件',
+  },
+  {
+    intent: 'workspace_line_edit',
+    priority: 91,
+    patterns: [
+      /按行(?:号)?(?:替换|修改|编辑)|行号替换|workspace_replace_lines/i,
+      /定点(?:修改|替换)|局部替换(?:脚本|代码|文件)/,
+      /old_string|精确替换|replace_all/i,
+    ],
+    preferredTools: ['workspace_replace_lines', 'workspace_apply_patch', 'code_preflight', 'workspace_read', 'activate_tool_pack'],
+    avoidTools: ['workspace_write', 'ask_user'],
+    confidence: 'high',
+    hint: '按行或精确替换 → workspace_replace_lines（edits 或 old_string）；多文件用 workspace_apply_patch；勿整文件 workspace_write；修完再 code_preflight；可与投研工具并用',
+  },
+  {
+    intent: 'workspace_shell',
+    priority: 89,
+    patterns: [
+      /\bping\b/i,
+      /\btraceroute\b/i,
+      /\btracert\b/i,
+      /运行(?:一下|这段)?\s*(?:python|py|node|js|脚本|代码)/i,
+      /执行(?:命令|shell|终端|脚本)/i,
+      /运行命令/,
+      /(?:python|py).*(?:跑|执行)/i,
+      /npm\s+install|pip\s+install/i,
+      /opptrix_run/i,
+      /\bshell\b/i,
+    ],
+    preferredTools: ['opptrix_run', 'code_preflight', 'workspace_replace_lines', 'http_fetch', 'shell_platform_status', 'activate_tool_pack'],
+    avoidTools: ['workspace_write', 'ensure_python', 'ask_user'],
+    confidence: 'high',
+    hint: '运行命令 → 一次性命令直接 opptrix_run(command=…)；自写脚本先 code_preflight，有 L 行号用 workspace_replace_lines 修，再 preflight → run；可先 get_system_info；测网站延迟优先 http_fetch；可与投研工具并用，勿先 ensure_python',
+  },
+  {
+    intent: 'local_data_catalog',
+    priority: 94,
+    patterns: [
+      /本地(?:数据|API|能力)(?:目录|清单|有哪些)/,
+      /list_local_data_apis|get_local_data_catalog/i,
+      /有哪些(?:本地|标准层)(?:数据)?(?:\s)?(?:API|能力|接口|目录|清单)/,
+      /公共(?:复用)?包|shared\/packages/i,
+    ],
+    preferredTools: ['list_local_data_apis', 'get_local_data_catalog', 'list_workspace_grants'],
+    avoidTools: ['get_project_info', 'get_system_info'],
+    confidence: 'high',
+    hint: '查本地/标准 API → list_local_data_apis → get_local_data_catalog；公共包扫 shared/packages',
+  },
+  {
+    intent: 'session_lan',
+    priority: 93,
+    patterns: [
+      /局域网|内网(?:访问|API|地址)|NAS|192\.168\./i,
+      /request_session_lan_access|allow_lan_session/i,
+      /本对话.*(?:允许|授权).*局域网/,
+    ],
+    preferredTools: ['request_session_lan_access', 'ask_user', 'http_fetch'],
+    avoidTools: ['browser_navigate'],
+    confidence: 'high',
+    hint: '需局域网 → request_session_lan_access 或 ask_user（allow_lan_session）；有效 LAN=全局||会话',
+  },
+  {
+    intent: 'secret_vault',
+    priority: 95,
+    patterns: [
+      /密钥保险箱|保险箱.*密钥|存入保险箱/,
+      /(?:录入|保存|写入).*(?:数据密钥|密钥|口令)/,
+      /request_secret|list_vault_secrets|grant_session_secret/i,
+      /API\s*密钥|第三方密钥|脚本.*密钥|不要.*粘贴.*密钥/i,
+    ],
+    preferredTools: ['request_secret', 'list_vault_secrets', 'grant_session_secret'],
+    avoidTools: ['ask_user'],
+    confidence: 'high',
+    hint: '第三方密钥 → request_secret 写入保险箱；已有则 list_vault_secrets + grant_session_secret；禁止 ask_user 收密钥',
+  },
+  {
+    intent: 'workspace_grep',
+    priority: 93,
+    patterns: [
+      /(?:在|从)?(?:工作区|授权|本地).*(?:搜|搜索|查找|找).*(?:内容|文本|代码|字符串|关键词)/,
+      /(?:搜|搜索|查找).*(?:工作区|文件).*(?:内容|文本|代码)/,
+      /文件(?:里|中).*(?:有没有|包含|出现)|代码里.*(?:搜|找)/,
+      /workspace_grep|\bgrep\b/i,
+    ],
+    preferredTools: ['workspace_grep', 'opptrix_run', 'workspace_read', 'workspace_replace_lines', 'activate_tool_pack'],
+    avoidTools: ['search_library', 'search_document'],
+    confidence: 'high',
+    hint: '搜工作区内容 → workspace_grep（keywords+match_mode 或 pattern）或 opptrix_run(rg/grep)；再 workspace_read(numbered) → workspace_replace_lines；勿虚构已移除工具、勿用 list 递归翻目录',
+  },
+  {
+    intent: 'workspace_glob',
+    priority: 92,
+    patterns: [
+      /(?:找|列出|搜索).*(?:所有|全部)?.*\.(?:py|ts|tsx|js|jsx|json|md|csv)(?:\s|$|文件)/i,
+      /按(?:扩展名|文件名|模式).*(?:找|列|搜).*文件/,
+      /(?:哪些|所有).*(?:\.py|\.ts|\.js).*文件/,
+      /workspace_glob|\bglob\b/i,
+      /\*\*\/\*\.\w+/,
+    ],
+    preferredTools: ['workspace_glob', 'opptrix_run', 'workspace_read', 'activate_tool_pack'],
+    avoidTools: ['search_library'],
+    confidence: 'high',
+    hint: '按文件名模式找文件 → workspace_glob 或 opptrix_run(ls/find)；再 read / replace_lines；勿虚构已移除工具、勿递归翻目录',
+  },
+  {
+    intent: 'workspace_files',
+    priority: 88,
+    patterns: [
+      /工作区|保存(?:到|成)?(?:文件|报告|csv|json)|写入(?:文件|报告)|读取(?:本地|工作区)?文件/,
+      /列出(?:目录|文件夹|文件)|创建文件夹|删除(?:文件|目录)/,
+      /下载(?:到|保存).*(?:文件|pdf|附件)|download/i,
+    ],
+    preferredTools: ['workspace_glob', 'workspace_grep', 'opptrix_run', 'workspace_write', 'download_file'],
+    avoidTools: ['browser_navigate'],
+    confidence: 'high',
+    hint: '本地工作区：找文件/看树 → workspace_glob 或 opptrix_run(ls/find)；搜内容 → workspace_grep 或 opptrix_run(rg)；建目录 → opptrix_run(mkdir -p) 或 workspace_write；不知 root 时 list_workspace_grants 至多一次',
+  },
+  {
+    intent: 'workspace_message_uri',
+    priority: 91,
+    patterns: [
+      /(?:消息|回复|聊天)(?:里|中)?(?:引用|插入|贴上|展示).*(?:工作区|图片|文件|视频|音频)/,
+      /(?:引用|展示).*(?:工作区).*(?:图片|文件|视频|音频)|opptrix-ws:\/\//i,
+      /resolve_workspace_path_uri/i,
+    ],
+    preferredTools: ['resolve_workspace_path_uri', 'workspace_glob', 'list_workspace_grants'],
+    avoidTools: ['browser_navigate', 'create_canvas'],
+    confidence: 'high',
+    hint: '消息内引用工作区文件 → resolve_workspace_path_uri 得到 opptrix-ws://；禁止 file:// 与绝对路径',
+  },
+  {
+    intent: 'http_api',
+    priority: 92,
+    patterns: [
+      /调用(?:开放|公开)?\s*api/i,
+      /http(?:s)?\s*请求/i,
+      /\bfetch\b/i,
+      /获取(?:远程|外部)\s*json/i,
+      /restful/i,
+    ],
+    preferredTools: ['http_fetch'],
+    avoidTools: ['browser_navigate', 'download_file'],
+    confidence: 'high',
+    hint: '结构化 HTTP API → http_fetch；大文件落盘用 download_file',
+  },
+  {
+    intent: 'folder_access',
+    priority: 93,
+    patterns: [
+      /可访问(?:哪些|什么)?(?:目录|文件夹|路径)|能(?:读|访问|打开)(?:哪些|什么)?(?:目录|文件夹)/,
+      /(?:本对话|当前对话|本会话).*(?:授权|可访问).*(?:工作区|目录|文件夹)/,
+      /授权(?:访问|读取|写入)?(?:文件夹|目录)|访问(?:我的|本地)(?:文件夹|目录)/,
+      /request_folder|list_workspace_grants/i,
+    ],
+    preferredTools: ['list_workspace_grants', 'request_folder_access'],
+    avoidTools: ['get_project_info', 'get_system_info', 'workspace_write'],
+    confidence: 'high',
+    hint: '不知 root_id / 问可访问目录 → list_workspace_grants（至多一次）；已知 root 直接 glob/grep/run；勿用 get_project_info 的 paths；需额外目录再 request_folder_access',
+  },
+  {
+    intent: 'market_regime',
+    priority: 84,
+    patterns: [/牛熊|风险偏好|市场状态|宏观环境|现在是牛市|熊市吗/],
+    preferredTools: ['get_market_regime'],
+    avoidTools: ['get_instrument_snapshot', 'get_market_dynamics'],
+    confidence: 'high',
+    hint: '问宏观牛熊叙事 → get_market_regime；CPI/LPR 等数字序列先 MCP 问数',
+  },
+  {
+    intent: 'market_dynamics',
+    // 高于 dragon_tiger(85)：同时问涨跌榜+龙虎榜时走全景，勿拆成 get_dragon_tiger
+    priority: 86,
+    patterns: [
+      /涨跌榜|板块轮动|市场全景|全球市场|市场动态|盘面概览|今日复盘|盘面复盘|全景复盘/,
+      /涨跌榜.{0,8}龙虎|龙虎榜.{0,8}涨跌/,
+      /龙虎榜|涨停池|连板天梯|晋级之路/,
+    ],
+    preferredTools: ['get_market_dynamics', 'get_market_regime'],
+    avoidTools: ['get_instrument_snapshot', 'web_search'],
+    confidence: 'high',
+    hint: '问涨跌榜/全景复盘 → get_market_dynamics（已含龙虎榜摘要）',
+  },
+  {
+    intent: 'morning_brief',
+    priority: 80,
+    patterns: [/早报|开盘简报|盘前/],
+    preferredTools: ['activate_agent_skill', 'list_agent_skills', 'get_market_dynamics'],
+    avoidTools: ['get_market_session'],
+    confidence: 'high',
+    hint: '早报/盘前 → 激活工作流技能 morning-market-brief；勿用 get_market_session 代替',
+  },
+  {
+    intent: 'closing_report',
+    priority: 80,
+    patterns: [/收盘报告|收盘复盘|尾盘总结/],
+    preferredTools: ['activate_agent_skill', 'list_agent_skills', 'get_market_dynamics'],
+    avoidTools: ['get_market_session'],
+    confidence: 'high',
+    hint: '收盘复盘 → 激活工作流技能 closing-market-brief',
+  },
+  {
+    intent: 'sector_constituents',
+    priority: 82,
+    patterns: [/板块成分|行业成分|成分股列表|板块里有哪些|同板块股票|行业成分股/],
+    preferredTools: ['get_sector_constituents', 'search_instruments'],
+    avoidTools: ['get_etf_holdings'],
+    confidence: 'high',
+    hint: '板块/行业成分 → get_sector_constituents（须 board_key/industry_code）；勿用产业链叙事代替',
+  },
+  {
+    intent: 'market_session',
+    priority: 78,
+    patterns: [/现在(开盘|休市|交易中)吗|是否开盘|交易时段|盘前还是盘后|市场开了吗|现在是盘中吗/],
+    preferredTools: ['get_market_session', 'get_trade_calendar', 'get_current_time'],
+    avoidTools: ['get_market_dynamics'],
+    confidence: 'high',
+    hint: '问是否开盘/时段 → get_market_session；完整交易日/休市 → get_trade_calendar',
+  },
+  {
+    intent: 'industry',
+    priority: 76,
+    patterns: [/产业链|上下游|行业透视|主题观察池|行业图谱|mermaid/i],
+    preferredTools: ['activate_agent_skill', 'list_agent_skills'],
+    avoidTools: ['search_instruments'],
+    confidence: 'high',
+    hint: '产业链/上下游 → 激活工作流技能 industry-chain（含内置知识库）；代表公司先 namespaced MCP 搜码/问数，不足再用 search_instruments',
+  },
+  {
+    intent: 'institution',
+    priority: 72,
+    patterns: [/机构评级|目标价|券商评级|机构观点/],
+    preferredTools: ['get_instrument_institution_rating', 'get_instrument_institution_report'],
+    avoidTools: ['web_search'],
+    confidence: 'high',
+    hint: '机构评级 → rating 概览，详报用 report',
+  },
+  {
+    intent: 'balance_sheet',
+    priority: 74,
+    patterns: [/资产负债表|资产负债明细|总资产|总负债|股东权益|所有者权益|负债率明细/],
+    preferredTools: ['get_instrument_balance_sheet', 'get_instrument_financials', 'get_instrument_snapshot'],
+    avoidTools: ['query_market_capability'],
+    confidence: 'high',
+    hint: '资产负债表 → 先 namespaced MCP 问数（若有），不足再用 get_instrument_balance_sheet；勿只用摘要 financials 代替完整表',
+  },
+  {
+    intent: 'cash_flow_statement',
+    priority: 74,
+    patterns: [/现金流量表|经营现金流|筹资现金流|投资现金流|现金流明细|自由现金流/],
+    preferredTools: ['get_instrument_cash_flow', 'get_instrument_financials', 'get_instrument_snapshot'],
+    avoidTools: ['query_market_capability'],
+    confidence: 'high',
+    hint: '现金流量表 → 先 namespaced MCP 问数（若有），不足再用 get_instrument_cash_flow',
+  },
+  {
+    intent: 'income_statement',
+    priority: 75,
+    patterns: [/利润表|损益表|营业收入明细|营业成本|费用明细|三表/],
+    preferredTools: [
+      'get_instrument_income_statement',
+      'get_instrument_balance_sheet',
+      'get_instrument_cash_flow',
+      'get_instrument_financials',
+    ],
+    avoidTools: ['query_market_capability'],
+    confidence: 'high',
+    hint: '利润表/三表 → 先 namespaced MCP 问数（若有），不足再用 get_instrument_income_statement（及资产负债/现金流）；摘要不够时勿只调 financials',
+  },
+  {
+    intent: 'financial_indicators',
+    priority: 73,
+    patterns: [/财务指标|盈利能力指标|偿债能力|营运能力|杜邦|roe明细|毛利率明细/i],
+    preferredTools: ['get_instrument_financial_indicators', 'get_instrument_financials'],
+    avoidTools: ['query_market_capability'],
+    confidence: 'high',
+    hint: '财务指标树 → get_instrument_financial_indicators（须 report）',
+  },
+  {
+    intent: 'trade_calendar',
+    priority: 81,
+    patterns: [/交易日历|交易日|休市日|下一交易日|哪天开市|节假日休市|A股日历/],
+    preferredTools: ['get_trade_calendar', 'get_market_session', 'get_current_time'],
+    avoidTools: ['get_market_dynamics'],
+    confidence: 'high',
+    hint: '交易日/休市 → get_trade_calendar；仅问是否盘中用 get_market_session',
+  },
+  {
+    intent: 'index_constituents',
+    priority: 83,
+    patterns: [/指数成分|沪深300成分|上证50成分|中证500成分|指数里有哪些股|成分指数|同花顺概念成分/],
+    preferredTools: ['get_index_constituents', 'get_sector_constituents', 'search_instruments'],
+    avoidTools: ['get_etf_holdings'],
+    confidence: 'high',
+    hint: '指数/同花顺概念成分 → get_index_constituents',
+  },
+  {
+    intent: 'financials',
+    priority: 72,
+    patterns: [/营收|净利润|ROE|财报|财务|同比|毛利率|每股收益|\bEPS\b/i],
+    preferredTools: [
+      'get_instrument_financials',
+      'get_instrument_income_statement',
+      'get_instrument_balance_sheet',
+      'get_instrument_cash_flow',
+      'get_instrument_snapshot',
+    ],
+    avoidTools: ['query_market_capability', 'web_search'],
+    confidence: 'high',
+    hint: '财务摘要 → 先 namespaced MCP 问数（若有），不足再用 get_instrument_financials；明细三表与指标用专用工具',
+  },
+  {
+    intent: 'profile',
+    priority: 70,
+    patterns: [/公司简介|主营业务|所属概念|所属行业|做什么的|公司概况|F10|基本资料/],
+    preferredTools: ['get_instrument_profile', 'get_instrument_snapshot'],
+    avoidTools: ['query_market_capability'],
+    confidence: 'high',
+    hint: '公司概况/概念 → 先 namespaced MCP 问数（若有），不足再用 get_instrument_profile',
+  },
+  {
+    intent: 'shareholders',
+    priority: 68,
+    patterns: [/十大股东|股东结构|股东持股|股权结构|流通股东|谁持股/],
+    preferredTools: ['get_instrument_shareholders', 'get_instrument_snapshot'],
+    avoidTools: ['get_instrument_institution_holdings'],
+    confidence: 'high',
+    hint: '十大股东/股本 → get_instrument_shareholders；季报机构持仓改 get_instrument_institution_holdings',
+  },
+  {
+    intent: 'institution_holdings',
+    priority: 70,
+    patterns: [
+      /机构持仓|基金持仓|QFII|社保持仓|券商持仓|保险持仓|信托持仓|主力数据|持股明细|机构持股一览/i,
+      /公募持仓|机构汇总持仓/,
+    ],
+    preferredTools: ['get_instrument_institution_holdings', 'get_instrument_shareholders'],
+    avoidTools: ['query_market_capability'],
+    confidence: 'high',
+    hint: '季报机构持仓 → get_instrument_institution_holdings(scope=overview|detail)；勿用十大股东代替',
+  },
+  {
+    intent: 'dividend',
+    priority: 66,
+    patterns: [/分红|派息|股息|股利|分红历史|分红方案/],
+    preferredTools: ['get_instrument_dividend', 'get_instrument_snapshot'],
+    avoidTools: [],
+    confidence: 'high',
+    hint: '分红派息 → get_instrument_dividend',
+  },
+  {
+    intent: 'price_only',
+    priority: 65,
+    patterns: [/只要现价|不要评分|不要深度|不要分析/],
+    preferredTools: ['get_instrument_quotes'],
+    avoidTools: ['get_instrument_snapshot', 'web_search'],
+    confidence: 'high',
+    hint: '只要现价 → get_instrument_quotes，勿拉综合快照',
+  },
+  {
+    intent: 'price_only',
+    priority: 64,
+    patterns: [/现价|最新价|多少钱|涨跌幅|实时行情|报价|现报/],
+    preferredTools: ['get_instrument_quotes', 'get_instrument_snapshot'],
+    avoidTools: ['web_search'],
+    confidence: 'high',
+    hint: '只需现价/涨跌 → 先 namespaced MCP 行情/问数（若有），不足再用本地 get_instrument_quotes / get_instrument_snapshot',
+  },
+  {
+    intent: 'search',
+    priority: 60,
+    patterns: [/搜一下|帮我找|叫什么代码|代码是多少|查一下.*是哪只|模糊搜索|搜(?:索|一下|下)?\s*[036]\d{5}/],
+    preferredTools: ['search_instruments', 'get_instrument_snapshot'],
+    avoidTools: ['web_search'],
+    confidence: 'high',
+    hint: '不确定代码 → 搜索/问数必须先调外部 MCP（server__tool）；search_instruments 仅当标的代码歧义或外部 MCP 未启用/失败',
+  },
+  {
+    intent: 'capabilities',
+    priority: 58,
+    patterns: [/能查什么|有哪些能力|支持什么数据|capabilities/i],
+    preferredTools: ['get_instrument_capabilities', 'list_tool_packs'],
+    avoidTools: [],
+    confidence: 'high',
+    hint: '问标的能力 → get_instrument_capabilities；问工具包 → list_tool_packs',
+  },
+  {
+    intent: 'provider_ext',
+    priority: 56,
+    patterns: [/自定义方法|invoke_provider|list_provider/i],
+    preferredTools: ['list_enabled_providers', 'query_market_capabilities', 'query_market_capability'],
+    avoidTools: ['get_instrument_snapshot'],
+    confidence: 'medium',
+    hint: '自定义数据源 → list → invoke；标准三表/日历勿走 custom',
+  },
+  {
+    intent: 'depth_analysis',
+    priority: 40,
+    patterns: [/分析|评估|评分|打分|值得买|好不好|深度|怎么看|研究一下|全面看看/],
+    preferredTools: [
+      'search_instruments',
+      'get_instrument_snapshot',
+      'get_instrument_financials',
+      'get_instrument_income_statement',
+      'get_instrument_balance_sheet',
+      'get_instrument_cash_flow',
+      'get_instrument_profile',
+      'get_instrument_institution_rating',
+    ],
+    avoidTools: ['get_instrument_quotes', 'web_search'],
+    confidence: 'medium',
+    hint: '深度分析：代码未定时搜索/问数必须先调外部 MCP；search_instruments 仅歧义或 MCP 未启用/失败；已有代码则先 namespaced MCP 问数/行情，不足再用本地 snapshot / 三表/摘要/profile 事实表',
+  },
+  {
+    intent: 'etf_general',
+    priority: 38,
+    patterns: [/\bETF\b|场内基金|联接基金/i],
+    preferredTools: ['search_instruments', 'get_instrument_snapshot', 'get_etf_profile', 'get_etf_nav', 'get_etf_holdings'],
+    avoidTools: ['get_portfolio_holdings'],
+    confidence: 'medium',
+    hint: 'ETF 综合：搜码/问数必须先调外部 MCP；search_instruments 仅歧义或 MCP 未启用/失败；再先 MCP 问数/概况，不足再用 snapshot/profile；明确净值用 get_etf_nav，成分用 get_etf_holdings',
+  },
+]
+
+/** 易混对 — 全局消歧（仅当两侧工具均已加载时注入） */
+export const TOOL_CONFUSION_PAIRS: ReadonlyArray<{
+  prefer: string
+  avoid: string
+  when: string
+}> = [
+  { prefer: 'activate_agent_skill', avoid: 'create_agent_skill', when: '用户要新建/定制工作流技能 → 先 activate create-skill 引导，勿直接 create 跳过步骤' },
+  { prefer: 'activate_agent_skill', avoid: 'import_agent_skill', when: '从零创建工作流技能 → 用 create-skill 引导，勿直接 import' },
+  { prefer: 'get_instrument_balance_sheet', avoid: 'get_instrument_financials', when: '要资产负债表明细而非摘要' },
+  { prefer: 'get_instrument_cash_flow', avoid: 'get_instrument_financials', when: '要现金流量表明细而非摘要字段' },
+  { prefer: 'get_instrument_income_statement', avoid: 'get_instrument_financials', when: '要利润表明细而非摘要' },
+  { prefer: 'get_trade_calendar', avoid: 'get_market_session', when: '要交易日/休市列表而非仅是否盘中' },
+  { prefer: 'get_index_constituents', avoid: 'get_sector_constituents', when: '问指数成分而非申万/板块 key 成分' },
+  { prefer: 'get_instrument_profile', avoid: 'get_instrument_snapshot', when: '只要公司概况/概念，不需综合快照' },
+  { prefer: 'get_instrument_financials', avoid: 'query_market_capability', when: '标准 financials 已覆盖' },
+  { prefer: 'get_instrument_balance_sheet', avoid: 'query_market_capability', when: '标准 balance_sheet 已覆盖' },
+  { prefer: 'get_instrument_cash_flow', avoid: 'query_market_capability', when: '标准 cash_flow 已覆盖' },
+  { prefer: 'get_instrument_income_statement', avoid: 'query_market_capability', when: '标准 income_statement 已覆盖' },
+  { prefer: 'get_instrument_snapshot', avoid: 'get_instrument_quotes', when: '需要综合快照（行情+概况），不止最新价' },
+  { prefer: 'get_etf_nav', avoid: 'get_instrument_quotes', when: '问 ETF 净值/溢价序列' },
+  { prefer: 'get_etf_holdings', avoid: 'get_portfolio_holdings', when: '问 ETF 成分而非个人持仓' },
+  { prefer: 'get_etf_profile', avoid: 'get_instrument_profile', when: '问 ETF 档案而非股票公司概况' },
+  { prefer: 'get_fund_nav', avoid: 'get_instrument_quotes', when: '问公募基金净值序列' },
+  { prefer: 'get_fund_nav', avoid: 'get_etf_nav', when: '问公募基金而非 ETF 净值' },
+  { prefer: 'get_fund_holdings', avoid: 'get_etf_holdings', when: '问公募基金季报重仓而非 ETF 成分' },
+  { prefer: 'get_fund_profile', avoid: 'get_etf_profile', when: '问公募基金档案而非 ETF 档案' },
+  { prefer: 'get_sector_constituents', avoid: 'get_etf_holdings', when: '问股票板块成分而非 ETF 持仓' },
+  { prefer: 'get_market_session', avoid: 'activate_agent_skill', when: '只问是否开盘/时段' },
+  { prefer: 'get_portfolio_holdings', avoid: 'get_watchlist', when: '问实盘持仓而非关注列表' },
+  { prefer: 'get_market_regime', avoid: 'get_instrument_snapshot', when: '问大盘牛熊而非单股' },
+  { prefer: 'list_news_articles', avoid: 'get_instrument_snapshot', when: '主任务是读资讯而非个股快照' },
+  { prefer: 'activate_agent_skill', avoid: 'search_instruments', when: '先做产业链（industry-chain 技能），代表公司再 MCP/本地搜码' },
+  { prefer: 'search_instruments', avoid: 'get_instrument_snapshot', when: '代码未确认时先搜码/问数，勿直接拉快照（优先 MCP 搜码；search_instruments 仅歧义或 MCP 未启用/失败）' },
+  { prefer: 'list_workspace_grants', avoid: 'get_project_info', when: '问可访问目录/授权工作区而非运行环境' },
+  { prefer: 'list_workspace_grants', avoid: 'get_system_info', when: '问文件访问范围而非系统信息' },
+  { prefer: 'browser_navigate', avoid: 'list_news_articles', when: '用户给出外部 URL 而非读订阅资讯' },
+  { prefer: 'browser_navigate', avoid: 'web_search', when: '用户已给出外部 URL，打开网页而非网页搜索' },
+  { prefer: 'web_search', avoid: 'search_instruments', when: '非股市公开网页（百科/文档/政策），而非搜股票代码' },
+  { prefer: 'web_search', avoid: 'query2data', when: '非股市公开网页检索，而非问财问数' },
+  { prefer: 'web_search', avoid: 'list_news_articles', when: '非股市公开网页检索，而非订阅资讯' },
+  { prefer: 'search_instruments', avoid: 'web_search', when: '搜股票代码/简称，而非公开网页' },
+  { prefer: 'query2data', avoid: 'web_search', when: '股市问数/选股/财务数据，而非公开网页检索' },
+  { prefer: 'news_search', avoid: 'web_search', when: '股市资讯，而非公开网页检索' },
+  { prefer: 'announcement_search', avoid: 'web_search', when: '上市公司公告，而非公开网页检索' },
+  { prefer: 'report_search', avoid: 'web_search', when: '机构研报，而非公开网页检索' },
+  { prefer: 'browser_snapshot', avoid: 'get_instrument_snapshot', when: '读取外部网页而非标的快照' },
+  { prefer: 'browser_snapshot', avoid: 'get_news_article', when: '外部网页内容而非 RSS 资讯正文' },
+  { prefer: 'list_news_articles', avoid: 'browser_navigate', when: '浏览订阅资讯而非任意 URL' },
+  { prefer: 'list_scheduled_jobs', avoid: 'opptrix_run', when: '管理或查看计划任务而非临时跑脚本' },
+  { prefer: 'run_scheduled_job_now', avoid: 'opptrix_run', when: '执行已登记的计划任务' },
+  { prefer: 'create_scheduled_job', avoid: 'opptrix_run', when: '用户要定时重复执行而非一次性命令' },
+  { prefer: 'search_library', avoid: 'search_document', when: '跨会话/跨研报检索 → search_library，勿用 search_document 单篇检索' },
+  { prefer: 'search_library', avoid: 'list_session_documents', when: '问哪些研报提到某标的/跨研报主题 → search_library，非本会话附件列表' },
+  { prefer: 'create_web', avoid: 'workspace_write', when: '要可预览 HTML 网页制品而非写工作区文件' },
+  { prefer: 'create_web', avoid: 'create_canvas', when: '明确要 HTML/网页/Chart.js/ECharts 页面时用 create_web，而非 TSX 画布' },
+  { prefer: 'create_canvas', avoid: 'create_web', when: '投研可视化报告/画布排版用 create_canvas，而非 HTML 网页' },
+  { prefer: 'resolve_industry_universe', avoid: 'query_data', when: '行业/板块指标排名尚未确认公司名单 → 先 resolve_industry_universe，勿直接 query_data' },
+  { prefer: 'resolve_industry_universe', avoid: 'search_instruments', when: '行业指标对比先解析可确认宇宙，勿只搜单个代码' },
+  { prefer: 'resolve_industry_universe', avoid: 'get_instrument_financials', when: '行业截面对比走研究画布，勿用财务摘要拼名单' },
+  { prefer: 'refine_dataset', avoid: 'query_data', when: '已有数据集上去掉公司或收窄年份 → refine_dataset，勿再次 query_data' },
+  { prefer: 'propose_widget', avoid: 'refine_dataset', when: '只改图种 → propose_widget，勿 refine_dataset' },
+  { prefer: 'propose_widget', avoid: 'update_widget', when: '只改图种或收窄研究范围 → propose_widget，勿擅自 update_widget' },
+  { prefer: 'update_proposal', avoid: 'update_widget', when: '预览未 Adopt 时改颜色/图例/轴标题 → update_proposal，勿 update_widget' },
+  { prefer: 'update_widget', avoid: 'update_proposal', when: '已 Adopt 到右侧画布的图改样式 → update_widget，勿 update_proposal' },
+  { prefer: 'refine_dataset', avoid: 'update_proposal', when: '分组均值/算术平均 → refine_dataset(aggregate_groups) 再 propose_widget' },
+  { prefer: 'query_data', avoid: 'refine_dataset', when: '改看另一指标 → query_data，勿 refine_dataset' },
+  { prefer: 'refine_dataset', avoid: 'delete_widget', when: '去掉公司而非删图 → refine_dataset' },
+  { prefer: 'query_data', avoid: 'get_instrument_financials', when: '比较多家公司标准财务指标并画研究画布 → query_data，勿用财务摘要工具拼 Dataset' },
+  { prefer: 'query_data', avoid: 'create_canvas', when: '比较毛利率等到研究预览 → query_data + propose_widget，勿用报告画布' },
+  { prefer: 'propose_widget', avoid: 'query_data', when: '已有数据集时再看排名/趋势 → propose_widget，勿再次 query_data' },
+  { prefer: 'propose_widget', avoid: 'create_widget', when: '比较/看看/分析默认提出对话预览，勿自动写入右侧画布' },
+  { prefer: 'create_widget', avoid: 'query_data', when: '明确加入右侧/再加一个图 → create_widget，勿再次 query_data' },
+  { prefer: 'create_widget', avoid: 'create_canvas', when: '右侧研究画布加图/改组件/删组件 → create_widget / update_widget / delete_widget，勿用报告画布 create_canvas' },
+  { prefer: 'update_widget', avoid: 'create_canvas', when: '改右侧已有组件类型或标题 → update_widget，勿新建报告画布' },
+  { prefer: 'delete_widget', avoid: 'create_canvas', when: '删右侧研究画布组件 → delete_widget' },
+  { prefer: 'create_canvas', avoid: 'create_widget', when: '完整可视化报告/投研画布排版用 create_canvas，而非右侧研究画布组件' },
+]
+
+const CN_CODE_RE = /(?:^|[^\d])([036]\d{5})(?:[^\d]|$)/
+const NS_REF_RE = /\b(?:CN|US|HK|CRYPTO):[A-Z0-9./]+\b/i
+const COMPANY_NAME_RE = /茅台|宁德|比亚迪|腾讯|苹果|阿里|bitcoin|比特币|贵州茅台|招商银行|美团|小米/i
+
+function hasInstrumentCue(message: string): boolean {
+  return CN_CODE_RE.test(message) || NS_REF_RE.test(message) || COMPANY_NAME_RE.test(message)
+}
+
+const L1_INTENTS = new Set([
+  'price_only',
+  'search',
+  'capabilities',
+  'general',
+  'watchlist',
+  'portfolio_trades',
+  'financials',
+  'balance_sheet',
+  'cash_flow_statement',
+  'income_statement',
+  'financial_indicators',
+  'trade_calendar',
+  'index_constituents',
+  'profile',
+  'shareholders',
+  'institution_holdings',
+  'dividend',
+  'market_session',
+  'sector_constituents',
+  'etf_profile',
+  'etf_nav',
+  'etf_holdings',
+  'web_snapshot_only',
+  'create_canvas',
+  'research_industry_universe',
+  'research_canvas_query',
+  'research_canvas_refine',
+  'research_canvas_propose',
+  'research_canvas_create',
+  'research_canvas_update',
+  'research_canvas_delete',
+  'create_mindmap',
+  'create_web',
+  'web_search',
+])
+
+const L3_INTENTS = new Set([
+  'depth_analysis',
+  'industry',
+  'portfolio_analysis',
+  'etf_general',
+])
+
+/** 显式要求全面/深度 → 强制 L3 */
+const L3_UPGRADE_RE = /全面|深度分析|深度研究|系统分析|完整复盘|投研备忘|综合评估|怎么研究/
+
+/**
+ * 由意图 + 话术确定研究档位（可测、确定性）。
+ */
+export function resolveResearchTier(intent: string, message: string): ResearchTier {
+  const text = message.trim()
+  if (L3_UPGRADE_RE.test(text)) return 'L3'
+  if (L3_INTENTS.has(intent)) return 'L3'
+  if (L1_INTENTS.has(intent)) return 'L1'
+  return 'L2'
+}
+
+function packsForTools(tools: string[]): ToolPackId[] {
+  const packs = new Set<ToolPackId>()
+  const always = new Set(alwaysOnPackIds())
+  for (const t of tools) {
+    const p = packIdForTool(t)
+    if (p && !always.has(p)) packs.add(p)
+  }
+  return [...packs]
+}
+
+  /** 编程能力意图：强制补种 workspace（不剔除投研/行情 pack） */
+  const CODING_INTENTS = new Set([
+    'workspace_coding',
+    'workspace_line_edit',
+    'workspace_code_preflight',
+    'workspace_shell',
+    'workspace_shell_install',
+    'workspace_shell_network',
+    'workspace_grep',
+    'workspace_glob',
+    'workspace_files',
+  ])
+
+  export function isCodingIntent(intent: string): boolean {
+    return CODING_INTENTS.has(intent)
+  }
+
+  /**
+   * 编程意图下：强制含 workspace；保留已有投研/行情 pack（可并用）。
+   */
+  export function forceCodingSeedPacks(
+    packs: readonly ToolPackId[],
+  ): ToolPackId[] {
+    const out: ToolPackId[] = []
+    const seen = new Set<ToolPackId>()
+    const push = (id: ToolPackId) => {
+      if (seen.has(id)) return
+      seen.add(id)
+      out.push(id)
+    }
+    push('workspace')
+    for (const p of packs) push(p)
+    return out
+  }
+
+function matchIntent(message: string): IntentRule | null {
+  const text = message.trim()
+  if (!text) return null
+  let best: IntentRule | null = null
+  for (const rule of INTENT_RULES) {
+    if (!rule.patterns.some(re => re.test(text))) continue
+    if (!best || rule.priority > best.priority) best = rule
+  }
+  return best
+}
+
+/**
+ * 解析本轮工具路由计划（确定性）。
+ */
+export function resolveToolRoutePlan(input: ToolRouteResolveInput): ToolRoutePlan {
+  const message = input.message.trim()
+  const matched = matchIntent(message)
+  const seeded = resolveSeedPacks({ message, contextRef: input.contextRef })
+
+  const finish = (
+    partial: Omit<ToolRoutePlan, 'researchTier'>,
+  ): ToolRoutePlan => ({
+    ...partial,
+    researchTier: resolveResearchTier(partial.intent, message),
+  })
+
+  if (!matched) {
+    // 有标的线索但无明确意图 → 轻量深度路径
+    if (hasInstrumentCue(message)) {
+      const preferredTools = ['get_instrument_snapshot', 'get_instrument_institution_rating', 'search_instruments']
+      const requiredPacks = packsForTools(preferredTools)
+      const seedPacks = mergePackBudget(requiredPacks, seeded)
+      return finish({
+        preferredTools,
+        avoidTools: ['get_instrument_quotes'],
+        requiredPacks,
+        seedPacks,
+        confidence: 'medium',
+        intent: 'instrument_cue',
+        routeHint: '已识别标的线索：先 namespaced MCP 行情/问数，不足再用本地 get_instrument_snapshot；代码不确定时先外部 MCP 搜码/问数；search_instruments 仅歧义或 MCP 未启用/失败',
+      })
+    }
+    if (input.contextRef?.kind === 'article') {
+      const preferredTools = ['get_news_article', 'list_news_articles']
+      const requiredPacks = packsForTools(preferredTools)
+      return finish({
+        preferredTools,
+        avoidTools: ['get_instrument_snapshot'],
+        requiredPacks,
+        seedPacks: mergePackBudget(requiredPacks, seeded),
+        confidence: 'high',
+        intent: 'article_context',
+        routeHint: '引用资讯上下文：用资讯工具阅读/扩展，勿改走个股快照',
+      })
+    }
+    return finish({
+      preferredTools: ['search_instruments', 'ask_user', 'list_tool_packs'],
+      avoidTools: [],
+      requiredPacks: [],
+      seedPacks: seeded,
+      confidence: 'low',
+      intent: 'general',
+      routeHint: '意图不明确：可先外部 MCP 搜码/问数澄清标的（search_instruments 仅歧义或 MCP 未启用/失败），或 list_tool_packs / ask_user',
+    })
+  }
+
+  let preferredTools = [...matched.preferredTools]
+  // 深度分析且代码未知 → 本地 search 进 preferred（冻结不按 preferred 重排；选型卡 hint 已要求先 MCP）
+  if (matched.intent === 'depth_analysis' && !hasInstrumentCue(message)) {
+    preferredTools = ['search_instruments', ...preferredTools.filter(t => t !== 'search_instruments')]
+  }
+  // 深度分析且已有代码 → search 降为可选末位
+  if (matched.intent === 'depth_analysis' && hasInstrumentCue(message)) {
+    preferredTools = preferredTools.filter(t => t !== 'search_instruments')
+    preferredTools = [
+      'get_instrument_snapshot',
+      'get_instrument_financials',
+      'get_instrument_profile',
+      'get_instrument_institution_rating',
+      ...preferredTools.filter(
+        t =>
+          t !== 'get_instrument_snapshot'
+          && t !== 'get_instrument_financials'
+          && t !== 'get_instrument_profile'
+          && t !== 'get_instrument_institution_rating',
+      ),
+    ]
+  }
+
+  let requiredPacks = packsForTools(preferredTools)
+  // L3 且用户要「全面」时：预算扩到 3，以同时容纳 analytics + fundamentals + market
+  const tierPreview = resolveResearchTier(matched.intent, message)
+  const packBudget =
+    tierPreview === 'L3' && L3_UPGRADE_RE.test(message)
+      ? Math.max(MAX_SEEDED_BUSINESS_PACKS, 3)
+      : MAX_SEEDED_BUSINESS_PACKS
+  if (tierPreview === 'L3' && L3_UPGRADE_RE.test(message) && !requiredPacks.includes('market')) {
+    requiredPacks = mergePackBudget([...requiredPacks, 'market'], seeded, packBudget)
+  }
+  let seedPacks = mergePackBudget(requiredPacks, seeded, packBudget)
+
+  // 编程意图：强制补种 workspace；不剔除行情/投研 pack（投研为主 + Coding 能力）
+  if (isCodingIntent(matched.intent)) {
+    seedPacks = forceCodingSeedPacks(seedPacks)
+    requiredPacks = forceCodingSeedPacks(
+      requiredPacks.includes('workspace') ? requiredPacks : ['workspace', ...requiredPacks],
+    )
+  }
+
+  return finish({
+    preferredTools,
+    avoidTools: matched.avoidTools ?? [],
+    requiredPacks,
+    seedPacks,
+    confidence: matched.confidence,
+    intent: matched.intent,
+    routeHint: matched.hint,
+  })
+}
+
+/** required 优先占预算，再用播种补足 */
+function mergePackBudget(
+  required: ToolPackId[],
+  seeded: ToolPackId[],
+  max = MAX_SEEDED_BUSINESS_PACKS,
+): ToolPackId[] {
+  const out: ToolPackId[] = []
+  const seen = new Set<ToolPackId>()
+  for (const p of [...required, ...seeded]) {
+    if (seen.has(p)) continue
+    seen.add(p)
+    out.push(p)
+    if (out.length >= max) break
+  }
+  return out
+}
+
+/**
+ * 生成本轮选型卡（仅引用已加载工具，避免提示未暴露工具）。
+ * 外部 MCP（server__tool）若已加载，展示首选须排在本地 preferred 之前，且 search_instruments 降为勿优先。
+ */
+export function buildRoundRoutePlaybook(
+  plan: ToolRoutePlan,
+  activeToolNames: readonly string[],
+): string {
+  const loaded = new Set(activeToolNames)
+  const mcpNames = activeToolNames.filter(n => parseNamespacedMcpTool(n))
+  const localPreferred = plan.preferredTools.filter(t => loaded.has(t))
+  const preferred = mcpNames.length > 0
+    ? [...mcpNames, ...localPreferred.filter(t => t !== 'search_instruments')]
+    : localPreferred
+  const avoidSet = new Set(plan.avoidTools.filter(t => loaded.has(t)))
+  if (mcpNames.length > 0 && loaded.has('search_instruments')) {
+    avoidSet.add('search_instruments')
+  }
+  const avoid = [...avoidSet]
+  const confusions = TOOL_CONFUSION_PAIRS.filter(
+    p => loaded.has(p.prefer) && loaded.has(p.avoid),
+  )
+
+  const lines = [
+    '【本轮工具选型卡 — 必须优先遵守】（外部 MCP 优先于本卡本地顺序；稳定性：远程失败再本地）',
+    `- 意图标签：${plan.intent}（置信度 ${plan.confidence}）`,
+    `- 研究档位：${plan.researchTier}`,
+    `- 选型说明：${plan.routeHint}`,
+  ]
+
+  if (preferred.length) {
+    lines.push(`- 首选调用顺序：${preferred.join(' → ')}`)
+    if (mcpNames.length > 0) {
+      lines.push(
+        '- 搜索/问数/选股必须先调外部 MCP（上列 server__tool）。search_instruments 仅当标的代码歧义或外部 MCP 未启用/失败时才允许。',
+      )
+    }
+    lines.push('- 首选工具已在本轮 tools 中：直接调用，勿仅为开工再 activate_tool_pack；结果不够再扩业务 pack，或 activate workspace 用沙盒编程补齐')
+    if (plan.researchTier === 'L1') {
+      lines.push('- L1：证据足够即停，禁止为「看起来专业」继续堆工具')
+    } else {
+      lines.push('- 若首选结果已足够回答用户，停止继续堆工具；不足再沿顺序下调')
+    }
+    if (plan.intent.startsWith('research_canvas')) {
+      lines.push('- 研究画布回合：先取数再预览，聊天只写短评；禁止写成深度备忘录；用户可见正文禁止工具名与接口')
+    }
+  } else if (
+    plan.intent === 'create_canvas'
+    || plan.intent === 'create_mindmap'
+    || plan.intent === 'create_web'
+  ) {
+    lines.push('- 用户未在输入框加号中打开「报告与脑图」，本轮没有报告/脑图/网页工具')
+    lines.push('- 禁止调用 create_canvas / create_mindmap / create_web；禁止 activate_tool_pack 加载 artifacts；财务比较用研究预览，关系梳理用文字')
+  } else {
+    lines.push('- 当前 tools 列表中尚无意图对应工具，按阶梯处理：')
+    lines.push('  1) list_tool_packs 查看是否有匹配的业务 pack')
+    lines.push('  2) 有则 activate_tool_pack 加载对应 pack 后重试')
+    lines.push(
+      '  3) 仍无匹配或激活后仍不够 → activate_tool_pack([\'workspace\'])，用 opptrix_run / code_preflight / workspace_* 编程完成（ensure_python 仅失败兜底；可与已有数据工具结合）；勿空转 activate 无关 pack，勿直接声称无法完成',
+    )
+  }
+
+  if (avoid.length) {
+    lines.push(`- 本轮勿优先：${avoid.join('、')}（除非用户明确要求）`)
+  }
+
+  if (confusions.length) {
+    lines.push('- 易混消歧：')
+    for (const c of confusions.slice(0, 6)) {
+      lines.push(`  · ${c.when} → 用 ${c.prefer}，不用 ${c.avoid}`)
+    }
+  }
+
+  if (plan.researchTier === 'L3') {
+    lines.push('- L3 覆盖检查（缺则 activate_tool_pack 或声明「本维未覆盖」）：')
+    lines.push('  · 身份：search / capabilities（已消歧可跳过）')
+    lines.push(`  · 价量事实：${loaded.has('get_instrument_snapshot') ? 'snapshot' : loaded.has('get_instrument_quotes') ? 'quotes' : '需加载 core 工具'}`)
+    lines.push(`  · 机构观点：${loaded.has('get_instrument_institution_rating') ? 'institution_rating 可用' : '需 activate fundamentals'}`)
+    lines.push(`  · 市场环境：${loaded.has('get_market_regime') ? 'regime 可用' : '未加载则声明未拉宏观，或 activate market'}`)
+    lines.push(`  · 事件披露：${loaded.has('list_news_articles') || loaded.has('get_notice_content') ? 'news/notice 可用' : '用户问事件时再 activate news；勿臆造催化'}`)
+  }
+
+  lines.push(
+    '- 禁止调用未出现在本轮 tools 参数中的工具名；缺能力时先 activate 对应业务 pack，标准工具仍不够则 activate workspace 用沙盒编程实现',
+  )
+  return lines.join('\n')
+}
+
+/**
+ * 将首选工具排到 OpenAI tools 列表前面（部分模型对靠前 schema 更敏感）。
+ *
+ * @param opts.remoteFirst 远程 MCP（命名空间 `server__tool`）工具整体排在本地工具之前，
+ *   仅在组内应用 preferred 排序；命名空间工具用其基础工具名匹配 preferred。
+ *   本地工具是兜底，故永远排在远程之后。
+ */
+export function orderToolsByPreference<T extends { function?: { name?: string }; name?: string }>(
+  tools: T[],
+  preferredTools: readonly string[],
+  opts?: { remoteFirst?: boolean },
+): T[] {
+  const remoteFirst = opts?.remoteFirst ?? false
+  if (!preferredTools.length && !remoteFirst) return tools
+  const rank = new Map(preferredTools.map((n, i) => [n, i]))
+  const nameOf = (t: T) => t.function?.name ?? t.name ?? ''
+  // 命名空间工具（server__tool）视为远程；用基础工具名匹配 preferred。
+  const baseName = (full: string) => parseNamespacedMcpTool(full)?.toolName ?? full
+  const isRemote = (full: string) => parseNamespacedMcpTool(full) != null
+  const rankOf = (full: string) => {
+    if (rank.has(full)) return rank.get(full)!
+    const base = baseName(full)
+    return rank.has(base) ? rank.get(base)! : 1000
+  }
+  return [...tools].sort((a, b) => {
+    const na = nameOf(a)
+    const nb = nameOf(b)
+    if (remoteFirst) {
+      const ga = isRemote(na) ? 0 : 1
+      const gb = isRemote(nb) ? 0 : 1
+      if (ga !== gb) return ga - gb
+    }
+    return rankOf(na) - rankOf(nb) || na.localeCompare(nb)
+  })
+}

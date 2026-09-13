@@ -1,0 +1,700 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import {
+  resolveInstrumentFromParams,
+  instrumentRefsFromList,
+  normalizeInstrumentHubParams,
+} from '../packages/shared/dist/instrument-param.js'
+import {
+  normalizeInstrumentRef,
+  canonicalHkSymbol,
+  instrumentRefLabel,
+  parseInstrumentNamespace,
+} from '../packages/shared/dist/instrument-symbol.js'
+import { instrumentRefKey } from '../packages/shared/dist/instrument-ref.js'
+import {
+  INSTRUMENT_HUB_FEATURE,
+  LEGACY_HUB_FEATURE_SHIM,
+  resolveInstrumentHubFeature,
+} from '../packages/shared/dist/instrument-hub.js'
+import {
+  resolveInstrumentQueryPlan,
+} from '../packages/a-stock-layer/dist/core/instrument-query.js'
+import { parseTickflowSymbol } from '../packages/a-stock-layer/dist/providers/tickflow/api/symbols.js'
+
+test('resolveInstrumentFromParams — legacy code and explicit market', () => {
+  const cn = resolveInstrumentFromParams({ code: '600519' })
+  assert.equal(cn?.market, 'CN')
+  assert.equal(cn?.symbol, '600519')
+
+  const us = resolveInstrumentFromParams({ market: 'US', symbol: 'AAPL' })
+  assert.equal(us?.market, 'US')
+  assert.equal(us?.symbol, 'AAPL')
+
+  const crypto = resolveInstrumentFromParams({ code: 'BTC/USDT' })
+  assert.equal(crypto?.market, 'CRYPTO')
+  assert.equal(crypto?.symbol, 'BTC')
+  assert.equal(crypto?.quote, 'USDT')
+
+  const prefixed = resolveInstrumentFromParams({ code: 'HK:0700' })
+  assert.equal(prefixed?.market, 'HK')
+  assert.equal(prefixed?.symbol, '00700')
+})
+
+test('instrumentRefsFromList batch resolves mixed legacy codes', () => {
+  const refs = instrumentRefsFromList(['600519', 'AAPL'])
+  assert.equal(refs.length, 2)
+  assert.equal(refs[0]?.market, 'CN')
+  assert.equal(refs[1]?.market, 'US')
+})
+
+test('instrumentRefsFromList resolves CN-only numeric codes', () => {
+  const refs = instrumentRefsFromList(['600519', '000001', '510300'])
+  assert.equal(refs.length, 3)
+  assert.ok(refs.every(r => r.market === 'CN'))
+  assert.equal(refs[0]?.symbol, '600519')
+  assert.equal(refs[2]?.assetClass, 'ETF')
+})
+
+test('LEGACY_HUB_FEATURE_SHIM maps major legacy features to instrument capabilities', () => {
+  const expected = [
+    ['stock_detail', 'snapshot'],
+    ['stock_quotes', 'quotes'],
+    ['stock_chart', 'chart'],
+    ['stock_kline', 'chart'],
+    ['stock_cyq', 'cyq'],
+    ['us_snapshot', 'snapshot'],
+    ['us_realtime', 'quotes'],
+    ['us_kline', 'chart'],
+    ['crypto_snapshot', 'snapshot'],
+    ['crypto_realtime', 'quotes'],
+    ['crypto_kline', 'chart'],
+    ['batch_stock_snapshots', 'batch_snapshots'],
+    ['stock_diagnosis', 'evaluation'],
+    ['latest_evaluation', 'evaluation'],
+    ['strategy_signal', 'strategy_signal'],
+    ['strategy_verify', 'strategy_verify'],
+    ['institution_rating', 'institution_rating'],
+    ['institution_report', 'institution_report'],
+    ['search_stocks', 'search'],
+    ['etf_snapshot', 'snapshot'],
+  ]
+  for (const [legacy, cap] of expected) {
+    assert.equal(LEGACY_HUB_FEATURE_SHIM[legacy], cap, `${legacy} → ${cap}`)
+    assert.equal(resolveInstrumentHubFeature(legacy), INSTRUMENT_HUB_FEATURE[cap], `${legacy} feature name`)
+  }
+})
+
+test('legacy hub feature shims map to instrument_*', () => {
+  assert.equal(resolveInstrumentHubFeature('stock_detail'), INSTRUMENT_HUB_FEATURE.snapshot)
+  assert.equal(resolveInstrumentHubFeature('us_kline'), INSTRUMENT_HUB_FEATURE.chart)
+  assert.equal(LEGACY_HUB_FEATURE_SHIM.stock_cyq, 'cyq')
+})
+
+test('normalizeInstrumentHubParams injects instrument object', () => {
+  const out = normalizeInstrumentHubParams({ code: '600519' })
+  assert.ok(out.instrument)
+  assert.equal(out.instrument.market, 'CN')
+})
+
+test('Engine resolveInstrumentQueryPlan uses registry for US realtime', () => {
+  const plan = resolveInstrumentQueryPlan(
+    { market: 'US', assetClass: 'EQUITY', symbol: 'AAPL' },
+    'realtime',
+  )
+  assert.equal(plan?.kind, 'registry')
+  if (plan?.kind === 'registry') {
+    assert.equal(plan.market, 'US')
+    assert.equal(plan.method, 'realtime')
+    assert.deepEqual(plan.args, ['AAPL', 'US'])
+  }
+})
+
+test('Engine resolveInstrumentQueryPlan CN ETF uses registry asset class', () => {
+  const plan = resolveInstrumentQueryPlan(
+    { market: 'CN', assetClass: 'ETF', symbol: '510300' },
+    'realtime',
+  )
+  assert.equal(plan?.kind, 'cn_realtime')
+})
+
+test('Engine resolveInstrumentQueryPlan CRYPTO realtime', () => {
+  const plan = resolveInstrumentQueryPlan(
+    { market: 'CRYPTO', assetClass: 'CRYPTO_SPOT', symbol: 'BTC', quote: 'USDT' },
+    'realtime',
+  )
+  assert.equal(plan?.kind, 'registry')
+  if (plan?.kind === 'registry') {
+    assert.equal(plan.market, 'CRYPTO')
+    assert.equal(plan.method, 'realtime')
+    assert.deepEqual(plan.args, ['BTC/USDT'])
+  }
+})
+
+test('Engine resolveInstrumentQueryPlan HK kline', () => {
+  const plan = resolveInstrumentQueryPlan(
+    { market: 'HK', assetClass: 'EQUITY', symbol: '00700' },
+    'kline',
+  )
+  assert.equal(plan?.kind, 'registry')
+  if (plan?.kind === 'registry') {
+    assert.equal(plan.market, 'HK')
+    assert.equal(plan.method, 'kline')
+    assert.deepEqual(plan.args, ['00700', 'daily', '', '', 120, 'HK'])
+  }
+})
+
+test('Engine resolveInstrumentQueryPlan JP snapshot uses composite', () => {
+  const plan = resolveInstrumentQueryPlan(
+    { market: 'JP', assetClass: 'EQUITY', symbol: '7203' },
+    'snapshot',
+  )
+  assert.equal(plan?.kind, 'composite_snapshot')
+  if (plan?.kind === 'composite_snapshot') {
+    assert.equal(plan.market, 'JP')
+    assert.equal(plan.symbol, '7203')
+  }
+})
+
+test('Engine resolveInstrumentQueryPlan KR instrument_search returns null (not connected)', () => {
+  const plan = resolveInstrumentQueryPlan(
+    { market: 'KR', assetClass: 'EQUITY', symbol: '005930' },
+    'instrument_search',
+    { keyword: '三星' },
+  )
+  assert.equal(plan, null)
+})
+
+test('Engine resolveInstrumentQueryPlan CN ETF nav uses registry', () => {
+  const plan = resolveInstrumentQueryPlan(
+    { market: 'CN', assetClass: 'ETF', symbol: '510300' },
+    'etf_nav',
+  )
+  assert.equal(plan?.kind, 'registry')
+  if (plan?.kind === 'registry') {
+    assert.equal(plan.method, 'etfNav')
+    assert.deepEqual(plan.args, ['510300'])
+  }
+})
+
+test('Engine resolveInstrumentQueryPlan CN ETF snapshot uses composite', () => {
+  const plan = resolveInstrumentQueryPlan(
+    { market: 'CN', assetClass: 'ETF', symbol: '510300' },
+    'etf_snapshot',
+  )
+  assert.equal(plan?.kind, 'composite_snapshot')
+  if (plan?.kind === 'composite_snapshot') {
+    assert.equal(plan.market, 'CN')
+    assert.equal(plan.symbol, '510300')
+    assert.equal(plan.assetClass, 'ETF')
+  }
+})
+
+test('Engine resolveInstrumentQueryPlan CN ETF snapshot capability uses composite', () => {
+  const plan = resolveInstrumentQueryPlan(
+    { market: 'CN', assetClass: 'ETF', symbol: '510300' },
+    'snapshot',
+  )
+  assert.equal(plan?.kind, 'composite_snapshot')
+  if (plan?.kind === 'composite_snapshot') {
+    assert.equal(plan.market, 'CN')
+    assert.equal(plan.symbol, '510300')
+    assert.equal(plan.assetClass, 'ETF')
+  }
+})
+
+test('Engine resolveInstrumentQueryPlan CN ETF profile uses etfProfile registry', () => {
+  const plan = resolveInstrumentQueryPlan(
+    { market: 'CN', assetClass: 'ETF', symbol: '510300' },
+    'profile',
+  )
+  assert.equal(plan?.kind, 'registry')
+  if (plan?.kind === 'registry') {
+    assert.equal(plan.market, 'CN')
+    assert.equal(plan.assetClass, 'ETF')
+    assert.equal(plan.method, 'etfProfile')
+    assert.deepEqual(plan.args, ['510300'])
+  }
+})
+
+test('Engine resolveInstrumentQueryPlan CN instrument_search uses registry', () => {
+  const plan = resolveInstrumentQueryPlan(
+    { market: 'CN', assetClass: 'EQUITY', symbol: '000001' },
+    'instrument_search',
+    { keyword: '600519', pageSize: 20 },
+  )
+  assert.equal(plan?.kind, 'registry')
+  if (plan?.kind === 'registry') {
+    assert.equal(plan.method, 'instrumentSearch')
+    assert.deepEqual(plan.args, ['600519', 'CN', 20])
+  }
+})
+
+test('canonical symbol normalization across markets', () => {
+  assert.equal(canonicalHkSymbol('700'), '00700')
+  assert.equal(canonicalHkSymbol('0700'), '00700')
+  assert.equal(canonicalHkSymbol('2'), '00002')
+  const hk = normalizeInstrumentRef({ market: 'HK', assetClass: 'EQUITY', symbol: '700' })
+  assert.equal(hk.symbol, '00700')
+  assert.equal(instrumentRefLabel(hk), 'HK:STOCK:00700.HK')
+  const hk2 = normalizeInstrumentRef({ market: 'HK', assetClass: 'EQUITY', symbol: '00002' })
+  assert.equal(instrumentRefLabel(hk2), 'HK:STOCK:00002.HK')
+  const cn = normalizeInstrumentRef({ market: 'CN', assetClass: 'EQUITY', symbol: '519' })
+  assert.equal(cn.symbol, '000519')
+})
+
+test('parseInstrumentNamespace accepts HK:HK.00002 StockIndex id', () => {
+  const ref = parseInstrumentNamespace('HK:HK.00002')
+  assert.equal(ref?.market, 'HK')
+  assert.equal(ref?.symbol, '00002')
+  assert.equal(instrumentRefLabel(ref), 'HK:STOCK:00002.HK')
+})
+
+test('parseTickflowSymbol keeps HK leading zeros', () => {
+  assert.equal(parseTickflowSymbol('00002.HK').code, '00002')
+  assert.equal(parseTickflowSymbol('00700.HK').code, '00700')
+})
+
+test('parseInstrumentNamespace resolves HK:HK.00002', () => {
+  const ref = parseInstrumentNamespace('HK:HK.00002')
+  assert.equal(ref?.market, 'HK')
+  assert.equal(ref?.symbol, '00002')
+})
+
+test('instrumentRefKey uses stock-index namespace without assetClass', () => {
+  const sz = normalizeInstrumentRef({
+    market: 'CN', assetClass: 'EQUITY', symbol: '000977', exchange: 'SZ',
+  })
+  assert.equal(instrumentRefKey(sz), 'CN:SZ.000977')
+  const sh = normalizeInstrumentRef({
+    market: 'CN', assetClass: 'INDEX', symbol: '000977', exchange: 'SH',
+  })
+  assert.equal(instrumentRefKey(sh), 'CN:SH.000977')
+
+  const btc = normalizeInstrumentRef({
+    market: 'CRYPTO',
+    assetClass: 'CRYPTO_SPOT',
+    symbol: 'btc',
+    quote: 'usdt',
+    exchange: 'binance',
+  })
+  assert.equal(instrumentRefKey(btc), 'CRYPTO:BINANCE.BTC/USDT')
+})
+
+test('parseInstrumentNamespace — CN:SZ.000009', async () => {
+  const { parseInstrumentNamespace, buildInstrumentNamespace, instrumentRefLabel } = await import(
+    '../packages/shared/dist/instrument-symbol.js'
+  )
+  const ref = parseInstrumentNamespace('CN:SZ.000009')
+  assert.equal(ref?.market, 'CN')
+  assert.equal(ref?.symbol, '000009')
+  assert.equal(ref?.exchange, 'SZ')
+  assert.equal(buildInstrumentNamespace(ref), 'CN:SZ.000009')
+  assert.equal(instrumentRefLabel(ref), 'CN:STOCK:000009.SZ')
+})
+
+test('parseInstrumentNamespace — CN:SH.510300 ETF preserves exchange', async () => {
+  const { parseInstrumentNamespace, buildInstrumentNamespace } = await import(
+    '../packages/shared/dist/instrument-symbol.js'
+  )
+  const ref = parseInstrumentNamespace('CN:SH.510300')
+  assert.equal(ref?.market, 'CN')
+  assert.equal(ref?.symbol, '510300')
+  assert.equal(ref?.exchange, 'SH')
+  assert.equal(ref?.assetClass, 'ETF')
+  assert.equal(buildInstrumentNamespace(ref), 'CN:SH.510300')
+})
+
+test('parseInstrumentNamespace — legacy CN:ETF.510300 on-exchange ETF', async () => {
+  const { parseInstrumentNamespace, buildOpptrixInstrumentId } = await import(
+    '../packages/shared/dist/instrument-symbol.js'
+  )
+  for (const code of ['CN:ETF.510300', 'CN:ETF:510300']) {
+    const ref = parseInstrumentNamespace(code)
+    assert.equal(ref?.market, 'CN', code)
+    assert.equal(ref?.assetClass, 'ETF', code)
+    assert.equal(ref?.symbol, '510300', code)
+    assert.equal(buildOpptrixInstrumentId(ref), 'CN:ETF:510300.SH', code)
+  }
+})
+
+test('resolveCnInstrumentRef — namespace and bare code', async () => {
+  const { resolveCnInstrumentRef, instrumentRefKey } = await import('../packages/shared/dist/instrument-ref.js')
+  const fromNs = resolveCnInstrumentRef('CN:SH.510300')
+  assert.equal(fromNs.market, 'CN')
+  assert.equal(fromNs.assetClass, 'ETF')
+  assert.equal(fromNs.symbol, '510300')
+  assert.equal(fromNs.exchange, 'SH')
+  assert.equal(instrumentRefKey(fromNs), 'CN:SH.510300')
+
+  const fromBare = resolveCnInstrumentRef('510300')
+  assert.equal(fromBare.assetClass, 'ETF')
+  assert.equal(fromBare.symbol, '510300')
+  assert.equal(fromBare.exchange, 'SH')
+})
+
+test('inferCnExchangeFromSymbol — SH/SZ ETF code segments', async () => {
+  const { inferCnExchangeFromSymbol, resolveCnInstrumentIdentity } = await import(
+    '../packages/shared/dist/instrument-symbol.js'
+  )
+  assert.equal(inferCnExchangeFromSymbol('510300'), 'SH')
+  assert.equal(inferCnExchangeFromSymbol('159915'), 'SZ')
+  assert.equal(inferCnExchangeFromSymbol('560010'), 'SH')
+  assert.equal(inferCnExchangeFromSymbol('588000'), 'SH')
+
+  const shEtf = resolveCnInstrumentIdentity({ market: 'CN', assetClass: 'EQUITY', symbol: '510300' })
+  assert.equal(shEtf.exchange, 'SH')
+  assert.equal(shEtf.assetClass, 'ETF')
+
+  const szEtf = resolveCnInstrumentIdentity({ market: 'CN', assetClass: 'EQUITY', symbol: '159915' })
+  assert.equal(szEtf.exchange, 'SZ')
+  assert.equal(szEtf.assetClass, 'ETF')
+})
+
+test('resolveStockMarketCode — SH/SZ ETF prefixes', async () => {
+  const { resolveStockMarketCode, ensureCnSecSymbol } = await import(
+    '../packages/a-stock-layer/dist/utils/helpers.js'
+  )
+  assert.equal(resolveStockMarketCode('510300'), 'SH')
+  assert.equal(resolveStockMarketCode('159915'), 'SZ')
+  assert.equal(ensureCnSecSymbol('510300'), 'sh510300')
+  assert.equal(ensureCnSecSymbol('159915'), 'sz159915')
+})
+
+test('resolveInstrumentRef — unified entry for namespace string', async () => {
+  const { resolveInstrumentRef } = await import('../packages/shared/dist/instrument-param.js')
+  const ref = resolveInstrumentRef('CN:SH.510300')
+  assert.equal(ref?.assetClass, 'ETF')
+  assert.equal(ref?.exchange, 'SH')
+  const fromParams = resolveInstrumentRef({ code: 'CN:SZ.159919' })
+  assert.equal(fromParams?.assetClass, 'ETF')
+  assert.equal(fromParams?.symbol, '159919')
+})
+
+test('resolveInstrumentQueryPlan CN ETF namespace snapshot uses composite', async () => {
+  const { resolveInstrumentQueryPlan } = await import('../packages/a-stock-layer/dist/core/instrument-query.js')
+  const { resolveCnInstrumentRef } = await import('../packages/shared/dist/instrument-ref.js')
+  const ref = resolveCnInstrumentRef('CN:SH.510300')
+  const plan = resolveInstrumentQueryPlan(ref, 'etf_snapshot')
+  assert.equal(plan?.kind, 'composite_snapshot')
+  if (plan?.kind === 'composite_snapshot') {
+    assert.equal(plan.market, 'CN')
+    assert.equal(plan.symbol, '510300')
+    assert.equal(plan.assetClass, 'ETF')
+  }
+})
+
+test('parseInstrumentRef resolves namespace in symbol field', async () => {
+  const { parseInstrumentRef } = await import('../packages/shared/dist/instrument-ref.js')
+  const ref = parseInstrumentRef({ market: 'CN', symbol: 'CN:SZ.000009' })
+  assert.equal(ref?.symbol, '000009')
+  assert.equal(ref?.exchange, 'SZ')
+})
+
+test('instrumentHubParams — REIT 全量 Opptrix ID', async () => {
+  const { instrumentHubParams, resolveInstrumentFromParams } = await import('../packages/shared/dist/instrument-param.js')
+  const ref = {
+    market: 'CN',
+    assetClass: 'REIT',
+    symbol: '180102',
+    exchange: 'SZ',
+  }
+  const params = instrumentHubParams(ref)
+  assert.equal(params.code, 'CN:REIT:180102.SZ')
+  assert.equal(params.instrument.assetClass, 'REIT')
+  const resolved = resolveInstrumentFromParams({
+    instrument: params.instrument,
+    code: '180102',
+  })
+  assert.equal(resolved?.assetClass, 'REIT')
+})
+
+test('resolveInstrumentFromParams — 有 instrument 时禁止裸 code 误解析', async () => {
+  const { resolveInstrumentFromParams } = await import('../packages/shared/dist/instrument-param.js')
+  const broken = resolveInstrumentFromParams({
+    instrument: { market: 'CN', assetClass: 'REIT', symbol: '180102', exchange: 'SZ' },
+    code: '180102',
+  })
+  assert.equal(broken?.assetClass, 'REIT')
+  const invalid = resolveInstrumentFromParams({
+    instrument: { market: 'CN', assetClass: 'NOT_A_CLASS', symbol: '180102' },
+    code: '180102',
+  })
+  assert.equal(invalid, null)
+})
+
+test('parseInstrumentRef — REIT / LOF assetClass 保留', async () => {
+  const { parseInstrumentRef } = await import('../packages/shared/dist/instrument-ref.js')
+  const { isCnPublicFundRef } = await import('../packages/a-stock-layer/dist/core/fund-instrument.js')
+  const reit = parseInstrumentRef({ market: 'CN', assetClass: 'REIT', symbol: '180102', exchange: 'SZ' })
+  assert.equal(reit?.assetClass, 'REIT')
+  assert.ok(isCnPublicFundRef(reit))
+  const lof = parseInstrumentRef({ market: 'CN', assetClass: 'LOF', symbol: '160105', exchange: 'SZ' })
+  assert.equal(lof?.assetClass, 'LOF')
+})
+
+test('parseInstrumentRef — INDEX / FUND 不被裸码误判为 EQUITY', async () => {
+  const { parseInstrumentRef } = await import('../packages/shared/dist/instrument-ref.js')
+  const index = parseInstrumentRef({ market: 'CN', assetClass: 'INDEX', symbol: '000001', exchange: 'SH' })
+  assert.equal(index?.assetClass, 'INDEX')
+  assert.equal(index?.exchange, 'SH')
+  assert.equal(index?.symbol, '000001')
+  const fund = parseInstrumentRef({ market: 'CN', assetClass: 'FUND', symbol: '007785', exchange: 'PF' })
+  assert.equal(fund?.assetClass, 'FUND')
+  assert.equal(fund?.exchange, 'PF')
+})
+
+test('listMarketCapabilities — 市场级标准能力探查（v3，manifest 声明锁定）', async () => {
+  const { MARKET_LEVEL_CAPABILITIES } = await import('../packages/a-stock-layer/dist/core/market-capabilities.js')
+  const tushareSpec = (await import('../packages/a-stock-layer/dist/providers/tushare/manifest.js')).TUSHARE_SPEC
+  const thSpec = (await import('../packages/a-stock-layer/dist/providers/tonghuashun/manifest.js')).TONGHUASHUN_SPEC
+  const tfSpec = (await import('../packages/a-stock-layer/dist/providers/tickflow/manifest.js')).TICKFLOW_SPEC
+
+  assert.ok(MARKET_LEVEL_CAPABILITIES.length >= 31)
+
+  const tushareFund = new Set(tushareSpec.bindingsFor(105, 5)
+    .filter(b => b.market === 'CN' && b.assetClass === 'FUND').map(b => String(b.capability)))
+  assert.ok(tushareFund.has('fund_company') && tushareFund.has('fund_nav_raw'))
+
+  const thEquity = new Set(thSpec.bindingsFor(120, 5)
+    .filter(b => b.market === 'CN' && b.assetClass === 'EQUITY').map(b => String(b.capability)))
+  assert.ok(thEquity.has('limit_up_ladder') && thEquity.has('hot_stock_list'))
+  const thIndex = new Set(thSpec.bindingsFor(120, 5)
+    .filter(b => b.market === 'CN' && b.assetClass === 'INDEX').map(b => String(b.capability)))
+  assert.ok(thIndex.has('index_catalog'))
+
+  const tfEquity = new Set(tfSpec.bindingsFor(110, 5)
+    .flatMap(b => (b.market === 'CN' || b.market === 'US' || b.market === 'HK') && b.assetClass === 'EQUITY'
+      ? [`${b.market}:${String(b.capability)}`] : []))
+  assert.ok(tfEquity.has('CN:market_depth') && tfEquity.has('US:kline_batch') && tfEquity.has('HK:intraday_batch'))
+})
+
+test('resolveCnInstrumentIdentity — exchange-first for ambiguous 000977', async () => {
+  const {
+    resolveCnInstrumentIdentity,
+    normalizeInstrumentRef,
+    parseCanonicalInstrumentInput,
+  } = await import('../packages/shared/dist/instrument-symbol.js')
+
+  const szStock = resolveCnInstrumentIdentity({
+    market: 'CN', symbol: '000977', exchange: 'SZ', assetClass: 'EQUITY',
+  })
+  assert.equal(szStock.exchange, 'SZ')
+  assert.equal(szStock.assetClass, 'EQUITY')
+
+  const shIndex = resolveCnInstrumentIdentity({
+    market: 'CN', symbol: '000977', exchange: 'SH', assetClass: 'INDEX',
+  })
+  assert.equal(shIndex.exchange, 'SH')
+  assert.equal(shIndex.assetClass, 'INDEX')
+
+  const parsed = parseCanonicalInstrumentInput('CN:SZ.000009')
+  assert.equal(parsed?.exchange, 'SZ')
+  assert.equal(parsed?.symbol, '000009')
+  assert.equal(parsed?.assetClass, 'EQUITY')
+
+  const normalized = normalizeInstrumentRef({
+    market: 'CN', symbol: '000977', exchange: 'SZ', assetClass: 'EQUITY',
+  })
+  assert.equal(normalized.exchange, 'SZ')
+  assert.equal(normalized.assetClass, 'EQUITY')
+})
+
+test('inferCnAssetClassFromSymbol — 000977 defaults to SZ equity without exchange', async () => {
+  const { inferCnAssetClassFromSymbol, isCnIndexSymbolByExchange } = await import(
+    '../packages/shared/dist/instrument-symbol.js'
+  )
+  assert.equal(inferCnAssetClassFromSymbol('000977'), 'EQUITY')
+  assert.equal(inferCnAssetClassFromSymbol('000977', 'SZ'), 'EQUITY')
+  assert.equal(inferCnAssetClassFromSymbol('000977', 'SH'), 'INDEX')
+  assert.equal(isCnIndexSymbolByExchange('000977', 'SH'), true)
+  assert.equal(isCnIndexSymbolByExchange('000977', 'SZ'), false)
+})
+
+test('resolveCnInstrumentIdentity — INDEX 000001 without exchange maps to SH', async () => {
+  const { resolveCnInstrumentIdentity } = await import('../packages/shared/dist/instrument-symbol.js')
+  const shComposite = resolveCnInstrumentIdentity({
+    market: 'CN', assetClass: 'INDEX', symbol: '000001',
+  })
+  assert.equal(shComposite.exchange, 'SH')
+  assert.equal(shComposite.assetClass, 'INDEX')
+})
+
+test('inferCnAssetClassFromSymbol — 000001 defaults to equity, 000300 stays index', async () => {
+  const { inferCnAssetClassFromSymbol, inferCnExchangeFromSymbol, parseInstrumentNamespace, normalizeInstrumentRef } = await import('../packages/shared/dist/instrument-symbol.js')
+  assert.equal(inferCnAssetClassFromSymbol('000001'), 'EQUITY')
+  assert.equal(inferCnAssetClassFromSymbol('000001', 'SH'), 'INDEX')
+  assert.equal(inferCnAssetClassFromSymbol('000300'), 'INDEX')
+  assert.equal(inferCnAssetClassFromSymbol('000300', 'SH'), 'INDEX')
+  assert.equal(inferCnExchangeFromSymbol('000001'), 'SZ')
+
+  const sz = parseInstrumentNamespace('CN:SZ.000001')
+  assert.ok(sz)
+  assert.equal(sz.exchange, 'SZ')
+  assert.equal(sz.assetClass, 'EQUITY')
+  assert.equal(sz.symbol, '000001')
+
+  const sh = parseInstrumentNamespace('CN:SH.000001')
+  assert.ok(sh)
+  assert.equal(sh.exchange, 'SH')
+  assert.equal(sh.assetClass, 'INDEX')
+
+  const bare = normalizeInstrumentRef({ market: 'CN', assetClass: 'EQUITY', symbol: '000001' })
+  assert.equal(bare.exchange, 'SZ')
+  assert.equal(bare.assetClass, 'EQUITY')
+})
+
+test('Engine resolveInstrumentQueryPlan CN realtime preserves exchange', () => {
+  const plan = resolveInstrumentQueryPlan(
+    { market: 'CN', assetClass: 'EQUITY', symbol: '000977', exchange: 'SZ' },
+    'realtime',
+  )
+  assert.equal(plan?.kind, 'cn_realtime')
+  if (plan?.kind === 'cn_realtime') {
+    assert.equal(plan.symbol, '000977')
+    assert.equal(plan.exchange, 'SZ')
+    assert.equal(plan.assetClass, 'EQUITY')
+  }
+
+  const indexPlan = resolveInstrumentQueryPlan(
+    { market: 'CN', assetClass: 'INDEX', symbol: '000977', exchange: 'SH' },
+    'realtime',
+  )
+  assert.equal(indexPlan?.kind, 'registry')
+  if (indexPlan?.kind === 'registry') {
+    assert.equal(indexPlan.assetClass, 'INDEX')
+    assert.equal(indexPlan.method, 'indexRealtime')
+    assert.deepEqual(indexPlan.args, ['000977'])
+  }
+})
+
+test('parseInstrumentNamespace — CN colon typo CN:SH:000977', async () => {
+  const { parseInstrumentNamespace, buildInstrumentNamespace } = await import('../packages/shared/dist/instrument-symbol.js')
+  const ref = parseInstrumentNamespace('CN:SH:000977')
+  assert.ok(ref)
+  assert.equal(ref.exchange, 'SH')
+  assert.equal(ref.assetClass, 'INDEX')
+  assert.equal(buildInstrumentNamespace(ref), 'CN:SH.000977')
+})
+
+test('parseCanonicalInstrumentInput — CN:SH:000977 body exchange', async () => {
+  const { parseCanonicalInstrumentInput, buildInstrumentNamespace } = await import('../packages/shared/dist/instrument-symbol.js')
+  const ref = parseCanonicalInstrumentInput('CN:SH:000977')
+  assert.ok(ref)
+  assert.equal(ref.exchange, 'SH')
+  assert.equal(ref.assetClass, 'INDEX')
+  assert.equal(buildInstrumentNamespace(ref), 'CN:SH.000977')
+})
+
+test('cnSecSymbol — 000977 exchange disambiguation', async () => {
+  const { cnSecSymbol } = await import('../packages/a-stock-layer/dist/utils/helpers.js')
+  assert.equal(cnSecSymbol('000977', 'SZ'), 'sz000977')
+  assert.equal(cnSecSymbol('000977', 'SH'), 'sh000977')
+})
+
+test('mergeDetailQuoteRows prefers exchange-aware fallback name', async () => {
+  const { mergeDetailQuoteRows } = await import('../packages/research-hub/dist/stock-detail-normalize.js')
+  const merged = mergeDetailQuoteRows('000977', { name: '内地低碳', price: 1 }, { name: '浪潮信息', price: 2 })
+  assert.equal(merged?.name, '浪潮信息')
+  assert.equal(merged?.price, 2)
+  assert.equal(merged?.pe, null)
+})
+
+
+test('wireProviderSymbolArg — 000977 per provider and exchange', async () => {
+  const { wireProviderSymbolArg, wireRegistryMethodArgs } = await import(
+    '../packages/a-stock-layer/dist/core/provider-wire.js'
+  )
+  const szEquity = { market: 'CN', assetClass: 'EQUITY', symbol: '000977', exchange: 'SZ' }
+  const shIndex = { market: 'CN', assetClass: 'INDEX', symbol: '000977', exchange: 'SH' }
+
+  assert.equal(wireProviderSymbolArg('tushare', 'code', 'profile', szEquity), '000977.SZ')
+  assert.equal(wireProviderSymbolArg('tushare', 'code', 'profile', shIndex), '000977.SH')
+  assert.equal(wireProviderSymbolArg('tickflow', 'code', 'kline', szEquity), '000977.SZ')
+  assert.equal(wireProviderSymbolArg('tonghuashun', 'code', 'realtime', szEquity), '000977.SZ')
+
+  const wiredTushare = wireRegistryMethodArgs('tushare', 'financials', ['000977', '', 'all'], szEquity)
+  assert.equal(wiredTushare[0], '000977.SZ')
+  assert.equal(wiredTushare[1], '')
+  assert.equal(wiredTushare[2], 'all')
+})
+
+test('resolveInstrumentQueryPlan US/HK/Crypto registry carries ref for wire', () => {
+  const us = resolveInstrumentQueryPlan(
+    { market: 'US', assetClass: 'EQUITY', symbol: 'aapl' },
+    'realtime',
+  )
+  assert.equal(us?.kind, 'registry')
+  if (us?.kind === 'registry') {
+    assert.equal(us.ref?.market, 'US')
+    assert.equal(us.ref?.symbol, 'AAPL')
+    assert.equal(us.args[0], 'AAPL')
+  }
+
+  const hk = resolveInstrumentQueryPlan(
+    { market: 'HK', assetClass: 'EQUITY', symbol: '700' },
+    'kline',
+    { count: 60 },
+  )
+  assert.equal(hk?.kind, 'registry')
+  if (hk?.kind === 'registry') {
+    assert.equal(hk.ref?.market, 'HK')
+    assert.equal(hk.ref?.symbol, '00700')
+    assert.equal(hk.args[0], '00700')
+  }
+
+  const crypto = resolveInstrumentQueryPlan(
+    { market: 'CRYPTO', assetClass: 'CRYPTO_SPOT', symbol: 'BTC', quote: 'USDT' },
+    'realtime',
+  )
+  assert.equal(crypto?.kind, 'registry')
+  if (crypto?.kind === 'registry') {
+    assert.equal(crypto.ref?.market, 'CRYPTO')
+    assert.equal(crypto.ref?.symbol, 'BTC')
+    assert.equal(crypto.args[0], 'BTC/USDT')
+  }
+})
+
+test('ensureCnSecSymbol — idempotent for wired sec input', async () => {
+  const { ensureCnSecSymbol, bareCnSymbol, secFullCode } = await import(
+    '../packages/a-stock-layer/dist/utils/helpers.js'
+  )
+  assert.equal(ensureCnSecSymbol('sz000977'), 'sz000977')
+  assert.equal(ensureCnSecSymbol('SH000977'), 'sh000977')
+  assert.equal(secFullCode('sz000977'), 'sz000977')
+  assert.equal(bareCnSymbol('sz000977'), '000977')
+  assert.equal(bareCnSymbol('000977.SZ'), '000977')
+})
+
+test('wireProviderSymbolArg — dot-suffix providers with exchange', async () => {
+  const { wireProviderSymbolArg } = await import(
+    '../packages/a-stock-layer/dist/core/provider-wire.js'
+  )
+  const szEquity = { market: 'CN', assetClass: 'EQUITY', symbol: '000977', exchange: 'SZ' }
+  assert.equal(wireProviderSymbolArg('tickflow', 'code', 'realtime', szEquity), '000977.SZ')
+  assert.equal(wireProviderSymbolArg('tushare', 'code', 'kline', szEquity), '000977.SZ')
+  assert.equal(wireProviderSymbolArg('tonghuashun', 'code', 'kline', szEquity), '000977.SZ')
+})
+
+test('resolveInstrumentQueryPlan — detail capabilities CN/US/HK', () => {
+  const cnRef = { market: 'CN', assetClass: 'EQUITY', symbol: '600519', exchange: 'SH' }
+  const dividend = resolveInstrumentQueryPlan(cnRef, 'dividend')
+  assert.equal(dividend?.kind, 'registry')
+  if (dividend?.kind === 'registry') {
+    assert.equal(dividend.method, 'dividend')
+    assert.equal(dividend.ref?.exchange, 'SH')
+  }
+
+  // v3：news/notices 死路由能力已从计划白名单移除（详见 tests/market-capability-whitelist）
+  assert.equal(resolveInstrumentQueryPlan(cnRef, 'notices'), null)
+  const usRef = { market: 'US', assetClass: 'EQUITY', symbol: 'AAPL' }
+  assert.equal(resolveInstrumentQueryPlan(usRef, 'news'), null)
+
+  const hkRef = { market: 'HK', assetClass: 'EQUITY', symbol: '00700' }
+  const hkDiv = resolveInstrumentQueryPlan(hkRef, 'dividend', { page: 1, pageSize: 10 })
+  assert.equal(hkDiv?.kind, 'registry')
+  if (hkDiv?.kind === 'registry') assert.equal(hkDiv.method, 'dividend')
+
+  // v3：technical_analysis 死路由能力已移除
+  assert.equal(resolveInstrumentQueryPlan(hkRef, 'technical_analysis'), null)
+})

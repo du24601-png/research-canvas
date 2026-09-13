@@ -1,0 +1,315 @@
+import path from 'node:path'
+import { WorkspaceError } from '../errors.js'
+
+const ALLOWED_BINARIES = new Set([
+  'python',
+  'python3',
+  'node',
+  'npm',
+  'npx',
+  'pip',
+  'pip3',
+  'ping',
+  'traceroute',
+  'tracert',
+])
+
+const DIAGNOSTIC_BINARIES = new Set(['ping', 'traceroute', 'tracert'])
+
+const INTERPRETER_BINARIES = new Set(['python', 'python3', 'node', 'npx'])
+
+const ALLOWED_BINARY_LABEL =
+  'python/python3.x/node/npm/pip/pip3.x 等解释器与包管理器，以及 ping/traceroute 等网络诊断命令'
+
+/** 允许 python3.12 / pip3.11 等带次版本号的 basename */
+function isVersionedPythonOrPip(bin: string): boolean {
+  return /^python3\.\d+$/.test(bin) || /^pip3\.\d+$/.test(bin)
+}
+
+function isPipLikeBinary(bin: string): boolean {
+  return bin === 'pip' || bin === 'pip3' || /^pip3\.\d+$/.test(bin)
+}
+
+function isPythonLikeBinary(bin: string): boolean {
+  return bin === 'python' || bin === 'python3' || /^python3\.\d+$/.test(bin)
+}
+
+const DANGEROUS_PATTERNS: RegExp[] = [
+  /\brm\s+(-[^\s]*\s+)*-[^\s]*r[^\s]*f[^\s]*\s+\//i,
+  /\brm\s+(-[^\s]*\s+)*-[^\s]*f[^\s]*r[^\s]*\s+\//i,
+  /\bformat\b/i,
+  /\bdiskpart\b/i,
+  /\bmkfs\b/i,
+  /\bdd\s+if=/i,
+  /\bsudo\b/i,
+  /\bsu\s+-/i,
+  /\bchmod\s+(-[^\s]*\s+)*777\b/i,
+  /\bcurl\b[^\n|]*\|\s*(ba)?sh\b/i,
+  /\bwget\b[^\n|]*\|\s*(ba)?sh\b/i,
+]
+
+const GLOBAL_INSTALL_FLAGS = new Set([
+  '-g',
+  '--global',
+  '--user',
+  '--system',
+])
+
+export function basenameOfArgv0(argv: string[]): string {
+  const raw = argv[0]?.trim()
+  if (!raw) return ''
+  const base = path.basename(raw.replace(/\\/g, '/'))
+  if (base.endsWith('.exe')) return base.slice(0, -4).toLowerCase()
+  return base.toLowerCase()
+}
+
+function isAllowedArgv0(rawArgv0: string): boolean {
+  const trimmed = rawArgv0.trim()
+  if (!trimmed) return false
+  if (path.resolve(trimmed) === path.resolve(process.execPath)) return true
+  const bin = basenameOfArgv0([trimmed])
+  return ALLOWED_BINARIES.has(bin) || isVersionedPythonOrPip(bin)
+}
+
+function effectiveShellBinary(argv: string[]): string {
+  const raw0 = argv[0]?.trim() ?? ''
+  if (path.resolve(raw0) === path.resolve(process.execPath)) {
+    if (argv.length >= 2) {
+      const cliBase = path.basename(argv[1].replace(/\\/g, '/')).toLowerCase()
+      if (cliBase === 'npm-cli.js') return 'npm'
+      if (cliBase === 'npx-cli.js') return 'npx'
+    }
+    return 'node'
+  }
+  return basenameOfArgv0(argv)
+}
+
+/**
+ * 命令非空校验。围栏内任意命令以 grant + SRT 为准，不再以二进制白名单为主限制。
+ * @deprecated 名称保留供旧测试/调用；请用非空校验语义理解
+ */
+export function assertAllowedShellArgv(argv: string[]): void {
+  if (!argv.length || !argv[0]?.trim()) {
+    throw new WorkspaceError('命令不能为空')
+  }
+}
+
+/** @deprecated 决策 6：不再作为主路径限制；导出供诊断/文档对照 */
+export function isShellBinaryAllowlisted(argv0: string): boolean {
+  return isAllowedArgv0(argv0)
+}
+
+/** @deprecated 软黑名单不再作为主策略；保留导出避免断代 */
+export function shellCommandMatchesDangerousPattern(joined: string): boolean {
+  return DANGEROUS_PATTERNS.some(re => re.test(joined))
+}
+
+export { ALLOWED_BINARY_LABEL }
+
+export function isNetworkDiagnosticCommand(argv: string[]): boolean {
+  return DIAGNOSTIC_BINARIES.has(basenameOfArgv0(argv))
+}
+
+/** 从 ping/traceroute/tracert argv 解析目标主机（跳过常见 flag） */
+export function parseDiagnosticTargetHost(argv: string[]): string | null {
+  if (!isNetworkDiagnosticCommand(argv)) return null
+  const skipNext = new Set(['-c', '-n', '-w', '-W', '-h', '-m', '-q', '-p', '-s', '-i', '-I'])
+  for (let i = 1; i < argv.length; i++) {
+    const arg = argv[i]?.trim()
+    if (!arg) continue
+    if (arg.startsWith('-')) {
+      const eq = arg.indexOf('=')
+      if (eq > 0) continue
+      const flag = arg.toLowerCase()
+      if (skipNext.has(flag) && i + 1 < argv.length && !argv[i + 1].startsWith('-')) {
+        i++
+      }
+      continue
+    }
+    return arg.replace(/^\[/, '').replace(/\]$/, '')
+  }
+  return null
+}
+
+export function commandNeedsNetwork(argv: string[]): boolean {
+  const bin = effectiveShellBinary(argv)
+  if (DIAGNOSTIC_BINARIES.has(bin)) return true
+  const rest = argv.slice(1).map(a => a.toLowerCase())
+  if (isPipLikeBinary(bin)) {
+    return rest.includes('install') || rest.includes('download')
+  }
+  // python -m pip install（resolveShellArgv 改写后）
+  if (isPythonLikeBinary(bin)) {
+    const mIdx = rest.findIndex((a, i) => a === '-m' && rest[i + 1] === 'pip')
+    if (mIdx >= 0) {
+      const afterPip = rest.slice(mIdx + 2)
+      return afterPip.includes('install') || afterPip.includes('download')
+    }
+  }
+  if (bin === 'npm' || bin === 'npx') {
+    return rest.includes('install') || rest.includes('ci') || rest.includes('update')
+  }
+  if (bin === 'node' && rest[0] === '-e') return false
+  return false
+}
+
+/** 解释器命令可能访问外网 — 触发出站确认（非 pip/npm install、非诊断） */
+export function commandMayNeedEgressConfirmation(argv: string[]): boolean {
+  const bin = basenameOfArgv0(argv)
+  if (DIAGNOSTIC_BINARIES.has(bin)) return false
+  if (commandNeedsNetwork(argv)) return false
+  return INTERPRETER_BINARIES.has(bin) || isPythonLikeBinary(bin)
+}
+
+/**
+ * 从 argv 抽取显式 URL/主机（含 scheme 的参数）。
+ * 供工作区隔离软出站审批：能解析则先确认，无法解析则不假装硬拦。
+ */
+export function extractExplicitHostsFromArgv(argv: readonly string[]): string[] {
+  const hosts = new Set<string>()
+  for (const raw of argv) {
+    const t = String(raw ?? '').trim()
+    if (!t) continue
+    if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(t) && !/^\/\/[^/]/.test(t)) continue
+    try {
+      const href = t.startsWith('//') ? `https:${t}` : t
+      const hostname = new URL(href).hostname
+      const normalized = hostname.trim().toLowerCase().replace(/\.$/, '')
+      if (normalized) hosts.add(normalized)
+    } catch {
+      /* ignore unparseable */
+    }
+  }
+  return [...hosts]
+}
+
+function isPipInstallArgv(argv: string[], bin: string): boolean {
+  if (isPipLikeBinary(bin)) return true
+  if (!isPythonLikeBinary(bin)) return false
+  const lower = argv.map(a => a.toLowerCase())
+  return lower.some((a, i) => a === '-m' && lower[i + 1] === 'pip')
+}
+
+export function assertPackageInstallPolicy(
+  argv: string[],
+  cwdAbs: string,
+  grantRootAbs: string,
+): string[] {
+  const bin = effectiveShellBinary(argv)
+  const pipInstall = isPipInstallArgv(argv, bin)
+  if (!pipInstall && bin !== 'npm' && bin !== 'npx') {
+    return argv
+  }
+
+  const lowerArgs = argv.map(a => a.toLowerCase())
+  const installIdx = lowerArgs.findIndex(a =>
+    a === 'install' || a === 'ci' || a === 'update',
+  )
+  if (installIdx < 0) return argv
+
+  for (const flag of GLOBAL_INSTALL_FLAGS) {
+    if (lowerArgs.includes(flag)) {
+      throw new WorkspaceError('禁止全局或用户目录安装；包只能装进当前授权工作区')
+    }
+  }
+
+  if (bin === 'npm' || bin === 'npx') {
+    for (let i = 0; i < argv.length; i++) {
+      const a = argv[i]
+      if (a === '--prefix' || a === '-C') {
+        const target = argv[i + 1]
+        if (target && !isUnderGrant(path.resolve(cwdAbs, target), grantRootAbs)) {
+          throw new WorkspaceError('npm 安装目标必须在授权工作区内')
+        }
+      }
+    }
+    return argv
+  }
+
+  // pip / python -m pip: 若无 --target / -t / -d，注入 --target 到工作区 vendor
+  const hasTarget = lowerArgs.some(a => a === '--target' || a === '-t' || a === '-d' || a.startsWith('--target='))
+  if (hasTarget) {
+    for (let i = 0; i < argv.length; i++) {
+      if (argv[i] === '--target' || argv[i] === '-t') {
+        const target = argv[i + 1]
+        if (target && !isUnderGrant(path.resolve(cwdAbs, target), grantRootAbs)) {
+          throw new WorkspaceError('pip 安装目标必须在授权工作区内')
+        }
+      }
+      if (argv[i]?.startsWith('--target=')) {
+        const target = argv[i].slice('--target='.length)
+        if (target && !isUnderGrant(path.resolve(cwdAbs, target), grantRootAbs)) {
+          throw new WorkspaceError('pip 安装目标必须在授权工作区内')
+        }
+      }
+    }
+    return argv
+  }
+
+  const vendorDir = '.opptrix-packages'
+  return [...argv.slice(0, installIdx + 1), '--target', vendorDir, ...argv.slice(installIdx + 1)]
+}
+
+/**
+ * 对 pip / python -m pip install 注入 `--cert`（幂等：已有则不改）。
+ * 非 pip install 原样返回。
+ */
+export function injectPipCertArgv(argv: readonly string[], certPath: string): string[] {
+  const trimmed = certPath.trim()
+  if (!trimmed) return [...argv]
+  const copy = [...argv]
+  const bin = effectiveShellBinary(copy)
+  if (!isPipInstallArgv(copy, bin)) return copy
+
+  const lowerArgs = copy.map(a => a.toLowerCase())
+  const installIdx = lowerArgs.findIndex(a => a === 'install')
+  if (installIdx < 0) return copy
+
+  for (let i = 0; i < copy.length; i++) {
+    const a = copy[i]
+    if (a === '--cert' || a.toLowerCase().startsWith('--cert=')) {
+      return copy
+    }
+  }
+
+  return [
+    ...copy.slice(0, installIdx + 1),
+    '--cert',
+    trimmed,
+    ...copy.slice(installIdx + 1),
+  ]
+}
+
+export function buildPipInstallArgv(packages: readonly string[]): string[] {
+  return ['pip3', 'install', '--target', '.opptrix-packages', ...packages]
+}
+
+export function buildNpmInstallArgv(packages: readonly string[]): string[] {
+  if (packages.length === 0) {
+    return ['npm', 'install']
+  }
+  return ['npm', 'install', ...packages]
+}
+
+function isUnderGrant(target: string, grantRoot: string): boolean {
+  const rel = path.relative(grantRoot, path.resolve(target))
+  return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel))
+}
+
+export function escapeShellArg(arg: string): string {
+  if (!/[\s"'\\$`!]/.test(arg)) return arg
+  return `"${arg.replace(/(["\\$`!])/g, '\\$1')}"`
+}
+
+export function argvToCommandString(argv: readonly string[]): string {
+  return argv.map(escapeShellArg).join(' ')
+}
+
+/**
+ * 将策略改写后的 argv 同步为真 shell 的 command 字符串。
+ * 管道/`&&` 等经 parseCommandToArgv 拆出的 token 保持字面量，供 shellWrap 执行。
+ * 真 shell 与 argv spawn 均须用此结果，避免只改 argv 而 commandString 仍是原文。
+ */
+export function syncCommandStringFromManagedArgv(argv: readonly string[]): string {
+  return argvToCommandString(argv)
+}

@@ -1,0 +1,323 @@
+export {
+  MarketDataEngine,
+  AshareEngine,
+  type InstrumentDataCapability,
+  Capability, CACHE_TYPE, DriverRegistry, Cache,
+  BaseDriver, CAP_METHOD, computeIndicators, registerAllDrivers,
+  normalizePreOpenRealtimeQuote, normalizePreOpenRealtimeQuotes, isMissingLivePrice,
+  TushareDriver,
+  TickflowDriver, StockIndexDriver,
+  getProviderConfigStore, ProviderConfigStore, ProviderCatalogService, createProviderCatalog,
+  PROVIDER_MANIFESTS, listProviderManifests, getProviderManifest,
+  ProviderLoader, createProviderLoader, getProviderLoader,
+  ManifestRegistry, getManifestRegistry,
+  QueryPlanExecutor, QUERY_PLANS, defaultCacheType, executeIntradaySessionsPlan,
+  computeChipDistribution, computeLatestChipProfile,
+} from './engine.js'
+
+export {
+  MARKET_LEVEL_CAPABILITIES,
+  isMarketLevelCapability,
+} from './engine.js'
+
+export {
+  installFromOppx,
+  installFromDirectory,
+  uninstallProviderPlugin,
+  listInstalledProviders as listInstalledProviderEntries,
+  providersRootDir,
+} from './providers/index.js'
+
+export type { InstalledProviderEntry, InstalledProvidersIndex } from './providers/installer.js'
+
+export type {
+  QueryPlan,
+  QueryPlanId,
+  QueryPlanStrategy,
+  QueryExecutionContext,
+} from './engine.js'
+
+export type { IntradayTrendBar, IntradayTrendFetchResult, IntradayTrendSession } from './utils/intraday-trends.js'
+export {
+  cnMarketNow,
+  cnTodayString,
+  isCnAfterMarketClose,
+  isCnBeforeMarketOpen,
+  isCnMarketOpen,
+  isCnTradingWeekday,
+  shouldPreferTodayIntraday,
+} from './utils/market-session.js'
+export {
+  cnCalendarYear,
+  cnCompactYmdDaysAgo,
+  cnTradingDayCompactYmd,
+  cnTradingDayYmd,
+  cnYmdDaysAgo,
+  cnYmdFromMs,
+  cnYmdToMs,
+} from './utils/cn-trading-day.js'
+export { pickIntradaySession } from './utils/intraday-trends.js'
+export {
+  crossMarketChartTimeZone,
+  crossMarketSessionDate,
+  hkFdaysToIntradayItems,
+  intradaySessionDateFromKlines,
+  isCrossMarketTradingDay,
+  isHkFdaysPayload,
+  marketLocalDatetimeToIso,
+  minuteKlinesToIntradayItems,
+  timezoneOffsetIso,
+  type CrossMarketChartMarket,
+  type HkFdaysDay,
+} from './utils/cross-market-intraday.js'
+export {
+  crossMarketFiveDayMinuteCount,
+  crossMarketIntradayMinuteCount,
+  resolveCrossMarketKlineEngineQuery,
+  type CrossMarketKlineEngineQuery,
+} from './utils/cross-market-kline.js'
+export { resampleOhlcKlines } from './utils/kline-resample.js'
+export {
+  parseStockMarket,
+  resolveStockMarketCode,
+  isShIndexCode,
+  type StockMarket,
+} from './utils/helpers.js'
+
+export {
+  loadTushareConfig, saveTushareConfig, publicTushareConfig, isTushareEnabled, tushareConfigPath,
+  resolveTushareHttpUrl, TUSHARE_DEFAULT_HTTP_URL,
+  testTushareConnection, TushareClient, toTsCode, fromTsCode,
+} from './providers/tushare/index.js'
+export type { TushareRuntimeConfig, PublicTushareConfig, TushareRow } from './providers/tushare/index.js'
+
+export {
+  FuyaoClient, testTonghuashunConnection,
+  loadTonghuashunConfig, isTonghuashunEnabled,
+} from './providers/tonghuashun/index.js'
+export type { FuyaoDumpDownloadKind } from './providers/tonghuashun/index.js'
+
+export {
+  testTickflowConnection,
+  loadTickflowConfig,
+  isTickflowEnabled,
+  TickflowClient,
+  TICKFLOW_MANIFEST,
+  TICKFLOW_SETTINGS,
+} from './providers/tickflow/index.js'
+export {
+  mapTickflowInstrumentToListItem,
+  mapTickflowInstrumentListItems,
+} from './providers/tickflow/normalize/instruments.js'
+export type { TickflowInstrument } from './providers/tickflow/api/client.js'
+
+export { PortfolioManager } from './portfolio/manager.js'
+export {
+  INSTRUMENT_ID_UNIFY_PORTFOLIO_V1,
+  PORTFOLIO_PURGE_WATCHLIST_ORPHANS_V1,
+} from './portfolio/store.js'
+export {
+  loadWatchlistItemsForPurge,
+  purgePortfolioWatchlistOrphans,
+  tradeMatchesAnyWatchlistItem,
+  tradeMatchesWatchlistItem,
+} from './portfolio/purge-watchlist-orphans.js'
+export {
+  inferTradeAssetClass,
+  portfolioCodeAliases,
+  portfolioDisplayCode,
+  portfolioInstrumentRef,
+  portfolioLedgerKey,
+} from './portfolio/instrument.js'
+export type { TradeRecord, HoldingPosition, PnLSummary } from './portfolio/models.js'
+export { WatchlistManager } from './watchlist/manager.js'
+export { WatchlistStore } from './watchlist/store.js'
+export { WatchlistGroupsManager } from './watchlist/groups-manager.js'
+export type { WatchlistItem } from './watchlist/models.js'
+export type { WatchlistGroup, WatchlistGroupsDocument } from './watchlist/groups-models.js'
+export { WATCHLIST_ALL_GROUP_ID, emptyWatchlistGroupsDocument } from './watchlist/groups-models.js'
+export { normalizeWatchlistGroupsDocument, WatchlistGroupsStore } from './watchlist/groups-store.js'
+export { normalizeWatchlistItem, watchlistItemKey, displayCodeFromInstrument, isOpptrixInstrumentCode, legacyToInstrument, tryLegacyToInstrument } from './watchlist/instrument.js'
+export {
+  INSTRUMENT_ID_UNIFY_WATCHLIST_V1,
+  migrateWatchlistItemInstrumentIdV1,
+  migrateWatchlistItemsInstrumentIdV1,
+  looksLikeFakeCnPadFromShortCode,
+} from './watchlist/migrate-instrument-id.js'
+export {
+  WATCHLIST_LEGACY_NAMESPACE_TO_OPTRIX_V1,
+  isLegacyWatchlistNamespaceCode,
+  migrateWatchlistLegacyNamespaceItem,
+  migrateWatchlistLegacyNamespaceItems,
+  watchlistItemNeedsLegacyNamespaceMigration,
+} from './watchlist/migrate-legacy-namespace.js'
+export {
+  INSTRUMENT_ID_UNIFY_WATCHLIST_V2,
+  watchlistItemNeedsDisambiguation,
+  disambiguateWatchlistItemsLocal,
+  disambiguateWatchlistItemFromHits,
+  disambiguateWatchlistItemFromOnlineHits,
+  disambiguateWatchlistItemOutcome,
+  listDisambiguationCandidates,
+  pickUniqueInstrumentRef,
+  filterExactDigitHits,
+  applyResolvedInstrument,
+  stripDigitBare,
+  type DisambiguationHit,
+  type DisambiguationCandidate,
+  type DisambiguateOutcome,
+} from './watchlist/disambiguate-instrument.js'
+
+export { normalizeCode, isBseCode, isBse920Code, resolveMarket, resolveSecId, resolveStockSecId, secFullCode, cnSecSymbol, secXueqiuSymbol } from './utils/helpers.js'
+export {
+  LruMap,
+  createNameCache,
+  DEFAULT_NAME_CACHE_MAX_ENTRIES,
+} from './utils/lru-map.js'
+export { instrumentRefKey } from '@opptrix/shared'
+export {
+  isCnEtfCode,
+  isCnExchangeListedFundCode,
+  isCnExchangeListedFundAssetClass,
+  usesCnExchangeFundRealtimeRoute,
+  toInstrumentRef,
+  inferCnAssetClass,
+  inferMarketFromSymbol,
+  instrumentId,
+} from './core/instrument.js'
+export {
+  isCnPublicFundRef,
+  toCnPublicFundRef,
+  assertCnPublicFundCode,
+  CN_PUBLIC_FUND_EXCHANGE,
+  isCnListedFundSymbol,
+  isCnLofSymbol,
+  inferCnPublicFundListingExchange,
+  stockIndexItemLooksLikeCnPublicFund,
+  resolveCnPublicFundBareCode,
+  isCnOtcFundRef,
+  toCnOtcFundRef,
+  assertCnOtcFundCode,
+  CN_OTC_FUND_EXCHANGE,
+} from './core/fund-instrument.js'
+export {
+  normalizeUsSymbol,
+  isValidUsSymbol,
+  usTodayString,
+  isUsMarketOpen,
+  isUsTradingWeekday,
+  isUsTradingDay,
+  isNyseHoliday,
+  nyseHolidaysForYear,
+  resolveUsQuoteSession,
+  usQuoteSessionLabel,
+  isUsPreMarket,
+  isUsPostMarket,
+} from './utils/us-market.js'
+export type { UsQuoteSession } from './utils/us-market.js'
+export {
+  normalizeRegionalSymbol,
+  toYahooFinanceSymbol,
+  isRegionalEquityMarket,
+} from './utils/regional-symbol.js'
+export type { RegionalEquityMarket } from './utils/regional-symbol.js'
+export { regionalTodayString, isRegionalTradingWeekday, isRegionalTradingDay, isRegionalHoliday, regionalHolidaysForYear } from './utils/regional-calendar.js'
+export {
+  STOCKINDEX_MANIFEST,
+  STOCKINDEX_SETTINGS,
+  STOCKINDEX_DEFAULT_BASE_URL,
+  STOCKINDEX_DEFAULT_BASE_URL as STOCK_INDEX_BASE_URL,
+  stockIndexApiKey,
+  opptrixInstrumentSearch,
+  opptrixGetInstrument,
+  opptrixFundNav,
+  opptrixFundQuoteBatch,
+  opptrixFundMetrics,
+  opptrixFxRmbLatest,
+  stockIndexListStocks,
+  stockIndexListEtfs,
+  StockIndexHttpClient,
+  opptrixInstrumentToStockIndexItem,
+  stockIndexItemsToListRows,
+  stockIndexItemToListRow,
+  stockIndexItemToInstrumentRef,
+  refLabelFromInstrument,
+  opptrixNavToStandardRows,
+  opptrixLatestNavToQuoteRow,
+  opptrixInstrumentToProfileRow,
+  opptrixMetricsToRow,
+  type StockIndexItem,
+  type StockIndexItem as StockIndexSearchItem,
+  type OpptrixInstrument,
+  type OpptrixNavRow,
+  type OpptrixFundLatestNavItem,
+  type OpptrixFundMetrics,
+  type OpptrixRmbRate,
+  type OpptrixRmbLatestData,
+} from './providers/stockindex/index.js'
+export {
+  searchInstrumentsOnline,
+  listInstrumentsOnline,
+  rankInstrumentSearchHits,
+  scoreInstrumentSearchHit,
+  resolveSearchAliasTargets,
+  InstrumentSearchError,
+  toInstrumentSearchError,
+  type InstrumentSearchHit,
+  type InstrumentSearchErrorReason,
+  type SearchAliasTarget,
+} from './search/instrument-search.js'
+export {
+  resolveInstrumentNamesViaStockIndex,
+  type InstrumentNameResolveHit,
+} from './search/instrument-resolve.js'
+export { parseCryptoPair, isCryptoPairNotation, normalizeCryptoBase } from './utils/crypto-market.js'
+export type { CryptoPairRef } from './utils/crypto-market.js'
+export {
+  resolveInstrumentQueryPlan,
+  unsupportedInstrumentCapabilityMessage,
+  type InstrumentQueryOpts,
+  type InstrumentQueryPlan,
+} from './core/instrument-query.js'
+export {
+  getFreeProviderThrottle,
+  shouldSkipProviderQuery,
+  recordProviderQuerySuccess,
+  recordProviderQueryEmpty,
+  recordProviderQueryError,
+  isFreeMarketDataProvider,
+  classifyProviderQueryError,
+} from './core/free-provider-throttle.js'
+export type { ProviderQueryErrorClass } from './core/provider-query-error.js'
+export { invokeProviderDriverMethod } from './core/provider-driver-guard.js'
+export {
+  wireProviderSymbolArg,
+  wireRegistryMethodArgs,
+  formatProviderMethodArgs,
+} from './core/provider-wire.js'
+export { resolveInstrumentFromParams, instrumentRefsFromList, normalizeInstrumentHubParams, instrumentProviderSymbol } from '@opptrix/shared'
+export {
+  normalizeInstrumentRef,
+  canonicalSymbolForMarket,
+  canonicalCnSymbol,
+  canonicalUsSymbol,
+  canonicalHkSymbol,
+  canonicalJpSymbol,
+  canonicalKrSymbol,
+  instrumentRefLabel,
+  parseCanonicalInstrumentInput,
+} from '@opptrix/shared'
+export type { AssetClass, Market, InstrumentRef } from '@opptrix/shared'
+
+export type {
+  MoneyFlow, IndexRealtime, IndexKline, MarketMoneyFlow, SectorMoneyFlow,
+  StockProfile, NewsItem, SentimentData, Dividend, DragonTiger, LimitUpDown,
+  GlobalIndex, TechnicalIndicator, ChipDistribution,
+} from './core/schema.js'
+
+export type { AnnouncementContent } from './announcement/index.js'
+export {
+  fetchAnnouncementContentByUrl,
+  compressPlainTextForAgent,
+  resolveAnnouncementUrl,
+} from './announcement/index.js'

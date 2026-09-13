@@ -1,0 +1,44 @@
+import { createPortal } from 'react-dom'
+import { makeStyles } from '@fluentui/react-components'
+import { DESKTOP_Z_OVERLAY_SIDEBAR } from './constants'
+import { desktopFrameTitlebarHeight } from './layout'
+
+const EDGE_WIDTH_PX = 8
+
+const useStyles = makeStyles({
+  edge: {
+    position: 'fixed',
+    left: 0,
+    bottom: 0,
+    width: `${EDGE_WIDTH_PX}px`,
+    // Below global chrome (1300), above panel title content
+    zIndex: DESKTOP_Z_OVERLAY_SIDEBAR,
+    pointerEvents: 'auto',
+    backgroundColor: 'transparent',
+  },
+})
+
+interface OverlaySidebarEdgeTriggerProps {
+  enabled: boolean
+  onReveal: () => void
+}
+
+/** Left-edge hover zone to reveal overlay sidebar in compact window mode. */
+export default function OverlaySidebarEdgeTrigger({
+  enabled,
+  onReveal,
+}: OverlaySidebarEdgeTriggerProps) {
+  const s = useStyles()
+
+  if (!enabled) return null
+
+  return createPortal(
+    <div
+      className={s.edge}
+      style={{ top: `${desktopFrameTitlebarHeight()}px` }}
+      onMouseEnter={onReveal}
+      aria-hidden
+    />,
+    document.body,
+  )
+}

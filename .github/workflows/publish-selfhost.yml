@@ -1,0 +1,99 @@
+# Publish @opptrix/selfhost to npm
+# Triggers: tag selfhost-v*  or  workflow_dispatch
+#
+# Prerequisites:
+#   1. npm org `@opptrix` exists (https://www.npmjs.com/org/create)
+#   2. NPM_TOKEN can publish to that org
+#   3. Tag selfhost-vX.Y.Z matches packages/selfhost version (or sync step bumps it)
+name: Publish selfhost
+
+on:
+  push:
+    tags:
+      - 'selfhost-v*'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Pack only (no npm publish)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  # Keep in sync with scripts/lib/ci-pins.env
+  CI_UBUNTU_RUNNER: ubuntu-24.04
+
+jobs:
+  publish:
+    name: Build & publish @opptrix/selfhost
+    runs-on: ubuntu-24.04  # pin: scripts/lib/ci-pins.env CI_UBUNTU_RUNNER
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: packages/selfhost
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+          registry-url: 'https://registry.npmjs.org'
+          scope: '@opptrix'
+
+      - name: Install dependencies (workspace root)
+        working-directory: .
+        run: npm ci
+
+      - name: Sync package version from tag
+        if: startsWith(github.ref, 'refs/tags/selfhost-v')
+        run: |
+          TAG="${GITHUB_REF_NAME#selfhost-v}"
+          echo "tag version=$TAG"
+          npm version "$TAG" --no-git-tag-version --allow-same-version
+
+      - name: Build selfhost bundle
+        run: npm run build
+
+      - name: Verify pack contents
+        run: |
+          npm pack --dry-run
+          test -f bundle/docker-compose.yml
+          test -f bundle/docker-compose.legacy-volumes.yml
+          test -f bundle/Dockerfile
+          test -f bin/opptrix.js
+          grep -q 'OPPTRIX_HOME=/opptrix' bundle/compose.env.example
+          grep -q 'opptrix-agent' bundle/Dockerfile
+          node -e 'const p=require("./package.json"); if(!p.bin||!p.bin.opptrix) throw new Error("missing bin.opptrix")'
+
+      - name: Publish
+        if: ${{ github.event_name == 'push' || inputs.dry_run == false }}
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Verify package is on registry.npmjs.org
+        if: ${{ github.event_name == 'push' || inputs.dry_run == false }}
+        working-directory: .
+        run: |
+          VER=$(node -p "require('./packages/selfhost/package.json').version")
+          echo "waiting for @opptrix/selfhost@$VER …"
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            if npm view "@opptrix/selfhost@$VER" version --registry https://registry.npmjs.org; then
+              npm view @opptrix/selfhost bin --registry https://registry.npmjs.org
+              exit 0
+            fi
+            sleep 6
+          done
+          echo "::error::Publish reported success but package not visible on registry.npmjs.org. Create npm org @opptrix and ensure NPM_TOKEN can publish to it."
+          exit 1
+
+      - name: Dry-run pack artifact
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run == true }}
+        run: |
+          npm pack
+          ls -la opptrix-selfhost-*.tgz

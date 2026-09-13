@@ -1,0 +1,602 @@
+import { useRef, type CSSProperties, type ReactNode } from 'react'
+import { makeStyles, mergeClasses } from '@fluentui/react-components'
+import OpptrixButton from '../components/opptrix/OpptrixButton'
+import { DESKTOP_FRAME_TITLEBAR_HEIGHT, DESKTOP_TITLEBAR_HEIGHT } from '../desktop/constants'
+import { desktopFrameTitlebarHeight } from '../desktop/layout'
+import MacTrafficLights from '../desktop/MacTrafficLights'
+import { useElectronFullscreen } from '../hooks/useElectronFullscreen'
+import { electronPlatform, isElectron } from '../platform/detect'
+import { opptrixCssVars, opptrixTokens } from '../theme/tokens'
+import { OnboardingAtmosphere } from './OnboardingAtmosphere'
+import { type OnboardingNavStep } from './onboardingTheme'
+
+/** Shared horizontal inset: tight on mobile, expands on wide screens. */
+const SHELL_PAD_X = 'clamp(16px, 4vw, 72px)'
+/** Matches `footerDock` height — scroll pad must clear this + safe-area. */
+const FOOTER_DOCK_HEIGHT_PX = 135
+const SCROLL_FOOTER_GAP_PX = 16
+
+export const useOnboardingShellStyles = makeStyles({
+  root: {
+    position: 'fixed',
+    inset: 0,
+    zIndex: 2000,
+    display: 'flex',
+    flexDirection: 'column',
+    backgroundColor: opptrixCssVars.canvas,
+    overflow: 'hidden',
+  },
+  stage: {
+    position: 'relative',
+    zIndex: 1,
+    flex: 1,
+    minHeight: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+  },
+  rootFrameTitlebar: {
+    paddingTop: `${DESKTOP_FRAME_TITLEBAR_HEIGHT}px`,
+    boxSizing: 'border-box',
+  },
+  electronTitleBar: {
+    position: 'relative',
+    zIndex: 2,
+    flexShrink: 0,
+    height: `${DESKTOP_TITLEBAR_HEIGHT}px`,
+    boxSizing: 'border-box',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingLeft: '12px',
+    borderBottom: `1px solid ${opptrixCssVars.separatorHairline}`,
+    backgroundColor: 'transparent',
+  },
+  electronTitleBarMac: {
+    justifyContent: 'flex-end',
+    paddingRight: '12px',
+  },
+  electronTitleBarWin: {
+    justifyContent: 'flex-end',
+    paddingRight: '12px',
+  },
+  titleBarDragOverlay: {
+    position: 'absolute',
+    inset: 0,
+    zIndex: 0,
+  },
+  /** Shared by AuthWindowShell electron title bar (login), not onboarding chrome. */
+  titleBarBrand: {
+    position: 'absolute',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    zIndex: 1,
+    fontSize: 'var(--opptrix-font-base)',
+    fontWeight: 600,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    color: opptrixCssVars.accent,
+    whiteSpace: 'nowrap',
+    pointerEvents: 'none',
+  },
+  scrollViewport: {
+    flex: 1,
+    minHeight: 0,
+    overflowY: 'auto',
+    overflowX: 'hidden',
+    width: '100%',
+  },
+  scrollInner: {
+    width: '100%',
+    maxWidth: '100%',
+    minHeight: '100%',
+    boxSizing: 'border-box',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    padding: `clamp(16px, 3vh, 28px) ${SHELL_PAD_X}`,
+    /** Clears footer dock height + safe-area + gap so last list rows stay visible */
+    paddingBottom: `calc(${FOOTER_DOCK_HEIGHT_PX + SCROLL_FOOTER_GAP_PX}px + env(safe-area-inset-bottom, 0px))`,
+  },
+  scrollInnerFlush: {
+    justifyContent: 'flex-start',
+  },
+  scrollInnerDisplay: {
+    justifyContent: 'center',
+    paddingBottom: 'clamp(16px, 3vh, 28px)',
+  },
+  content: {
+    width: '100%',
+    maxWidth: '520px',
+    boxSizing: 'border-box',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    textAlign: 'center',
+  },
+  /** Workflow steps: opaque white panel so Atmosphere grid does not show through */
+  contentPanel: {
+    padding: 'clamp(16px, 2.5vh, 22px) clamp(16px, 3vw, 22px)',
+    borderRadius: opptrixTokens.radiusLg,
+    border: `1px solid ${opptrixCssVars.border}`,
+    backgroundColor: '#FFFFFF',
+    boxSizing: 'border-box',
+  },
+  contentDisplay: {
+    maxWidth: '640px',
+  },
+  contentWide: {
+    maxWidth: '600px',
+  },
+  contentAlignStart: {
+    alignItems: 'stretch',
+    textAlign: 'left',
+  },
+  chromeRail: {
+    width: '100%',
+    maxWidth: '520px',
+    boxSizing: 'border-box',
+    marginLeft: 'auto',
+    marginRight: 'auto',
+  },
+  chromeRailDisplay: {
+    maxWidth: '640px',
+  },
+  chromeRailWide: {
+    maxWidth: '600px',
+  },
+  progressDock: {
+    flexShrink: 0,
+    width: '100%',
+    boxSizing: 'border-box',
+    backgroundColor: 'transparent',
+    padding: `clamp(14px, 2.5vh, 20px) ${SHELL_PAD_X}`,
+  },
+  progressDots: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+  },
+  progressDot: {
+    width: '6px',
+    height: '6px',
+    borderRadius: '999px',
+    backgroundColor: opptrixCssVars.separator,
+    transitionProperty: 'background-color, opacity',
+    transitionDuration: '220ms',
+  },
+  progressDotActive: {
+    backgroundColor: opptrixCssVars.accent,
+  },
+  progressDotDone: {
+    backgroundColor: opptrixCssVars.accentMuted,
+  },
+  heroBlock: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    padding: 'clamp(28px, 8vh, 80px) clamp(4px, 2vw, 16px)',
+    textAlign: 'center',
+  },
+  displayKicker: {
+    marginBottom: 'clamp(12px, 2vh, 18px)',
+    fontSize: 'var(--opptrix-font-md)',
+    fontWeight: 600,
+    letterSpacing: '0.1em',
+    textTransform: 'uppercase',
+    color: opptrixCssVars.accent,
+  },
+  displayTitle: {
+    fontSize: 'clamp(28px, 5.5vw, 42px)',
+    fontWeight: 600,
+    letterSpacing: '-0.035em',
+    color: opptrixCssVars.textPrimary,
+    lineHeight: 1.12,
+    maxWidth: '14em',
+  },
+  displayLead: {
+    marginTop: 'clamp(20px, 3vh, 32px)',
+    fontSize: 'clamp(16px, 2.4vw, 19px)',
+    color: opptrixCssVars.textSecondary,
+    lineHeight: 1.75,
+    maxWidth: '24em',
+  },
+  displayNote: {
+    marginTop: 'clamp(16px, 2.5vh, 24px)',
+    fontSize: 'clamp(14px, 1.8vw, 16px)',
+    color: opptrixCssVars.textTertiary,
+    lineHeight: 1.65,
+    maxWidth: '22em',
+  },
+  versionLine: {
+    marginTop: 'clamp(14px, 2vh, 20px)',
+    fontSize: 'var(--opptrix-font-base)',
+    fontWeight: 500,
+    letterSpacing: '0.03em',
+    color: opptrixCssVars.accent,
+  },
+  sectionTitle: {
+    fontSize: 'clamp(20px, 3.2vw, 26px)',
+    fontWeight: 600,
+    letterSpacing: '-0.025em',
+    color: opptrixCssVars.textPrimary,
+    lineHeight: 1.2,
+  },
+  sectionLead: {
+    marginTop: 'clamp(12px, 2vh, 16px)',
+    marginBottom: 'clamp(20px, 3vh, 28px)',
+    fontSize: 'clamp(15px, 2vw, 17px)',
+    color: opptrixCssVars.textSecondary,
+    lineHeight: 1.7,
+  },
+  legalLead: {
+    fontSize: 'clamp(15px, 2vw, 17px)',
+    color: opptrixCssVars.textSecondary,
+    lineHeight: 1.75,
+  },
+  agreeRow: {
+    display: 'flex',
+    alignItems: 'center',
+    flexWrap: 'nowrap',
+    gap: '10px',
+    marginTop: '14px',
+    padding: '12px 14px',
+    textAlign: 'left',
+    lineHeight: 1.4,
+    borderRadius: '10px',
+    border: `1px solid ${opptrixCssVars.borderStrong}`,
+    backgroundColor: opptrixCssVars.surface,
+    boxSizing: 'border-box',
+    cursor: 'pointer',
+    '& .fui-Checkbox': {
+      margin: 0,
+      flexShrink: 0,
+    },
+    '& .fui-Checkbox__indicator': {
+      margin: 0,
+    },
+  },
+  agreeText: {
+    display: 'inline',
+    fontSize: 'var(--opptrix-font-lg)',
+    color: opptrixCssVars.textPrimary,
+    lineHeight: 1.4,
+    whiteSpace: 'nowrap',
+  },
+  link: {
+    padding: 0,
+    border: 'none',
+    background: 'transparent',
+    color: opptrixCssVars.accent,
+    fontSize: 'inherit',
+    fontWeight: 500,
+    cursor: 'pointer',
+    textDecoration: 'none',
+    ':hover': {
+      textDecoration: 'underline',
+    },
+  },
+  inlineLink: {
+    display: 'inline',
+    padding: 0,
+    margin: 0,
+    border: 'none',
+    background: 'transparent',
+    color: opptrixCssVars.accent,
+    fontSize: 'inherit',
+    fontWeight: 500,
+    fontFamily: 'inherit',
+    lineHeight: 'inherit',
+    cursor: 'pointer',
+    textDecoration: 'none',
+    verticalAlign: 'baseline',
+    ':hover': {
+      textDecoration: 'underline',
+    },
+  },
+  error: {
+    marginTop: '12px',
+    fontSize: 'var(--opptrix-font-base)',
+    color: opptrixCssVars.error,
+    lineHeight: 1.45,
+    textAlign: 'left',
+  },
+  centerLoading: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '12px',
+    minHeight: '200px',
+  },
+  footerDock: {
+    flexShrink: 0,
+    width: '100%',
+    boxSizing: 'border-box',
+    display: 'flex',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    minHeight: `${FOOTER_DOCK_HEIGHT_PX}px`,
+    height: `${FOOTER_DOCK_HEIGHT_PX}px`,
+    paddingTop: 0,
+    paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+    paddingLeft: SHELL_PAD_X,
+    paddingRight: SHELL_PAD_X,
+  },
+  footer: {
+    width: '100%',
+    minHeight: '44px',
+    boxSizing: 'border-box',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '12px',
+    flexShrink: 0,
+  },
+  footerSingle: {
+    width: '100%',
+    minHeight: '44px',
+    boxSizing: 'border-box',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: '12px',
+    flexWrap: 'wrap',
+  },
+  footerBack: {
+    flexShrink: 0,
+  },
+  footerEnd: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: '10px',
+    flexShrink: 0,
+    flexWrap: 'wrap',
+  },
+})
+
+interface OnboardingShellProps {
+  steps: OnboardingNavStep[]
+  stepIndex: number
+  canBack: boolean
+  onBack: () => void
+  bodyFlush?: boolean
+  /** 欢迎/亮点等纯文案步：更宽、更高、更大字号 */
+  layoutMode?: 'display' | 'workflow'
+  contentWide?: boolean
+  contentAlignStart?: boolean
+  hideFooter?: boolean
+  hideProgress?: boolean
+  footerSecondary?: ReactNode
+  footerPrimary: ReactNode
+  children: ReactNode
+}
+
+function chromeRailClass(
+  s: ReturnType<typeof useOnboardingShellStyles>,
+  opts: { isDisplay: boolean; contentWide: boolean },
+) {
+  return mergeClasses(
+    s.chromeRail,
+    opts.isDisplay && s.chromeRailDisplay,
+    opts.contentWide && s.chromeRailWide,
+  )
+}
+
+function OnboardingFooterBar({
+  s,
+  canBack,
+  onBack,
+  footerSecondary,
+  footerPrimary,
+}: {
+  s: ReturnType<typeof useOnboardingShellStyles>
+  canBack?: boolean
+  onBack?: () => void
+  footerSecondary?: ReactNode
+  footerPrimary: ReactNode
+}) {
+  if (!canBack || !onBack) {
+    return (
+      <footer className={s.footerSingle}>
+        {footerSecondary}
+        {footerPrimary}
+      </footer>
+    )
+  }
+
+  return (
+    <footer className={s.footer}>
+      <OpptrixButton variant="secondary" className={s.footerBack} onClick={onBack}>
+        返回
+      </OpptrixButton>
+      <div className={s.footerEnd}>
+        {footerSecondary}
+        {footerPrimary}
+      </div>
+    </footer>
+  )
+}
+
+export function OnboardingShell({
+  steps,
+  stepIndex,
+  canBack,
+  onBack,
+  bodyFlush = false,
+  layoutMode = 'workflow',
+  contentWide = false,
+  contentAlignStart = false,
+  hideFooter = false,
+  hideProgress = false,
+  footerSecondary,
+  footerPrimary,
+  children,
+}: OnboardingShellProps) {
+  const s = useOnboardingShellStyles()
+  const shellRef = useRef<HTMLDivElement>(null)
+  const macFullscreen = useElectronFullscreen()
+  const electronChrome = isElectron()
+  const electronWin = electronChrome && electronPlatform() !== 'darwin'
+  // Only when there is no primary WindowFrameTitleBar (darwin / Web keep current behavior).
+  const showOnboardingElectronTitleBar =
+    electronChrome && desktopFrameTitlebarHeight() === 0
+  const showTrafficLights =
+    showOnboardingElectronTitleBar && electronPlatform() === 'darwin' && !macFullscreen
+  const isDisplay = layoutMode === 'display'
+  const railClass = chromeRailClass(s, { isDisplay, contentWide })
+
+  const electronTitleBar = showOnboardingElectronTitleBar ? (
+    <header
+      className={mergeClasses(
+        s.electronTitleBar,
+        'opptrix-onboarding-title-bar',
+        electronWin ? s.electronTitleBarWin : s.electronTitleBarMac,
+      )}
+    >
+      <div
+        className={mergeClasses(s.titleBarDragOverlay, 'opptrix-onboarding-title-drag')}
+        aria-hidden
+      />
+      {showTrafficLights ? <MacTrafficLights /> : null}
+    </header>
+  ) : null
+
+  return (
+    <div
+      ref={shellRef}
+      className={mergeClasses(
+        s.root,
+        electronWin && s.rootFrameTitlebar,
+        'opptrix-onboarding-shell',
+      )}
+      style={{ '--onb-dx': '0', '--onb-dy': '0' } as CSSProperties}
+      role="dialog"
+      aria-modal="true"
+      aria-label="启动引导"
+    >
+      <OnboardingAtmosphere hostRef={shellRef} />
+      {electronTitleBar}
+
+      <div className={s.stage}>
+        {!hideProgress && (
+          <div className={mergeClasses(s.progressDock, 'opptrix-onboarding-progress-dock')}>
+            <div className={railClass}>
+              <div className={s.progressDots} aria-hidden>
+                {steps.map((_, i) => (
+                  <div
+                    key={i}
+                    className={mergeClasses(
+                      s.progressDot,
+                      i < stepIndex && s.progressDotDone,
+                      i === stepIndex && s.progressDotActive,
+                    )}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div
+          className={mergeClasses(
+            s.scrollViewport,
+            'opptrix-onboarding-scroll',
+          )}
+        >
+          <div
+            className={mergeClasses(
+              s.scrollInner,
+              bodyFlush && s.scrollInnerFlush,
+              isDisplay && s.scrollInnerDisplay,
+            )}
+          >
+            <div
+              className={mergeClasses(
+                s.content,
+                !isDisplay && s.contentPanel,
+                isDisplay && s.contentDisplay,
+                contentWide && s.contentWide,
+                contentAlignStart && s.contentAlignStart,
+              )}
+            >
+              {children}
+            </div>
+          </div>
+        </div>
+
+        {!hideFooter && (
+          <div className={mergeClasses(s.footerDock, 'opptrix-onboarding-footer-dock')}>
+            <div className={railClass}>
+              <OnboardingFooterBar
+                s={s}
+                canBack={canBack}
+                onBack={onBack}
+                footerSecondary={footerSecondary}
+                footerPrimary={footerPrimary}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export function OnboardingHeroBlock({ children }: { children: ReactNode }) {
+  const s = useOnboardingShellStyles()
+  return <div className={s.heroBlock}>{children}</div>
+}
+
+export function OnboardingTextLink({
+  children,
+  onClick,
+  className,
+}: {
+  children: ReactNode
+  onClick: () => void
+  className?: string
+}) {
+  const s = useOnboardingShellStyles()
+  return (
+    <OpptrixButton
+      variant="ghost"
+      className={mergeClasses(s.link, className)}
+      onClick={onClick}
+    >
+      {children}
+    </OpptrixButton>
+  )
+}
+
+/** 行内文字链接：无按钮 min-height/padding，用于协议同意行等紧凑横排 */
+export function OnboardingInlineLink({
+  children,
+  onClick,
+  className,
+}: {
+  children: ReactNode
+  onClick: () => void
+  className?: string
+}) {
+  const s = useOnboardingShellStyles()
+  return (
+    <button
+      type="button"
+      className={mergeClasses(s.inlineLink, className)}
+      onClick={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        onClick()
+      }}
+    >
+      {children}
+    </button>
+  )
+}

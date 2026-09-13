@@ -1,0 +1,196 @@
+import type { ResearchHub } from '@opptrix/research-hub'
+import { normalizeCode } from '@opptrix/a-stock-layer'
+
+export type StockPrepStepId = 'quote' | 'klines'
+export type StockPrepStepStatus = 'pending' | 'running' | 'done' | 'error'
+export type StockPrepJobStatus = 'idle' | 'running' | 'done' | 'error'
+
+export interface StockPrepStep {
+  id: StockPrepStepId
+  label: string
+  status: StockPrepStepStatus
+  message: string | null
+}
+
+export interface StockPrepSnapshot {
+  code: string
+  status: StockPrepJobStatus
+  steps: StockPrepStep[]
+  percent: number
+  message: string | null
+  started_at: string | null
+  updated_at: string
+  error: string | null
+}
+
+const STEP_DEFS: Array<{ id: StockPrepStepId; label: string }> = [
+  { id: 'quote', label: '行情与基本面' },
+  { id: 'klines', label: 'K 线数据' },
+]
+
+function freshSteps(): StockPrepStep[] {
+  return STEP_DEFS.map(s => ({ ...s, status: 'pending', message: null }))
+}
+
+function idleSnapshot(code: string): StockPrepSnapshot {
+  return {
+    code,
+    status: 'idle',
+    steps: freshSteps(),
+    percent: 0,
+    message: null,
+    started_at: null,
+    updated_at: new Date().toISOString(),
+    error: null,
+  }
+}
+
+/** 终态快照 TTL；running 不受误删。与下方「done 1h 复用」配合，避免 Map 无限涨 */
+const SNAPSHOT_TTL_MS = 45 * 60 * 1000
+const MAX_SNAPSHOTS = 200
+
+const snapshots = new Map<string, StockPrepSnapshot>()
+const running = new Set<string>()
+
+export const STOCK_PREP_SNAPSHOT_TTL_MS = SNAPSHOT_TTL_MS
+export const STOCK_PREP_MAX_SNAPSHOTS = MAX_SNAPSHOTS
+
+function isProtected(code: string, snap: StockPrepSnapshot): boolean {
+  return running.has(code) || snap.status === 'running'
+}
+
+/** 驱逐过期 / 超额终态；running 保留 */
+export function pruneStockPrepSnapshots(now = Date.now()): void {
+  for (const [code, snap] of snapshots) {
+    if (isProtected(code, snap)) continue
+    const updated = Date.parse(snap.updated_at)
+    if (!Number.isFinite(updated) || now - updated > SNAPSHOT_TTL_MS) {
+      snapshots.delete(code)
+    }
+  }
+  while (snapshots.size > MAX_SNAPSHOTS) {
+    const oldest = [...snapshots.entries()]
+      .filter(([code, snap]) => !isProtected(code, snap))
+      .sort((a, b) => Date.parse(a[1].updated_at) - Date.parse(b[1].updated_at))[0]
+    if (!oldest) break
+    snapshots.delete(oldest[0])
+  }
+}
+
+/** @internal 测试用 */
+export function resetStockPrepSnapshotsForTests(): void {
+  snapshots.clear()
+  running.clear()
+}
+
+/** @internal 测试用 */
+export function stockPrepSnapshotsSizeForTests(): number {
+  return snapshots.size
+}
+
+/** @internal 测试用 */
+export function injectStockPrepSnapshotForTests(snap: StockPrepSnapshot, opts?: { running?: boolean }): void {
+  snapshots.set(snap.code, snap)
+  if (opts?.running) running.add(snap.code)
+  else running.delete(snap.code)
+}
+
+function patch(code: string, patch: Partial<StockPrepSnapshot>) {
+  const prev = snapshots.get(code) ?? idleSnapshot(code)
+  const next = { ...prev, ...patch, updated_at: new Date().toISOString() }
+  snapshots.set(code, next)
+  return next
+}
+
+function patchStep(code: string, stepId: StockPrepStepId, stepPatch: Partial<StockPrepStep>) {
+  const snap = snapshots.get(code) ?? idleSnapshot(code)
+  const steps = snap.steps.map(s => (s.id === stepId ? { ...s, ...stepPatch } : s))
+  const doneCount = steps.filter(s => s.status === 'done').length
+  const runningCount = steps.filter(s => s.status === 'running').length
+  const percent = Math.min(
+    99,
+    Math.round(((doneCount + runningCount * 0.35) / steps.length) * 100),
+  )
+  return patch(code, { steps, percent })
+}
+
+export function getStockPrep(code: string): StockPrepSnapshot {
+  pruneStockPrepSnapshots()
+  const normalized = normalizeCode(code)
+  return snapshots.get(normalized) ?? idleSnapshot(normalized)
+}
+
+export function startStockPrep(hub: ResearchHub, code: string, opts?: { force?: boolean }): StockPrepSnapshot {
+  pruneStockPrepSnapshots()
+  const normalized = normalizeCode(code)
+  const existing = snapshots.get(normalized)
+  if (running.has(normalized)) {
+    return existing ?? idleSnapshot(normalized)
+  }
+  if (!opts?.force && existing?.status === 'done') {
+    const age = Date.now() - new Date(existing.updated_at).getTime()
+    if (age < 60 * 60 * 1000) return existing
+  }
+
+  const now = new Date().toISOString()
+  const snap: StockPrepSnapshot = {
+    code: normalized,
+    status: 'running',
+    steps: freshSteps(),
+    percent: 0,
+    message: '后台准备个股数据…',
+    started_at: now,
+    updated_at: now,
+    error: null,
+  }
+  snapshots.set(normalized, snap)
+  running.add(normalized)
+
+  void (async () => {
+    try {
+      for (const def of STEP_DEFS) {
+        patchStep(normalized, def.id, { status: 'running', message: `正在${def.label}…` })
+        patch(normalized, { message: `正在${def.label}…` })
+
+        switch (def.id) {
+          case 'quote': {
+            const resp = await hub.dispatch('instrument_snapshot', {
+              instrument: { market: 'CN', assetClass: 'EQUITY', symbol: normalized },
+            })
+            if (!resp.success) throw new Error(resp.message || '行情加载失败')
+            patchStep(normalized, def.id, { status: 'done', message: '已同步' })
+            break
+          }
+          case 'klines': {
+            const resp = await hub.dispatch('instrument_chart', {
+              instrument: { market: 'CN', assetClass: 'EQUITY', symbol: normalized },
+              period: 'daily',
+              count: 120,
+            })
+            if (!resp.success) throw new Error(resp.message || 'K 线加载失败')
+            patchStep(normalized, def.id, { status: 'done', message: '已同步' })
+            break
+          }
+        }
+      }
+      patch(normalized, {
+        status: 'done',
+        percent: 100,
+        message: '数据已就绪，可随时查看',
+        error: null,
+      })
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      const snapNow = snapshots.get(normalized)
+      const failedStep = snapNow?.steps.find(s => s.status === 'running')
+      if (failedStep) {
+        patchStep(normalized, failedStep.id, { status: 'error', message: msg })
+      }
+      patch(normalized, { status: 'error', message: msg, error: msg })
+    } finally {
+      running.delete(normalized)
+    }
+  })()
+
+  return snap
+}

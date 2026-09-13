@@ -1,0 +1,707 @@
+/**
+ * 标的查询计划路由 — 根据 InstrumentRef + 数据能力，解析为具体的 Engine 执行计划。
+ *
+ * 用途：Agent/Hub 层调用时，将"我要查 AAPL 的 K 线"转化为具体的 Provider 调用路径。
+ * 支持市场：CN（A股）、US（美股）、HK（港股）、CRYPTO（加密货币）；JP/KR 暂不接入标准 API。
+ */
+
+import type { AssetClass, InstrumentRef, Market } from '@opptrix/shared'
+import { instrumentProviderSymbol, normalizeInstrumentRef } from '@opptrix/shared'
+import { Capability } from './capabilities.js'
+import { isCnEtfCode } from './instrument.js'
+import { isCnLofSymbol } from './fund-instrument.js'
+import { isRegionalEquityMarket, type RegionalEquityMarket } from '../utils/regional-symbol.js'
+
+/**
+ * 标的数据能力 — 定义可查询的数据类型（标准 Instrument API）。
+ *
+ * 未列入本类型的 Provider 方法须登记为自定义方法，经
+ * 市场级能力统一走 `engine.queryMarketCapability`（白名单见 core/market-capabilities.ts）。
+ *
+ * - realtime:       实时/最新行情
+ * - kline:          K 线历史数据
+ * - snapshot:       聚合快照（概况 + 行情 + 近期 K 线）
+ * - profile:        公司/基金基本面资料
+ * - financials:     财务摘要（营收/利润/ROE 等）
+ * - balance_sheet:  资产负债表多期
+ * - cash_flow:      现金流量表多期
+ * - income_statement: 利润表多期
+ * - stock_list:         股票列表（分页、板块过滤）
+ * - instrument_search:  跨市场关键词搜索（相关性排序）
+ * - index_constituents: 指数/板块成分股
+ * - trade_calendar:     交易日历（市场级；year 经 opts）
+ * - etf_list:       ETF 列表（支持关键词）
+ * - etf_profile:    ETF 基本面资料
+ * - etf_nav:        ETF 净值序列
+ * - etf_holdings:   ETF 持仓成分
+ * - etf_snapshot:   ETF 聚合快照（概况 + 净值 + 行情）
+ * - dividend:       分红送转记录
+ * - news:           个股资讯/新闻
+ * - shareholders:   股东结构/持仓统计
+ * - inst_holding:   机构持仓一览
+ */
+export type InstrumentDataCapability =
+  | 'realtime'
+  | 'kline'
+  | 'snapshot'
+  | 'profile'
+  | 'financials'
+  | 'balance_sheet'
+  | 'cash_flow'
+  | 'income_statement'
+  | 'stock_list'
+  // @legacy-alias instrument_search — 灰名：动词性后缀 search 经规则 A v4 增补条款收入
+  // 变体后缀白名单（本项即 _search 锚点）；新增搜索类能力须复用 _search 后缀，禁造其他动词后缀。
+  | 'instrument_search'
+  | 'index_constituents'
+  | 'trade_calendar'
+  | 'etf_list'
+  | 'etf_profile'
+  | 'etf_nav'
+  | 'etf_holdings'
+  | 'etf_snapshot'
+  | 'fund_list'
+  | 'fund_profile'
+  | 'fund_nav'
+  | 'fund_holdings'
+  | 'fund_snapshot'
+  | 'fund_quote'
+  | 'fund_returns'
+  | 'fund_drawdown'
+  | 'fund_allocation'
+  | 'fund_holders'
+  | 'fund_dividend'
+  | 'fund_manager'
+  | 'fund_diagnosis'
+  | 'fund_news'
+  | 'fund_financials'
+  | 'dividend'
+  | 'shareholders'
+  // @legacy-alias inst_holding — 缩写段 inst（institution）灰名（规则 A 合法但命名质量观察项），
+  // 禁止新增同模式缩写；市场级同名能力标注见 core/market-capabilities.ts。
+  // 未来合规名方向：institution_holding。
+  | 'inst_holding'
+
+/**
+ * 标的查询可选参数 — 控制返回数量、关键词、报告日期/类型、周期等。
+ */
+export interface InstrumentQueryOpts {
+  /** 返回数据条数（如 K 线根数），默认 120 */
+  count?: number
+  /** 搜索关键词（用于 stock_list / instrument_search） */
+  keyword?: string
+  /** 财务报告截止日期 YYYY-MM-DD（用于 financials / balance_sheet / cash_flow / income_statement） */
+  reportDate?: string
+  /** 报告类型："annual"（年报）或 "quarter"（季报），默认 annual；摘要能力用 */
+  reportType?: string
+  /** K 线周期："daily"、"weekly"、"monthly"、"1m" 等，默认 daily */
+  period?: string
+  /** stock_list 分页 */
+  page?: number
+  pageSize?: number
+  /** stock_list 板块过滤（如 hsj、cyb） */
+  boardKey?: string
+  /** stock_list 行业代码过滤（A 股） */
+  industryCode?: string
+  /** 指数/板块代码（index_constituents） */
+  indexCode?: string
+  /** 交易日历年份（trade_calendar） */
+  year?: number
+  /** K 线起始日期 YYYY-MM-DD（CN cn_kline） */
+  startDate?: string
+  /** K 线结束日期 YYYY-MM-DD（CN cn_kline） */
+  endDate?: string
+}
+
+/**
+ * 标的查询执行计划 — 根据市场与能力路由到具体执行路径。
+ *
+ * 路由规则：
+ *   - registry:       通过 Provider Registry 标准路由（US/HK/JP/KR 等）
+ *   - cn_realtime:    A 股实时行情专用通道（新浪/东财批量接口）
+  *   - composite_snapshot: 跨市场复合快照（聚合行情 + 公司资料 + 近期 K 线）
+ */
+export type InstrumentQueryPlan =
+  | {
+    /** 标准 Registry 路由 */
+    kind: 'registry'
+    market: Market
+    assetClass: AssetClass
+    capability: Capability
+    /** Provider 上要调用的方法名 */
+    method: string
+    /** 是否使用缓存 */
+    useCache: boolean
+    /** 方法参数列表 */
+    args: unknown[]
+    /** 标的身份 — qScoped 按 Provider 线格式重写 args */
+    ref?: InstrumentRef
+  }
+  | {
+    /** 跨市场复合快照（聚合多维度数据） */
+    kind: 'composite_snapshot'
+    market: Market
+    symbol: string
+    assetClass?: AssetClass
+    ref?: InstrumentRef
+  }
+  | {
+    /** A 股实时行情专用路径（EQUITY/ETF；INDEX 走 registry INDEX_REALTIME） */
+    kind: 'cn_realtime'
+    symbol: string
+    exchange?: string
+    assetClass: AssetClass
+  }
+  | {
+    /** A 股 K 线专用路径 */
+    kind: 'cn_kline'
+    symbol: string
+    exchange?: string
+    assetClass: AssetClass
+    count: number
+    period?: string
+    start?: string
+    end?: string
+  }
+
+// ── 内部辅助函数 ──
+
+function cnAssetClass(ref: InstrumentRef): AssetClass {
+  return normalizeInstrumentRef(ref).assetClass
+}
+
+function cnSymbol(ref: InstrumentRef): string {
+  return normalizeInstrumentRef(ref).symbol
+}
+
+function usSymbol(ref: InstrumentRef): string {
+  return normalizeInstrumentRef(ref).symbol
+}
+
+function regionalSymbol(ref: InstrumentRef): string {
+  return normalizeInstrumentRef(ref).symbol
+}
+
+function cryptoPair(ref: InstrumentRef): string {
+  return instrumentProviderSymbol(normalizeInstrumentRef(ref))
+}
+
+function registryPlan(
+  market: Market,
+  assetClass: AssetClass,
+  capability: Capability,
+  method: string,
+  useCache: boolean,
+  args: unknown[],
+  ref?: InstrumentRef,
+): InstrumentQueryPlan {
+  return { kind: 'registry', market, assetClass, capability, method, useCache, args, ref }
+}
+
+/** INDEX 必须走指数 snapshot；禁止丢掉 assetClass 后再用裸码猜测。 */
+function cnListedFundQueryClass(
+  assetClass: AssetClass,
+  symbol: string,
+): 'ETF' | 'LOF' | null {
+  if (assetClass === 'LOF') return 'LOF'
+  if (assetClass === 'ETF') return 'ETF'
+  // legacy：命名空间 / 裸码无 class token
+  if (isCnLofSymbol(symbol)) return 'LOF'
+  if (isCnEtfCode(symbol)) return 'ETF'
+  return null
+}
+
+function cnRealtimePlan(
+  normalized: InstrumentRef,
+  symbol: string,
+  exchange: string | undefined,
+  assetClass: AssetClass,
+): InstrumentQueryPlan {
+  if (assetClass === 'INDEX') {
+    return registryPlan(
+      'CN',
+      'INDEX',
+      Capability.INDEX_REALTIME,
+      'indexRealtime',
+      false,
+      [symbol],
+      normalized,
+    )
+  }
+  return { kind: 'cn_realtime', symbol, exchange, assetClass }
+}
+
+function instrumentSearchPlanForFund(
+  opts: InstrumentQueryOpts,
+): InstrumentQueryPlan | null {
+  const keyword = (opts.keyword ?? '').trim()
+  if (!keyword) return null
+  const limit = Math.min(opts.pageSize ?? 30, 100)
+  return registryPlan('CN', 'FUND', Capability.FUND_LIST, 'fundList', true, [keyword, keyword, limit])
+}
+
+function instrumentSearchPlan(
+  market: Market,
+  opts: InstrumentQueryOpts,
+): InstrumentQueryPlan | null {
+  const keyword = (opts.keyword ?? '').trim()
+  if (!keyword) return null
+  const limit = Math.min(opts.pageSize ?? 30, 100)
+  const args: unknown[] = [keyword, market, limit]
+  if (opts.boardKey) args.push(opts.boardKey)
+  if (opts.industryCode) args.push(opts.industryCode)
+  return registryPlan(market, 'EQUITY', Capability.INSTRUMENT_SEARCH, 'instrumentSearch', true, args)
+}
+
+/**
+ * 将 InstrumentRef + 数据能力解析为 Engine 执行计划。
+ *
+ * @param ref    标的引用（含市场、代码、资产类别）
+ * @param dataCap 需要的数据能力
+ * @param opts   可选查询参数
+ * @returns 执行计划，不支持的组合返回 null
+ */
+export function resolveInstrumentQueryPlan(
+  ref: InstrumentRef,
+  dataCap: InstrumentDataCapability,
+  opts: InstrumentQueryOpts = {},
+): InstrumentQueryPlan | null {
+  const count = opts.count ?? 120
+
+  // ── A 股市场 ──
+  if (ref.market === 'CN') {
+    const normalized = normalizeInstrumentRef(ref)
+    const symbol = normalized.symbol
+    const assetClass = normalized.assetClass
+    const exchange = normalized.exchange
+
+    if (assetClass === 'FUND') {
+      switch (dataCap) {
+        case 'snapshot':
+        case 'fund_snapshot':
+          return { kind: 'composite_snapshot', market: 'CN', symbol, assetClass: 'FUND', ref: normalized }
+        case 'fund_profile':
+        case 'profile':
+          return registryPlan('CN', 'FUND', Capability.FUND_PROFILE, 'fundProfile', true, [symbol], normalized)
+        case 'fund_nav':
+          return registryPlan('CN', 'FUND', Capability.FUND_NAV, 'fundNav', true, [symbol], normalized)
+        case 'fund_holdings':
+          return registryPlan('CN', 'FUND', Capability.FUND_HOLDINGS, 'fundHoldings', true, [symbol], normalized)
+        case 'fund_quote':
+        case 'realtime':
+          // 净值日更：启用后端缓存（watchlist fund_quote TTL=600）
+          return registryPlan('CN', 'FUND', Capability.FUND_QUOTE, 'fundQuote', true, [symbol], normalized)
+        case 'fund_returns':
+          return registryPlan('CN', 'FUND', Capability.FUND_RETURNS, 'fundReturns', true, [symbol], normalized)
+        case 'fund_drawdown':
+          return registryPlan('CN', 'FUND', Capability.FUND_DRAWDOWN, 'fundDrawdown', true, [symbol], normalized)
+        case 'fund_allocation':
+          return registryPlan('CN', 'FUND', Capability.FUND_ALLOCATION, 'fundAllocation', true, [symbol], normalized)
+        case 'fund_holders':
+          return registryPlan('CN', 'FUND', Capability.FUND_HOLDERS, 'fundHolders', true, [symbol], normalized)
+        case 'fund_dividend':
+          return registryPlan('CN', 'FUND', Capability.FUND_DIVIDEND, 'fundDividend', true, [symbol], normalized)
+        case 'fund_manager':
+          return registryPlan('CN', 'FUND', Capability.FUND_MANAGER, 'fundManager', true, [symbol], normalized)
+        case 'fund_diagnosis':
+          return registryPlan('CN', 'FUND', Capability.FUND_DIAGNOSIS, 'fundDiagnosis', true, [symbol], normalized)
+        case 'fund_news':
+          return registryPlan('CN', 'FUND', Capability.FUND_NEWS, 'fundNews', true, [symbol], normalized)
+        case 'fund_financials':
+          return registryPlan('CN', 'FUND', Capability.FUND_FINANCIALS, 'fundFinancials', true, [symbol], normalized)
+        case 'fund_list':
+          return registryPlan('CN', 'FUND', Capability.FUND_LIST, 'fundList', true, [
+            'CN', opts.keyword ?? '',
+          ])
+        case 'instrument_search':
+          return instrumentSearchPlanForFund(opts)
+        default:
+          return null
+      }
+    }
+
+    if (assetClass === 'REIT') {
+      switch (dataCap) {
+        case 'snapshot':
+        case 'fund_snapshot':
+          return { kind: 'composite_snapshot', market: 'CN', symbol, assetClass: 'REIT', ref: normalized }
+        case 'fund_profile':
+        case 'profile':
+          return registryPlan('CN', 'REIT', Capability.FUND_PROFILE, 'fundProfile', true, [symbol], normalized)
+        case 'fund_nav':
+          return registryPlan('CN', 'REIT', Capability.FUND_NAV, 'fundNav', true, [symbol], normalized)
+        case 'fund_holdings':
+          return registryPlan('CN', 'REIT', Capability.FUND_HOLDINGS, 'fundHoldings', true, [symbol], normalized)
+        case 'fund_quote':
+        case 'realtime':
+          return registryPlan('CN', 'REIT', Capability.FUND_QUOTE, 'fundQuote', true, [symbol], normalized)
+        case 'fund_returns':
+          return registryPlan('CN', 'REIT', Capability.FUND_RETURNS, 'fundReturns', true, [symbol], normalized)
+        case 'fund_drawdown':
+          return registryPlan('CN', 'REIT', Capability.FUND_DRAWDOWN, 'fundDrawdown', true, [symbol], normalized)
+        case 'fund_allocation':
+          return registryPlan('CN', 'REIT', Capability.FUND_ALLOCATION, 'fundAllocation', true, [symbol], normalized)
+        case 'fund_holders':
+          return registryPlan('CN', 'REIT', Capability.FUND_HOLDERS, 'fundHolders', true, [symbol], normalized)
+        case 'fund_dividend':
+          return registryPlan('CN', 'REIT', Capability.FUND_DIVIDEND, 'fundDividend', true, [symbol], normalized)
+        case 'fund_manager':
+          return registryPlan('CN', 'REIT', Capability.FUND_MANAGER, 'fundManager', true, [symbol], normalized)
+        case 'fund_diagnosis':
+          return registryPlan('CN', 'REIT', Capability.FUND_DIAGNOSIS, 'fundDiagnosis', true, [symbol], normalized)
+        case 'fund_news':
+          return registryPlan('CN', 'REIT', Capability.FUND_NEWS, 'fundNews', true, [symbol], normalized)
+        case 'fund_financials':
+          return registryPlan('CN', 'REIT', Capability.FUND_FINANCIALS, 'fundFinancials', true, [symbol], normalized)
+        default:
+          return null
+      }
+    }
+
+    switch (dataCap) {
+      case 'realtime':
+        return cnRealtimePlan(normalized, symbol, exchange, assetClass)
+      case 'kline':
+        if (assetClass === 'INDEX') {
+          return registryPlan(
+            'CN',
+            'INDEX',
+            Capability.INDEX_KLINE,
+            'indexKline',
+            true,
+            [symbol, opts.period ?? 'daily', opts.startDate ?? '', opts.endDate ?? '', count],
+            normalized,
+          )
+        }
+        return {
+          kind: 'cn_kline',
+          symbol,
+          exchange,
+          assetClass,
+          count,
+          period: opts.period ?? 'daily',
+          start: opts.startDate,
+          end: opts.endDate,
+        }
+      case 'snapshot':
+        {
+          const listed = cnListedFundQueryClass(assetClass, symbol)
+          if (listed) {
+            return {
+              kind: 'composite_snapshot',
+              market: 'CN',
+              symbol,
+              assetClass: listed,
+              ref: normalized,
+            }
+          }
+        }
+        return cnRealtimePlan(normalized, symbol, exchange, assetClass)
+      case 'profile': {
+        const listed = cnListedFundQueryClass(assetClass, symbol)
+        if (listed === 'LOF') {
+          return registryPlan('CN', 'LOF', Capability.ETF_PROFILE, 'etfProfile', true, [symbol], normalized)
+        }
+        if (listed === 'ETF') {
+          return registryPlan('CN', 'ETF', Capability.ETF_PROFILE, 'etfProfile', true, [symbol], normalized)
+        }
+        return registryPlan('CN', assetClass, Capability.STOCK_PROFILE, 'profile', true, [symbol], normalized)
+      }
+      case 'financials':
+        return registryPlan('CN', assetClass, Capability.FINANCIAL_SUMMARY, 'financials', true, [
+          symbol, opts.reportDate ?? '', opts.reportType ?? 'annual',
+        ], normalized)
+      case 'balance_sheet':
+        return registryPlan('CN', assetClass, Capability.BALANCE_SHEET, 'balanceSheet', true, [
+          symbol, opts.reportDate ?? '',
+        ], normalized)
+      case 'cash_flow':
+        return registryPlan('CN', assetClass, Capability.CASH_FLOW, 'cashFlow', true, [
+          symbol, opts.reportDate ?? '',
+        ], normalized)
+      case 'income_statement':
+        return registryPlan('CN', assetClass, Capability.INCOME_STMT, 'incomeStatement', true, [
+          symbol, opts.reportDate ?? '',
+        ], normalized)
+      case 'index_constituents': {
+        const indexCode = (opts.indexCode ?? symbol).trim()
+        if (!indexCode) return null
+        return registryPlan('CN', 'INDEX', Capability.INDEX_CONST, 'indexConstituents', true, [indexCode])
+      }
+      case 'trade_calendar':
+        return registryPlan(
+          'CN',
+          'EQUITY',
+          Capability.TRADE_CALENDAR,
+          'tradeCalendar',
+          true,
+          [opts.year ?? new Date().getFullYear()],
+        )
+      case 'stock_list': {
+        const page = opts.page ?? 1
+        const pageSize = opts.pageSize ?? 100
+        // StockIndex: stockList(marketOrKeyword, keyword, page, pageSize, board?, industry?)
+        // 板块/行业成分须走空 keyword + 第 5/6 参；或 keyword=`board:key:CN`
+        if (opts.boardKey || opts.industryCode) {
+          if (opts.boardKey && !opts.industryCode && !(opts.keyword ?? '').trim()) {
+            return registryPlan('CN', 'EQUITY', Capability.STOCK_LIST, 'stockList', true, [
+              `board:${opts.boardKey}:CN`, '', page, pageSize,
+            ])
+          }
+          return registryPlan('CN', 'EQUITY', Capability.STOCK_LIST, 'stockList', true, [
+            '', '', page, pageSize, opts.boardKey, opts.industryCode,
+          ])
+        }
+        const args: unknown[] = [opts.keyword ?? '']
+        if (opts.page != null) args.push(page, pageSize)
+        return registryPlan('CN', 'EQUITY', Capability.STOCK_LIST, 'stockList', true, args)
+      }
+      case 'instrument_search':
+        return instrumentSearchPlan('CN', opts)
+      case 'etf_list': {
+        const listed = cnListedFundQueryClass(assetClass, symbol)
+        if (listed) {
+          return registryPlan('CN', listed, Capability.ETF_LIST, 'etfList', true, [
+            'CN', opts.keyword ?? '',
+          ])
+        }
+        return null
+      }
+      case 'etf_profile': {
+        const listed = cnListedFundQueryClass(assetClass, symbol)
+        if (listed) {
+          return registryPlan('CN', listed, Capability.ETF_PROFILE, 'etfProfile', true, [symbol], normalized)
+        }
+        return null
+      }
+      case 'etf_nav': {
+        const listed = cnListedFundQueryClass(assetClass, symbol)
+        if (listed) {
+          return registryPlan('CN', listed, Capability.ETF_NAV, 'etfNav', true, [symbol], normalized)
+        }
+        return null
+      }
+      case 'etf_holdings': {
+        const listed = cnListedFundQueryClass(assetClass, symbol)
+        if (listed) {
+          return registryPlan('CN', listed, Capability.ETF_HOLDINGS, 'etfHoldings', true, [symbol], normalized)
+        }
+        return null
+      }
+      case 'etf_snapshot': {
+        const listed = cnListedFundQueryClass(assetClass, symbol)
+        if (listed) {
+          return { kind: 'composite_snapshot', market: 'CN', symbol, assetClass: listed, ref: normalized }
+        }
+        return null
+      }
+      case 'dividend':
+        return registryPlan('CN', assetClass, Capability.DIVIDEND, 'dividend', true, [symbol], normalized)
+      case 'shareholders':
+        return registryPlan(
+          'CN',
+          assetClass,
+          Capability.SHAREHOLDER,
+          'shareholders',
+          true,
+          [symbol, opts.reportDate ?? ''],
+          normalized,
+        )
+      case 'inst_holding':
+        return registryPlan('CN', assetClass, Capability.INST_HOLDING, 'instHolding', true, [symbol], normalized)
+      default:
+        return null
+    }
+  }
+
+  // ── 美股指数 ──
+  if (ref.market === 'US' && ref.assetClass === 'INDEX') {
+    const normalized = normalizeInstrumentRef(ref)
+    const sym = normalized.symbol
+    switch (dataCap) {
+      case 'realtime':
+        return registryPlan('US', 'INDEX', Capability.INDEX_REALTIME, 'indexRealtime', false, [sym, 'US'], normalized)
+      case 'kline':
+        return registryPlan('US', 'INDEX', Capability.INDEX_KLINE, 'indexKline', true, [
+          sym, opts.period ?? 'daily', opts.startDate ?? '', opts.endDate ?? '', count, 'US',
+        ], normalized)
+      case 'snapshot':
+        return registryPlan('US', 'INDEX', Capability.INDEX_REALTIME, 'indexRealtime', false, [sym, 'US'], normalized)
+      default:
+        return null
+    }
+  }
+
+  // ── 美股市场 ──
+  if (ref.market === 'US' && ref.assetClass === 'EQUITY') {
+    const normalized = normalizeInstrumentRef(ref)
+    const sym = usSymbol(ref)
+    switch (dataCap) {
+      case 'realtime':
+        return registryPlan('US', 'EQUITY', Capability.STOCK_REALTIME, 'realtime', true, [sym, 'US'], normalized)
+      case 'kline':
+        return registryPlan('US', 'EQUITY', Capability.STOCK_KLINE, 'kline', true, [
+          sym, opts.period ?? 'daily', opts.startDate ?? '', opts.endDate ?? '', count, 'US',
+        ], normalized)
+      case 'snapshot':
+        return { kind: 'composite_snapshot', market: 'US', symbol: sym }
+      case 'profile':
+        return registryPlan('US', 'EQUITY', Capability.STOCK_PROFILE, 'profile', true, [sym, 'US'], normalized)
+      case 'financials':
+        return registryPlan('US', 'EQUITY', Capability.FINANCIAL_SUMMARY, 'financials', true, [
+          sym, opts.reportDate ?? '', opts.reportType ?? 'annual',
+        ], normalized)
+      case 'balance_sheet':
+        return registryPlan('US', 'EQUITY', Capability.BALANCE_SHEET, 'balanceSheet', true, [
+          sym, opts.reportDate ?? '',
+        ], normalized)
+      case 'cash_flow':
+        return registryPlan('US', 'EQUITY', Capability.CASH_FLOW, 'cashFlow', true, [
+          sym, opts.reportDate ?? '',
+        ], normalized)
+      case 'income_statement':
+        return registryPlan('US', 'EQUITY', Capability.INCOME_STMT, 'incomeStatement', true, [
+          sym, opts.reportDate ?? '',
+        ], normalized)
+      case 'stock_list': {
+        const page = opts.page ?? 1
+        const pageSize = opts.pageSize ?? 100
+        if (opts.boardKey) {
+          return registryPlan('US', 'EQUITY', Capability.STOCK_LIST, 'stockList', true, [
+            `board:${opts.boardKey}:US`, '', page, pageSize,
+          ])
+        }
+        const args: unknown[] = ['US', opts.keyword ?? '']
+        if (opts.page != null) args.push(page, pageSize)
+        return registryPlan('US', 'EQUITY', Capability.STOCK_LIST, 'stockList', true, args)
+      }
+      case 'instrument_search':
+        return instrumentSearchPlan('US', opts)
+      case 'shareholders':
+        return registryPlan(
+          'US',
+          'EQUITY',
+          Capability.SHAREHOLDER,
+          'shareholders',
+          true,
+          [sym, opts.page ?? 1],
+          normalized,
+        )
+      default:
+        return null
+    }
+  }
+
+  // ── 区域市场（HK；JP/KR 暂不接入） ──
+  if (isRegionalEquityMarket(ref.market)) {
+    const market = ref.market as RegionalEquityMarket
+    const normalized = normalizeInstrumentRef(ref)
+    const sym = regionalSymbol(ref)
+
+    if (ref.assetClass === 'INDEX') {
+      switch (dataCap) {
+        case 'realtime':
+          return registryPlan(market, 'INDEX', Capability.INDEX_REALTIME, 'indexRealtime', false, [sym, market], normalized)
+        case 'kline':
+          return registryPlan(market, 'INDEX', Capability.INDEX_KLINE, 'indexKline', true, [
+            sym, opts.period ?? 'daily', opts.startDate ?? '', opts.endDate ?? '', count, market,
+          ], normalized)
+        case 'snapshot':
+          return registryPlan(market, 'INDEX', Capability.INDEX_REALTIME, 'indexRealtime', false, [sym, market], normalized)
+        default:
+          return null
+      }
+    }
+
+    if (market === 'JP' || market === 'KR') {
+      switch (dataCap) {
+        case 'realtime':
+          return registryPlan(market, 'EQUITY', Capability.STOCK_REALTIME, 'realtime', true, [sym, market], normalized)
+        case 'kline':
+          return registryPlan(market, 'EQUITY', Capability.STOCK_KLINE, 'kline', true, [
+            sym, opts.period ?? 'daily', opts.startDate ?? '', opts.endDate ?? '', count, market,
+          ], normalized)
+        case 'snapshot':
+          return { kind: 'composite_snapshot', market, symbol: sym }
+        case 'profile':
+          return registryPlan(market, 'EQUITY', Capability.STOCK_PROFILE, 'profile', true, [sym, market], normalized)
+        default:
+          return null
+      }
+    }
+
+    switch (dataCap) {
+      case 'realtime':
+        return registryPlan(market, 'EQUITY', Capability.STOCK_REALTIME, 'realtime', true, [sym, market], normalized)
+      case 'kline':
+        return registryPlan(market, 'EQUITY', Capability.STOCK_KLINE, 'kline', true, [
+          sym, opts.period ?? 'daily', opts.startDate ?? '', opts.endDate ?? '', count, market,
+        ], normalized)
+      case 'snapshot':
+        return { kind: 'composite_snapshot', market, symbol: sym }
+      case 'profile':
+        return registryPlan(market, 'EQUITY', Capability.STOCK_PROFILE, 'profile', true, [sym, market], normalized)
+      case 'stock_list': {
+        const page = opts.page ?? 1
+        const pageSize = opts.pageSize ?? 100
+        if (opts.boardKey) {
+          return registryPlan(market, 'EQUITY', Capability.STOCK_LIST, 'stockList', true, [
+            `board:${opts.boardKey}:${market}`, '', page, pageSize,
+          ])
+        }
+        const args: unknown[] = [market, opts.keyword ?? '']
+        if (opts.page != null) args.push(page, pageSize)
+        return registryPlan(market, 'EQUITY', Capability.STOCK_LIST, 'stockList', true, args)
+      }
+      case 'instrument_search':
+        return market === 'HK' ? instrumentSearchPlan('HK', opts) : null
+      case 'dividend':
+        if (market === 'HK') {
+          return registryPlan(
+            'HK',
+            'EQUITY',
+            Capability.DIVIDEND,
+            'dividend',
+            true,
+            [sym, opts.page ?? 1, opts.pageSize ?? 10, true],
+            normalized,
+          )
+        }
+        return null
+      default:
+        return null
+    }
+  }
+
+  // ── 加密货币市场 ──
+  if (ref.market === 'CRYPTO') {
+    const normalized = normalizeInstrumentRef(ref)
+    const pair = cryptoPair(ref)
+    switch (dataCap) {
+      case 'realtime':
+        return registryPlan('CRYPTO', 'CRYPTO_SPOT', Capability.STOCK_REALTIME, 'realtime', true, [pair], normalized)
+      case 'kline':
+        return registryPlan('CRYPTO', 'CRYPTO_SPOT', Capability.STOCK_KLINE, 'kline', true, [
+          pair, opts.period ?? 'daily', '', '', count,
+        ], normalized)
+      case 'snapshot':
+        return { kind: 'composite_snapshot', market: 'CRYPTO', symbol: pair }
+      case 'stock_list':
+        return registryPlan('CRYPTO', 'CRYPTO_SPOT', Capability.STOCK_LIST, 'stockList', true, ['CRYPTO', opts.keyword ?? ''])
+      default:
+        return null
+    }
+  }
+
+  return null
+}
+
+/**
+ * 生成"不支持"提示消息 — 当标的市场/资产类别不支持指定能力时调用。
+ */
+export function unsupportedInstrumentCapabilityMessage(
+  ref: InstrumentRef,
+  dataCap: InstrumentDataCapability,
+): string {
+  return `${ref.market}/${ref.assetClass} 不支持 capability: ${dataCap}`
+}

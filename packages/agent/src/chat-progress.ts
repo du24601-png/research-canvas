@@ -1,0 +1,1350 @@
+/**
+ * 聊天进度事件系统 — 在 Agent 聊天过程中推送实时状态更新。
+ *
+ * 用途：前端实时展示 Agent 的思考过程、工具调用进度、流式回复片段。
+ * 事件流：thinking → tool_start → tool_done → ... → done
+ */
+
+import { parseNamespacedMcpTool, type ResearchCanvasEvent } from '@opptrix/shared'
+import type { TokenUsage } from './llm/token-usage.js'
+import type { ReasoningSegment } from './reasoning-timeline.js'
+
+/**
+ * 工具调用步骤状态 — 标识单次工具调用的当前阶段。
+ * - running: 正在执行
+ * - done:    执行成功完成
+ * - error:   执行出错
+ */
+export type ChatToolStepStatus = 'running' | 'done' | 'error'
+
+export interface ChatContextUsageSnapshot {
+  usedTokens: number
+  limitTokens: number
+  remainingTokens: number
+  modelRef: string
+  estimated: boolean
+  /** 0–100；不下发 projection 全文 */
+  usagePercent: number
+  /** 已整理过上下文（刷新仍在） */
+  compacted: boolean
+  /** 最近一轮前缀缓存命中率 0–100；无上游上报则省略 */
+  cacheHitPercent?: number
+  cachedPromptTokens?: number
+}
+
+export interface ChatTurnUsageSnapshot extends TokenUsage {
+  estimated?: boolean
+}
+
+/**
+ * 工具调用步骤 — 单次工具调用的完整生命周期信息。
+ *
+ * 用途：在聊天界面中展示"正在评估 600519..."、"获取 K 线数据"等进度条。
+ * 生命周期：创建(status=running) → 完成(enrichStepFromResult) → 显示结果摘要
+ */
+export interface ChatToolStep {
+  /** 步骤唯一 ID（如 UUID 或递增序号） */
+  id: string
+  /** 工具名称（如 "evaluate_stock"、"get_stock_kline"） */
+  tool: string
+  /** 显示给用户的中文标签（如"评估 600519 因子与评分"） */
+  label: string
+  /** 当前状态 */
+  status: ChatToolStepStatus
+  /** 参数预览文本（人读短摘要，截断至 240 字符），行内简要展示 */
+  argsPreview?: string
+  /** 参数完整详情（pretty-print，截断至 4000 字符），点击查看详情时显示 */
+  argsDetail?: string
+  /** Agent 思考过程片段（如有） */
+  thinking?: string
+  /** 结果摘要文本（截断至 180 字符） */
+  resultPreview?: string
+  /** 结果完整详情（截断至 4000 字符），点击展开时显示 */
+  resultDetail?: string
+  /** 开始时间 ISO 8601 */
+  startedAt: string
+  /** 完成时间 ISO 8601 */
+  finishedAt?: string
+  /** 大输出已截断/落盘（供 SSE / UI；落盘逻辑由后端实现） */
+  truncated?: boolean
+  resultTruncated?: boolean
+  /** 可选用户向提示字段（UI 用固定产品文案，不直接展示技术内容） */
+  ui_hint?: string
+  /** 相对路径信号；勿把绝对路径写入此字段供 UI 展示 */
+  saved_rel_path?: string
+}
+
+/**
+ * 聊天进度事件 — 聊天过程中推送的各类实时状态。
+ *
+ * 事件类型说明：
+ *   - thinking:    Agent 正在推理（round=第几轮，label=当前步骤描述）
+ *   - tool_start:  工具调用开始（step 含工具名、参数、开始时间）
+ *   - tool_done:   工具调用完成（step 含结果摘要、完成时间）
+ *   - research_canvas: 研究画布组件变更（独立于 tool_done）
+ *   - reply:       流式回复片段（content=本次增量文本）
+ *   - done:        全部完成（reply=最终回复、tools_used=使用的工具列表、title=会话标题）
+ *   - error:       出错（message=错误信息）
+ */
+export interface ChatUserPromptPayload {
+  id: string
+  title?: string
+  prompt: string
+  /** confirm/text 为空数组；choice 为 2–50 项 */
+  options: Array<{ id: string; label: string }>
+  allowMultiple?: boolean
+  /** confirm=拒绝/确认；choice=选项；text=开放填空（解析层应始终写出） */
+  mode?: 'confirm' | 'choice' | 'text'
+  kind?: 'choice' | 'secret'
+  name?: string
+  inject_hosts?: string[]
+  reject_label?: string
+  confirm_label?: string
+  allow_custom?: boolean
+}
+
+export type ChatProgressEvent =
+  | {
+    type: 'thinking'
+    round: number
+    label: string
+    /** 派生全文（join SEP）；兼容旧客户端 */
+    snippet?: string
+    /** 结构化分段；UI 竖轴优先用此字段 */
+    segments?: ReasoningSegment[]
+    /** 本轮加载的工具包 id */
+    active_packs?: string[]
+    /** 本轮暴露给 LLM 的工具数量 */
+    tools_exposed_count?: number
+    /** 本轮意图路由首推工具 */
+    preferred_tools?: string[]
+    /** 本轮意图标签 */
+    route_intent?: string
+    /** 本轮投研答复档位 L1/L2/L3 */
+    research_tier?: string
+  }
+  | { type: 'tool_start'; step: ChatToolStep }
+  | { type: 'tool_done'; step: ChatToolStep }
+  | { type: 'user_prompt'; prompt: ChatUserPromptPayload }
+  | { type: 'steer_applied'; message: string }
+  | {
+    type: 'reply'
+    content?: string
+    estimatedTokens?: number
+    /** 流式 delta 预览片段；终答勿带 true */
+    draft?: boolean
+  }
+  | {
+    type: 'done'
+    /** Agent 最终回复文本 */
+    reply: string
+    /** 本轮使用的工具名称列表 */
+    tools_used: string[]
+    /** 会话 ID */
+    session_id: string
+    /** 自动生成的会话标题（可选） */
+    title?: string
+    /** 全部工具调用步骤（含状态、耗时、结果） */
+    tool_steps: ChatToolStep[]
+    /** 是否被用户取消 */
+    cancelled?: boolean
+    /** 本轮 assistant 累计用量 */
+    turn_usage?: ChatTurnUsageSnapshot
+    /** Composer 上下文占用快照 */
+    context_usage?: ChatContextUsageSnapshot
+  }
+  | { type: 'error'; message: string }
+  | {
+    type: 'context_compact'
+    level: 'micro' | 'structured' | 'overflow_retry'
+    message: string
+    usageRatio?: number
+    contextTokens?: number
+  }
+  | {
+    type: 'job_watch'
+    action: 'attached' | 'deduped' | 'updated' | 'cleared' | 'resuming'
+    watch_id: string
+    job_id: string
+    kind: string
+    label: string
+    percent?: number
+    eta_seconds?: number
+    source: string
+  }
+  | {
+    type: 'job_progress'
+    job_id: string
+    kind: string
+    state: string
+    label: string
+    percent?: number
+    title?: string
+    cancelable?: boolean
+    stdout_tail?: string
+  }
+  | {
+    type: 'subagent_started'
+    run_id: string
+    label: string
+    status: string
+    child_session_id: string
+    mode: string
+  }
+  | {
+    type: 'subagent_progress'
+    run_id: string
+    label: string
+    status: string
+    child_session_id: string
+    mode: string
+    summary?: string
+  }
+  | {
+    type: 'subagent_done'
+    run_id: string
+    label: string
+    status: string
+    child_session_id: string
+    mode: string
+    summary?: string
+  }
+  | {
+    type: 'subagent_child_progress'
+    run_id: string
+    child_session_id: string
+    label: string
+    mode: string
+    child:
+      | {
+        type: 'thinking'
+        round: number
+        label: string
+        snippet?: string
+        segments?: ReasoningSegment[]
+      }
+      | { type: 'tool_start'; step: ChatToolStep }
+      | { type: 'tool_done'; step: ChatToolStep }
+      | {
+        type: 'reply'
+        content?: string
+        estimatedTokens?: number
+        draft?: boolean
+      }
+  }
+  | {
+    type: 'research_canvas'
+    event: ResearchCanvasEvent
+  }
+
+/**
+ * 聊天进度回调选项 — 配置进度推送回调和中断信号。
+ *
+ * 用途：聊天发起时传入，用于实时接收 Agent 执行进度。
+ */
+export interface ChatProgressOptions {
+  /** 进度事件回调函数，Agent 每个阶段变化时调用 */
+  onProgress?: (event: ChatProgressEvent) => void
+  /** AbortSignal，用于用户取消聊天请求 */
+  signal?: AbortSignal
+  /**
+   * 无人值守（计划任务 / 后台 Agent）：剔除 ask_user / request_secret，
+   * 禁止 waitForAnswer 挂起；工作区覆盖/删除确认自动放行，密钥类立即取消。
+   */
+  unattended?: boolean
+  /**
+   * 定时唤醒续跑：为 true 时不清该会话 pending wake（由 resume handler 注入）。
+   * 用户主动发消息开聊时须为 false/缺省，以取消挂起 timer。
+   */
+  wakeResume?: boolean
+  /**
+   * 本轮开始时的研究画布轻量快照（仅 widgets 的 id/type/title/datasetId）。
+   * 非法项由 TurnCanvasState 丢弃；不作为画布持久化副本。
+   */
+  researchCanvasSnapshot?: unknown
+}
+
+// ── 工具中文标签映射 ──
+
+/** 倒计时文案（工具结果 / 步骤标签；UI 动态倒计时复用同口径） */
+export function formatWakeSecondsLabel(seconds: number): string {
+  const s = Math.max(0, Math.floor(seconds))
+  if (s < 60) return `约 ${s} 秒后继续检查`
+  const m = Math.floor(s / 60)
+  const r = s % 60
+  if (r === 0) return `约 ${m} 分后继续检查`
+  return `约 ${m} 分 ${r} 秒后继续检查`
+}
+
+const TOOL_LABELS: Record<string, string> = {
+  get_market_regime: '分析宏观市场状态',
+  get_market_dynamics: '获取市场动态全景',
+  get_etf_list: '读取 ETF 列表',
+  get_etf_nav: '读取 ETF 净值',
+  get_etf_holdings: '读取 ETF 持仓',
+  get_etf_profile: '读取 ETF 档案',
+  get_fund_list: '读取公募基金列表',
+  get_fund_profile: '读取公募基金档案',
+  get_fund_nav: '读取公募基金净值',
+  get_fund_holdings: '读取公募基金持仓',
+  batch_instrument_snapshots: '批量获取候选标的快照',
+  get_watchlist: '读取关注列表',
+  search_instruments: '搜索标的',
+  analyze_portfolio: '分析组合因子暴露',
+  get_portfolio_holdings: '读取实盘持仓',
+  portfolio_trades: '查询交易流水',
+  portfolio_summary: '汇总持仓盈亏',
+  get_news_center_status: '查询资讯中心状态',
+  list_news_groups: '读取资讯分组',
+  list_news_sources: '读取资讯订阅来源',
+  list_news_articles: '浏览资讯列表',
+  get_news_article: '读取资讯正文',
+  add_news_source: '添加资讯订阅',
+  delete_news_source: '删除资讯订阅',
+  import_news_sources: '导入资讯订阅',
+  create_news_group: '创建资讯分组',
+  update_news_group: '更新资讯分组',
+  delete_news_group: '删除资讯分组',
+  move_news_source: '移动资讯订阅',
+  validate_news_source: '验证资讯订阅地址',
+  list_rsshub_categories: '浏览 RSS 分类',
+  list_rsshub_domains: '浏览 RSS 网站',
+  search_rsshub_routes: '搜索可订阅 RSS',
+  get_rsshub_domain_routes: '列出网站 RSS 订阅项',
+  get_notice_content: '读取公告正文',
+  list_tool_packs: '列出可用工具包',
+  activate_tool_pack: '激活工具包',
+  list_agent_skills: '列出工作流技能',
+  activate_agent_skill: '激活工作流技能',
+  get_agent_skill: '查看工作流技能',
+  get_agent_skill_file: '读取技能附件',
+  create_agent_skill: '创建工作流技能',
+  import_agent_skill: '导入工作流技能',
+  delete_agent_skill: '删除工作流技能',
+  get_current_time: '获取当前时间',
+  schedule_turn_wake: '等待后继续',
+  cancel_job: '取消后台任务',
+  list_jobs: '查看后台任务',
+  get_system_info: '读取运行环境信息',
+  get_app_settings: '读取应用设置',
+  get_project_info: '读取应用信息',
+  get_integration_status: '检查外部集成状态',
+  list_session_documents: '查看本对话研报',
+  search_library: '检索文档库',
+  search_document: '检索研报内容',
+  read_document: '阅读研报片段',
+  create_canvas: '创建画布',
+  update_canvas: '更新画布',
+  read_canvas: '读取画布',
+  resolve_industry_universe: '确认对比公司',
+  query_data: '查询研究数据',
+  refine_dataset: '调整研究范围',
+  propose_widget: '生成研究视图',
+  update_proposal: '调整预览样式',
+  create_widget: '添加研究组件',
+  update_widget: '更新研究组件',
+  delete_widget: '移除研究组件',
+  create_mindmap: '创建脑图',
+  update_mindmap: '更新脑图',
+  read_mindmap: '读取脑图',
+  create_web: '创建网页',
+  update_web: '更新网页',
+  read_web: '读取网页',
+  list_web_vendor: '查看网页库',
+  ask_user: '向你确认问题',
+  run_subagent: '委派协作任务',
+  list_subagents: '查看协作任务',
+  cancel_subagent: '取消协作任务',
+  get_subagent: '查询协作任务',
+  reclaim_subagent: '回收协作任务',
+  get_instrument_capabilities: '查询标的能力',
+  get_instrument_snapshot: '获取标的快照',
+  get_instrument_profile: '读取公司概况',
+  get_instrument_financials: '读取财务摘要',
+  get_instrument_balance_sheet: '读取资产负债表',
+  get_instrument_cash_flow: '读取现金流量表',
+  get_instrument_income_statement: '读取利润表',
+  get_instrument_financial_indicators: '读取财务指标',
+  get_instrument_shareholders: '读取股东结构',
+  get_instrument_institution_holdings: '读取机构持仓',
+  get_instrument_dividend: '读取分红历史',
+  get_trade_calendar: '读取交易日历',
+  get_sector_constituents: '读取板块成分股',
+  get_index_constituents: '读取指数成分股',
+  get_market_session: '查询交易时段',
+  get_instrument_quotes: '获取标的行情',
+  get_instrument_institution_rating: '汇总机构评级',
+  get_instrument_institution_report: '生成机构评级报告',
+  browser_navigate: '打开网页',
+  browser_snapshot: '读取页面内容',
+  browser_click: '点击',
+  browser_type: '输入',
+  browser_screenshot: '网页截图',
+  browser_close: '关闭网页浏览',
+  opptrix_run: '运行命令',
+  shell_run: '运行命令',
+  code_preflight: '检查脚本',
+  opptrix_install: '安装依赖',
+  shell_install: '安装依赖',
+  request_shell_network: '申请沙盒联网',
+  shell_platform_status: '检查运行环境是否就绪',
+  python_env_status: '查看 Python 环境',
+  ensure_python: '准备 Python 环境',
+  workspace_glob: '按模式查找文件',
+  workspace_grep: '搜索工作区内容',
+  workspace_read: '读取工作区文件',
+  workspace_write: '保存到工作区',
+  workspace_replace_lines: '按行替换',
+  workspace_apply_patch: '应用补丁',
+  workspace_delete: '删除工作区内容',
+  download_file: '下载文件到工作区',
+  http_fetch: '获取网页内容',
+  request_folder_access: '请求授权文件夹',
+  list_workspace_grants: '查看可访问目录',
+  resolve_workspace_path_uri: '生成消息文件引用',
+  list_local_data_apis: '查看本地数据目录',
+  get_local_data_catalog: '查阅数据调用说明',
+  request_session_lan_access: '申请局域网访问',
+  request_secret: '录入保险箱密钥',
+  list_vault_secrets: '查看保险箱',
+  grant_session_secret: '授权本对话密钥',
+  revoke_session_secret: '撤销本对话密钥',
+  delete_vault_secret: '删除保险箱密钥',
+  list_mcp_servers: '查看已连接扩展',
+  enable_mcp_server: '启用扩展服务',
+  disable_mcp_server: '停用扩展服务',
+  edit_mcp_server: '修改扩展配置',
+  install_mcp_server: '添加扩展服务',
+  uninstall_mcp_server: '移除扩展服务',
+  reorder_mcp_servers: '调整扩展优先级',
+  list_enabled_providers: '查看可用数据源',
+  query_market_capabilities: '探查市场级标准能力',
+  query_market_capability: '执行市场级标准能力',
+  list_scheduled_jobs: '查看计划任务',
+  get_scheduled_job: '读取计划任务',
+  create_scheduled_job: '创建计划任务',
+  update_scheduled_job: '更新计划任务',
+  enable_scheduled_job: '启用计划任务',
+  disable_scheduled_job: '暂停计划任务',
+  delete_scheduled_job: '删除计划任务',
+  run_scheduled_job_now: '立即执行计划任务',
+  list_scheduled_job_runs: '查看执行记录',
+}
+
+function firstCode(args: Record<string, unknown>): string | null {
+  const code = args.code
+  if (typeof code === 'string' && code.trim()) return code.trim()
+  if (Array.isArray(args.codes) && args.codes.length) {
+    const first = args.codes[0]
+    if (typeof first === 'string' && first.trim()) return first.trim()
+  }
+  return null
+}
+
+function codesCount(args: Record<string, unknown>): number | null {
+  if (Array.isArray(args.codes)) return args.codes.length
+  return null
+}
+
+function instrumentsCount(args: Record<string, unknown>): number | null {
+  if (Array.isArray(args.instruments)) return args.instruments.length
+  return null
+}
+
+function stockRef(args: Record<string, unknown>, result?: unknown): string {
+  const fromResult = extractStockName(result)
+  const code = firstCode(args) ?? extractStockCode(result)
+  if (fromResult && code) return `${fromResult}（${code}）`
+  if (fromResult) return fromResult
+  if (code) return code
+  return ''
+}
+
+function extractStockCode(result: unknown): string | null {
+  if (!result || typeof result !== 'object') return null
+  const r = result as Record<string, unknown>
+  const data = r.data && typeof r.data === 'object' ? r.data as Record<string, unknown> : r
+  const code = data.code ?? data.ts_code
+  return typeof code === 'string' && code.trim() ? code.trim() : null
+}
+
+function extractStockName(result: unknown): string | null {
+  if (!result || typeof result !== 'object') return null
+  const r = result as Record<string, unknown>
+  const data = r.data && typeof r.data === 'object' ? r.data as Record<string, unknown> : r
+  const name = data.name ?? data.stock_name
+  return typeof name === 'string' && name.trim() ? name.trim() : null
+}
+
+function truncateLabel(text: string, max = 40): string {
+  return text.length <= max ? text : `${text.slice(0, max)}…`
+}
+
+function humanizeToolName(name: string): string {
+  // 屏蔽内部 rsshub 标识，避免过程条 fallback 暴露实现名
+  const readable = name.replace(/_/g, ' ').replace(/\brsshub\b/gi, 'RSS').trim()
+  return truncateLabel(readable, 48)
+}
+
+function pathBasename(path: string): string {
+  const normalized = path.replace(/\\/g, '/').replace(/\/+$/, '')
+  const i = normalized.lastIndexOf('/')
+  const base = i >= 0 ? normalized.slice(i + 1) : normalized
+  return base || path
+}
+
+function workspacePathHint(args: Record<string, unknown>): string {
+  const path = typeof args.path === 'string' ? args.path.trim() : ''
+  if (!path) return ''
+  return truncateLabel(pathBasename(path) || path, 40)
+}
+
+function urlHostnameHint(args: Record<string, unknown>): string {
+  const url = typeof args.url === 'string' ? args.url.trim() : ''
+  if (!url) return ''
+  try {
+    const host = new URL(url).hostname
+    return host || truncateLabel(url, 40)
+  } catch {
+    return truncateLabel(url, 40)
+  }
+}
+
+function mcpServerHint(args: Record<string, unknown>): string {
+  const title = typeof args.title === 'string' ? args.title.trim() : ''
+  if (title) return truncateLabel(title, 40)
+  const id = typeof args.server_id === 'string'
+    ? args.server_id.trim()
+    : typeof args.serverId === 'string'
+      ? args.serverId.trim()
+      : ''
+  return id ? truncateLabel(id, 40) : ''
+}
+
+function providerHint(args: Record<string, unknown>, includeMethod = false): string {
+  const provider = typeof args.provider_id === 'string' ? args.provider_id.trim() : ''
+  const method = typeof args.method === 'string' ? args.method.trim() : ''
+  const keyword = typeof args.keyword === 'string' ? args.keyword.trim() : ''
+  if (includeMethod && provider && method) return `${provider} · ${method}`
+  if (provider && keyword) return `${provider} · ${keyword}`
+  if (provider) return provider
+  if (keyword) return keyword
+  if (method) return method
+  return ''
+}
+
+function packIdsHint(args: Record<string, unknown>): string {
+  const raw = args.pack_ids ?? args.packIds
+  const ids = Array.isArray(raw)
+    ? raw.filter((v): v is string => typeof v === 'string').map(s => s.trim()).filter(Boolean)
+    : typeof raw === 'string' && raw.trim()
+      ? [raw.trim()]
+      : []
+  if (!ids.length) return ''
+  const shown = ids.slice(0, 3).join(', ')
+  return ids.length > 3 ? `${shown}…` : shown
+}
+
+function scheduleJobTitleFrom(args: Record<string, unknown>, result?: unknown): string {
+  const fromArgs = typeof args.title === 'string' ? args.title.trim() : ''
+  if (fromArgs) return truncateLabel(fromArgs, 28)
+  if (result && typeof result === 'object') {
+    const r = result as Record<string, unknown>
+    const job = r.job && typeof r.job === 'object' ? r.job as Record<string, unknown> : null
+    const title = typeof job?.title === 'string' ? job.title.trim() : ''
+    if (title) return truncateLabel(title, 28)
+  }
+  return ''
+}
+
+function scheduleKindHint(kind: unknown): string {
+  if (kind === 'agent_prompt') return '智能分析'
+  if (kind === 'shell_script') return '脚本'
+  return ''
+}
+
+function scheduleWhenHint(
+  scheduleKind: unknown,
+  schedule: unknown,
+): string {
+  if (scheduleKind === 'once') {
+    const runAt = schedule && typeof schedule === 'object'
+      && typeof (schedule as { run_at?: unknown }).run_at === 'string'
+      ? (schedule as { run_at: string }).run_at.trim()
+      : ''
+    if (!runAt) return '指定时间执行一次'
+    const d = new Date(runAt)
+    if (Number.isNaN(d.getTime())) return '指定时间执行一次'
+    return `于 ${d.toLocaleString('zh-CN', { hour12: false })} 执行一次`
+  }
+  if (scheduleKind === 'interval') {
+    const every = schedule && typeof schedule === 'object'
+      && typeof (schedule as { every_sec?: unknown }).every_sec === 'number'
+      ? (schedule as { every_sec: number }).every_sec
+      : 0
+    if (every >= 3600) {
+      const h = Math.round(every / 3600)
+      return `每隔 ${h} 小时`
+    }
+    if (every >= 60) {
+      const m = Math.round(every / 60)
+      return `每隔 ${m} 分钟`
+    }
+    if (every > 0) return `每隔 ${every} 秒`
+    return '按间隔重复'
+  }
+  if (scheduleKind === 'cron') return '按周期重复'
+  return ''
+}
+
+function formatScheduleToolLabel(
+  tool: string,
+  base: string,
+  args: Record<string, unknown>,
+  result?: unknown,
+): string {
+  const title = scheduleJobTitleFrom(args, result)
+  const kind = scheduleKindHint(
+    args.kind
+    ?? (result && typeof result === 'object'
+      && (result as { job?: { kind?: unknown } }).job?.kind),
+  )
+  const when = scheduleWhenHint(args.schedule_kind, args.schedule)
+
+  switch (tool) {
+    case 'list_scheduled_jobs':
+      return base
+    case 'create_scheduled_job': {
+      const bits = [base]
+      if (title) bits.push(title)
+      else if (kind) bits.push(kind)
+      if (when && title) bits.push(when)
+      return bits.length > 1 ? bits.join(' · ') : base
+    }
+    case 'get_scheduled_job':
+    case 'update_scheduled_job':
+    case 'enable_scheduled_job':
+    case 'disable_scheduled_job':
+    case 'delete_scheduled_job':
+    case 'run_scheduled_job_now':
+    case 'list_scheduled_job_runs':
+      return title ? `${base} · ${title}` : base
+    default:
+      return base
+  }
+}
+
+/**
+ * 生成工具调用的中文显示标签 — 根据工具名和参数生成可读描述。
+ *
+ * @param tool   工具名称
+ * @param args   工具参数
+ * @param result 工具返回结果（可选，用于提取股票名称）
+ * @returns 中文标签（如"评估 贵州茅台（600519）因子与评分"）
+ */
+export function formatToolLabel(tool: string, args: Record<string, unknown> = {}, result?: unknown): string {
+  const parsed = parseNamespacedMcpTool(tool)
+  if (parsed) {
+    return `调用扩展能力 · ${humanizeToolName(parsed.toolName)}`
+  }
+
+  const baseRaw = TOOL_LABELS[tool] ?? humanizeToolName(tool)
+  const base = baseRaw.replace(/rsshub/gi, 'RSS')
+  const ref = stockRef(args, result)
+
+  switch (tool) {
+    case 'get_market_regime':
+    case 'get_market_dynamics':
+      return base
+    case 'batch_instrument_snapshots': {
+      const n = instrumentsCount(args) ?? codesCount(args)
+      return n != null ? `批量获取 ${n} 只候选标的快照` : '批量获取候选标的快照'
+    }
+    case 'get_instrument_institution_rating':
+    case 'get_instrument_institution_report':
+      return ref ? `汇总 ${ref} 机构观点` : base
+    case 'get_instrument_snapshot':
+    case 'get_instrument_quotes': {
+      const iref = instrumentRefFromArgs(args) ?? ref
+      return iref ? `${base} · ${iref}` : base
+    }
+    case 'list_rsshub_categories':
+      return base
+    case 'list_rsshub_domains': {
+      const category = typeof args.category === 'string' ? args.category.trim() : ''
+      return category ? `${base} · ${truncateLabel(category, 24)}` : base
+    }
+    case 'search_rsshub_routes': {
+      const q = typeof args.q === 'string' ? args.q.trim() : ''
+      return q ? `${base} · ${truncateLabel(q, 24)}` : base
+    }
+    case 'get_rsshub_domain_routes': {
+      const domain = typeof args.domain === 'string' ? args.domain.trim() : ''
+      return domain ? `${base} · ${truncateLabel(domain, 28)}` : base
+    }
+    case 'search_instruments': {
+      const kw = typeof args.keyword === 'string' ? args.keyword.trim() : ''
+      if (kw) return `${base} · ${kw}`
+      return base
+    }
+    case 'ask_user': {
+      const q = typeof args.prompt === 'string'
+        ? args.prompt.trim()
+        : typeof args.question === 'string'
+          ? args.question.trim()
+          : ''
+      if (!q) return base
+      const short = q.length > 36 ? `${q.slice(0, 36)}…` : q
+      return `等待你的确认：${short}`
+    }
+    case 'schedule_turn_wake': {
+      const fromResult = result && typeof result === 'object' && 'seconds' in result
+        ? Number((result as { seconds?: unknown }).seconds)
+        : NaN
+      const fromArgs = typeof args.seconds === 'number' ? args.seconds : Number(args.seconds)
+      const sec = Number.isFinite(fromResult) && fromResult > 0
+        ? Math.floor(fromResult)
+        : (Number.isFinite(fromArgs) && fromArgs > 0 ? Math.floor(fromArgs) : 0)
+      return sec > 0 ? formatWakeSecondsLabel(sec) : base
+    }
+    case 'opptrix_run':
+    case 'shell_run': {
+      const command = typeof args.command === 'string' ? args.command.trim() : ''
+      const argv = Array.isArray(args.argv)
+        ? args.argv.filter((v): v is string => typeof v === 'string').slice(0, 4)
+        : []
+      const fromArgv = argv.length ? argv.join(' ') : ''
+      const fromResult = result && typeof result === 'object' && !Array.isArray(result)
+        ? (result as Record<string, unknown>).command_summary
+        : undefined
+      const summary = typeof fromResult === 'string' ? fromResult.trim() : ''
+      // 优先 command；旧路径 argv；结果里的 command_summary 作兜底
+      const cmd = command || fromArgv || summary
+      const short = cmd.length > 48 ? `${cmd.slice(0, 48)}…` : cmd
+      return short ? `${base} · ${short}` : base
+    }
+    case 'code_preflight': {
+      const hint = workspacePathHint(args)
+      return hint ? `${base} · ${hint}` : base
+    }
+    case 'opptrix_install':
+    case 'shell_install': {
+      const mgr = typeof args.manager === 'string' ? args.manager : ''
+      const pkgs = Array.isArray(args.packages) ? args.packages.filter((p): p is string => typeof p === 'string') : []
+      const pkgHint = pkgs.length ? pkgs.slice(0, 3).join(', ') : 'package.json'
+      return mgr ? `${base} · ${mgr} · ${pkgHint}` : base
+    }
+    case 'request_shell_network': {
+      const intent = typeof args.intent === 'string' ? args.intent : ''
+      return intent ? `${base} · ${intent}` : base
+    }
+    case 'shell_platform_status':
+    case 'python_env_status':
+    case 'ensure_python':
+      return base
+    case 'workspace_read':
+    case 'workspace_write':
+    case 'workspace_replace_lines':
+    case 'workspace_apply_patch':
+    case 'workspace_delete': {
+      const hint = workspacePathHint(args)
+      return hint ? `${base} · ${hint}` : base
+    }
+    case 'workspace_glob': {
+      const pattern = typeof args.pattern === 'string'
+        ? args.pattern.trim()
+        : typeof args.glob === 'string'
+          ? args.glob.trim()
+          : ''
+      const pathHint = workspacePathHint(args)
+      if (pattern && pathHint) return `${base} · ${truncateLabel(pattern, 28)} · ${pathHint}`
+      if (pattern) return `${base} · ${truncateLabel(pattern, 36)}`
+      return pathHint ? `${base} · ${pathHint}` : base
+    }
+    case 'workspace_grep': {
+      const pattern = typeof args.pattern === 'string'
+        ? args.pattern.trim()
+        : typeof args.query === 'string'
+          ? args.query.trim()
+          : ''
+      const pathHint = workspacePathHint(args)
+      if (pattern && pathHint) return `${base} · ${truncateLabel(pattern, 28)} · ${pathHint}`
+      if (pattern) return `${base} · ${truncateLabel(pattern, 36)}`
+      return pathHint ? `${base} · ${pathHint}` : base
+    }
+    case 'http_fetch':
+    case 'download_file':
+    case 'browser_navigate': {
+      const host = urlHostnameHint(args)
+      return host ? `${base} · ${host}` : base
+    }
+    case 'activate_tool_pack': {
+      const packs = packIdsHint(args)
+      return packs ? `${base} · ${packs}` : base
+    }
+    case 'activate_agent_skill': {
+      const raw = args.skill_names ?? args.skillNames
+      const names = Array.isArray(raw)
+        ? raw.map(x => String(x)).filter(Boolean)
+        : typeof raw === 'string'
+          ? [raw]
+          : []
+      return names.length ? `${base} · ${names.slice(0, 3).join(', ')}` : base
+    }
+    case 'enable_mcp_server':
+    case 'disable_mcp_server':
+    case 'install_mcp_server':
+    case 'uninstall_mcp_server':
+    case 'edit_mcp_server': {
+      const hint = mcpServerHint(args)
+      return hint ? `${base} · ${hint}` : base
+    }
+    case 'query_market_capabilities': {
+      return base
+    }
+    case 'query_market_capability': {
+      const cap = typeof args.capability === 'string' ? args.capability.trim() : ''
+      return cap ? `${base} · ${truncateLabel(cap, 36)}` : base
+    }
+    case 'request_folder_access': {
+      const hint = typeof args.hint === 'string' ? args.hint.trim() : ''
+      const pathHint = typeof args.path === 'string' ? args.path.trim() : ''
+      const text = hint || pathHint
+      if (!text) return base
+      return `${base} · ${truncateLabel(text, 36)}`
+    }
+    case 'list_scheduled_jobs':
+    case 'get_scheduled_job':
+    case 'create_scheduled_job':
+    case 'update_scheduled_job':
+    case 'enable_scheduled_job':
+    case 'disable_scheduled_job':
+    case 'delete_scheduled_job':
+    case 'run_scheduled_job_now':
+    case 'list_scheduled_job_runs':
+      return formatScheduleToolLabel(tool, base, args, result)
+    default:
+      return ref ? `${base} · ${ref}` : base
+  }
+}
+
+/**
+ * 格式化工具参数预览 — 人读短摘要（非裸 JSON），截断至 240 字符。
+ */
+export function formatArgsPreview(args: Record<string, unknown>, tool?: string): string {
+  try {
+    const human = tool ? humanArgsPreview(tool, args) : commonArgsPreview(args)
+    if (human) return human.length <= 240 ? human : `${human.slice(0, 240)}…`
+    const s = JSON.stringify(args, null, 0)
+    return s.length <= 240 ? s : `${s.slice(0, 240)}…`
+  } catch {
+    return ''
+  }
+}
+
+function strArg(args: Record<string, unknown>, key: string): string {
+  const v = args[key]
+  return typeof v === 'string' ? v.trim() : ''
+}
+
+function commonArgsPreview(args: Record<string, unknown>): string {
+  const bits: string[] = []
+  const command = strArg(args, 'command')
+  if (command) bits.push(truncateLabel(command, 72))
+  const pattern = strArg(args, 'pattern') || strArg(args, 'glob') || strArg(args, 'query')
+  if (pattern) bits.push(`模式 ${truncateLabel(pattern, 40)}`)
+  const pathHint = workspacePathHint(args)
+  if (pathHint) bits.push(pathHint)
+  const keyword = strArg(args, 'keyword')
+  if (keyword) bits.push(truncateLabel(keyword, 36))
+  const urlHost = urlHostnameHint(args)
+  if (urlHost) bits.push(urlHost)
+  return bits.join(' · ')
+}
+
+function humanArgsPreview(tool: string, args: Record<string, unknown>): string {
+  switch (tool) {
+    case 'opptrix_run':
+    case 'shell_run': {
+      const command = strArg(args, 'command')
+      const argv = Array.isArray(args.argv)
+        ? args.argv.filter((v): v is string => typeof v === 'string').slice(0, 6)
+        : []
+      const fromArgv = argv.length ? argv.join(' ') : ''
+      const title = strArg(args, 'title') || strArg(args, 'name')
+      const cmd = command || fromArgv
+      if (title && cmd) return `${truncateLabel(title, 24)} · ${truncateLabel(cmd, 56)}`
+      if (title) return truncateLabel(title, 72)
+      return cmd ? truncateLabel(cmd, 80) : ''
+    }
+    case 'workspace_glob': {
+      const pattern = strArg(args, 'pattern') || strArg(args, 'glob')
+      const pathHint = workspacePathHint(args)
+      if (pattern && pathHint) return `匹配 ${truncateLabel(pattern, 40)} · ${pathHint}`
+      if (pattern) return `匹配 ${truncateLabel(pattern, 56)}`
+      return pathHint
+    }
+    case 'workspace_grep': {
+      const pattern = strArg(args, 'pattern') || strArg(args, 'query')
+      const pathHint = workspacePathHint(args)
+      if (pattern && pathHint) return `搜索 ${truncateLabel(pattern, 40)} · ${pathHint}`
+      if (pattern) return `搜索 ${truncateLabel(pattern, 56)}`
+      return pathHint
+    }
+    case 'workspace_apply_patch': {
+      const pathHint = workspacePathHint(args)
+      const patch = strArg(args, 'patch') || strArg(args, 'diff')
+      if (pathHint && patch) return `${pathHint} · 补丁 ${Math.min(patch.length, 9999)} 字`
+      if (pathHint) return pathHint
+      return patch ? `补丁 ${Math.min(patch.length, 9999)} 字` : ''
+    }
+    case 'workspace_read':
+    case 'workspace_write':
+    case 'workspace_replace_lines':
+    case 'workspace_delete':
+      return workspacePathHint(args)
+    case 'http_fetch':
+    case 'download_file':
+    case 'browser_navigate':
+      return urlHostnameHint(args)
+    case 'code_preflight':
+      return workspacePathHint(args)
+    case 'cancel_job':
+    case 'list_jobs': {
+      const jobId = strArg(args, 'job_id')
+      const kind = strArg(args, 'kind')
+      if (jobId) return `任务 ${truncateLabel(jobId, 36)}`
+      if (kind) return `类型 ${kind}`
+      return ''
+    }
+    case 'search_instruments': {
+      const kw = strArg(args, 'keyword')
+      return kw ? truncateLabel(kw, 48) : ''
+    }
+    default:
+      return commonArgsPreview(args)
+  }
+}
+
+/**
+ * 格式化工具参数完整详情 — pretty-print JSON，截断至 4000 字符。
+ * 供详情弹窗展示，避免行内 240 字符预览带来的信息丢失。
+ */
+export function formatArgsDetail(args: Record<string, unknown>): string {
+  try {
+    const s = JSON.stringify(args, null, 2)
+    return s.length <= 4000 ? s : `${s.slice(0, 4000)}…`
+  } catch {
+    return ''
+  }
+}
+
+function instrumentRefFromArgs(args: Record<string, unknown>): string | null {
+  const inst = args.instrument
+  if (inst && typeof inst === 'object') {
+    const i = inst as Record<string, unknown>
+    const market = typeof i.market === 'string' ? i.market : ''
+    const symbol = i.symbol ?? i.pair
+    if (typeof symbol === 'string' && symbol.trim()) {
+      return market ? `${market}:${symbol.trim()}` : symbol.trim()
+    }
+  }
+  if (typeof args.symbol === 'string' && args.symbol.trim()) {
+    const market = typeof args.market === 'string' ? args.market : 'US'
+    return `${market}:${args.symbol.trim()}`
+  }
+  if (typeof args.pair === 'string' && args.pair.trim()) {
+    return `CRYPTO:${args.pair.trim()}`
+  }
+  return null
+}
+
+function asResearchEnvelope(result: unknown): {
+  success?: boolean
+  message?: string
+  data?: unknown
+} | null {
+  if (!result || typeof result !== 'object') return null
+  const r = result as Record<string, unknown>
+  if ('success' in r || ('data' in r && 'message' in r)) {
+    return {
+      success: typeof r.success === 'boolean' ? r.success : undefined,
+      message: typeof r.message === 'string' ? r.message : undefined,
+      data: r.data,
+    }
+  }
+  return null
+}
+
+function fmtPct(v: unknown): string | null {
+  if (typeof v !== 'number' || Number.isNaN(v)) return null
+  const sign = v > 0 ? '+' : ''
+  return `${sign}${v.toFixed(2)}%`
+}
+
+function summarizeBatchSnapshot(data: unknown, message?: string): string | null {
+  if (!data || typeof data !== 'object') return message ?? null
+  const d = data as Record<string, unknown>
+  const rows = Array.isArray(d.discover_items)
+    ? d.discover_items as Record<string, unknown>[]
+    : Array.isArray(d.items)
+      ? d.items as Record<string, unknown>[]
+      : []
+  const quotes = Array.isArray(d.quotes) ? d.quotes as Record<string, unknown>[] : []
+  const count = typeof d.count === 'number' ? d.count : rows.length + quotes.length
+  if (!count) return message ?? '无批量截面数据'
+
+  const tradeDate = d.trade_date != null ? String(d.trade_date) : null
+  let head = `批量截面 ${count} 只`
+  if (tradeDate) head += `（${tradeDate}）`
+
+  if (rows.length) {
+    const sample = rows.slice(0, 3).map(row => {
+      const code = row.code ?? row.symbol ?? '?'
+      const name = typeof row.name === 'string' ? row.name : ''
+      const score = row.total_score ?? row.score
+      const keyFactors = row.key_factors && typeof row.key_factors === 'object'
+        ? row.key_factors as Record<string, unknown>
+        : null
+      const pe = row.pe ?? keyFactors?.pe
+      const label = name ? `${name}（${code}）` : String(code)
+      if (typeof score === 'number') return `${label} ${score} 分`
+      if (typeof pe === 'number') return `${label} PE ${pe}`
+      return label
+    })
+    const tail = rows.length > 3 ? `等 ${rows.length} 只` : ''
+    return [head, sample.join(' · '), tail].filter(Boolean).join('：')
+  }
+
+  if (quotes.length) {
+    const sample = quotes.slice(0, 3).map(q => {
+      const code = q.code ?? '?'
+      const pct = fmtPct(q.change_pct ?? q.changePct)
+      return pct ? `${code} ${pct}` : String(code)
+    })
+    return `${head}：${sample.join(' · ')}`
+  }
+
+  return message ?? head
+}
+
+function summarizeInstrumentSnapshot(data: unknown, message?: string): string | null {
+  if (!data || typeof data !== 'object') return message ?? null
+  const d = data as Record<string, unknown>
+  const code = d.code ?? d.symbol ?? d.pair
+  const name = typeof d.name === 'string' ? d.name : null
+  const quote = d.quote && typeof d.quote === 'object' ? d.quote as Record<string, unknown> : null
+  const price = quote?.price ?? d.price
+  const pct = fmtPct(quote?.change_pct ?? quote?.changePct ?? d.change_pct ?? d.changePct)
+  const label = name && code ? `${name}（${code}）` : (name ?? code ?? '标的')
+  const priceText = typeof price === 'number' ? price.toFixed(2) : null
+  const bits = [label, priceText, pct].filter(Boolean)
+  return bits.length ? bits.join(' · ') : (message ?? null)
+}
+
+function summarizeInstrumentQuotes(data: unknown, message?: string): string | null {
+  if (!data || typeof data !== 'object') return message ?? null
+  const d = data as Record<string, unknown>
+  const quotes = Array.isArray(d.quotes) ? d.quotes as Record<string, unknown>[] : []
+  if (!quotes.length) return message ?? '无行情数据'
+  const sample = quotes.slice(0, 4).map(q => {
+    const code = q.code ?? '?'
+    const pct = fmtPct(q.change_pct ?? q.changePct)
+    return pct ? `${code} ${pct}` : String(code)
+  })
+  const head = `${quotes.length} 只行情`
+  return `${head}：${sample.join(' · ')}`
+}
+
+function summarizeInstrumentSearch(data: unknown, message?: string): string | null {
+  if (!data || typeof data !== 'object') return message ?? null
+  const d = data as Record<string, unknown>
+  const items = Array.isArray(d.items) ? d.items as Record<string, unknown>[] : []
+  if (!items.length) return message ?? '未找到匹配标的'
+  const sample = items.slice(0, 3).map(item => {
+    const code = item.code ?? item.ref_label ?? item.symbol ?? '?'
+    const name = typeof item.name === 'string' ? item.name : ''
+    return name ? `${name}（${code}）` : String(code)
+  })
+  const head = `找到 ${typeof d.count === 'number' ? d.count : items.length} 只`
+  return `${head}：${sample.join(' · ')}`
+}
+
+function summarizeShellRunResult(result: unknown): string | null {
+  if (!result || typeof result !== 'object') return null
+  const r = result as Record<string, unknown>
+  if (typeof r.error === 'string') return r.error
+  if (r.needs_confirmation === true) return '等待你的确认'
+  const exitCode = r.exit_code
+  const ok = r.ok === true || exitCode === 0
+  const parts: string[] = []
+  if (typeof exitCode === 'number') {
+    parts.push(ok ? `退出码 ${exitCode}` : `失败，退出码 ${exitCode}`)
+  } else if (ok) {
+    parts.push('执行完成')
+  }
+  const stdout = typeof r.stdout === 'string' ? r.stdout.trim() : ''
+  if (stdout) {
+    const line = stdout.split('\n').find(l => l.trim()) ?? stdout
+    const snippet = line.length > 80 ? `${line.slice(0, 80)}…` : line
+    parts.push(snippet)
+  }
+  if (typeof r.ready === 'boolean') {
+    parts.push(r.ready ? '隔离环境已就绪' : '隔离环境未就绪')
+    const msg = typeof r.message === 'string' ? r.message.trim() : ''
+    if (msg && !r.ready) parts.push(msg.length > 60 ? `${msg.slice(0, 60)}…` : msg)
+  }
+  return parts.length ? parts.join(' · ') : null
+}
+
+function scheduleRunStatusHint(status: unknown): string {
+  if (status === 'ok') return '已完成'
+  if (status === 'error') return '执行失败'
+  if (status === 'running') return '进行中'
+  if (status === 'skipped') return '已跳过'
+  return typeof status === 'string' && status.trim() ? status.trim() : ''
+}
+
+function summarizeScheduledJob(job: Record<string, unknown>): string {
+  const title = typeof job.title === 'string' && job.title.trim()
+    ? `「${truncateLabel(job.title.trim(), 24)}」`
+    : '计划任务'
+  const kind = scheduleKindHint(job.kind)
+  const enabled = job.enabled === true ? '已启用' : job.enabled === false ? '已暂停' : ''
+  const next = typeof job.next_run_at === 'string' && job.next_run_at.trim()
+    ? (() => {
+      const d = new Date(job.next_run_at as string)
+      if (Number.isNaN(d.getTime())) return ''
+      return `下次 ${d.toLocaleString('zh-CN', { hour12: false })}`
+    })()
+    : ''
+  const last = scheduleRunStatusHint(job.last_status)
+  return [title, kind, enabled, next, last ? `最近${last}` : ''].filter(Boolean).join(' · ')
+}
+
+function summarizeScheduleToolResult(tool: string, result: unknown): string | null {
+  if (!result || typeof result !== 'object') return null
+  const r = result as Record<string, unknown>
+  if (typeof r.error === 'string') return r.error
+
+  if (tool === 'list_scheduled_jobs') {
+    const jobs = Array.isArray(r.jobs) ? r.jobs : []
+    if (!jobs.length) return '还没有计划任务'
+    const sample = jobs.slice(0, 3).map((item) => {
+      if (!item || typeof item !== 'object') return null
+      const title = typeof (item as { title?: unknown }).title === 'string'
+        ? (item as { title: string }).title.trim()
+        : ''
+      return title ? truncateLabel(title, 16) : null
+    }).filter((v): v is string => Boolean(v))
+    const head = `共 ${jobs.length} 项计划任务`
+    return sample.length ? `${head}：${sample.join(' · ')}` : head
+  }
+
+  if (tool === 'list_scheduled_job_runs') {
+    const runs = Array.isArray(r.runs) ? r.runs : []
+    if (!runs.length) return '还没有执行记录'
+    const latest = runs[0] && typeof runs[0] === 'object'
+      ? runs[0] as Record<string, unknown>
+      : null
+    const status = latest ? scheduleRunStatusHint(latest.status) : ''
+    const head = `最近 ${runs.length} 次执行`
+    return status ? `${head} · 最新${status}` : head
+  }
+
+  if (tool === 'delete_scheduled_job') {
+    if (r.needs_confirmation === true) {
+      const summary = typeof r.summary === 'string' ? r.summary.trim() : ''
+      return summary || '删除前需要你确认'
+    }
+    if (r.ok === true || r.deleted) return '已删除该计划任务'
+  }
+
+  if (tool === 'run_scheduled_job_now') {
+    const run = r.run && typeof r.run === 'object' ? r.run as Record<string, unknown> : null
+    if (!run) return '已提交立即执行'
+    const status = scheduleRunStatusHint(run.status)
+    const summary = typeof run.summary === 'string' ? run.summary.trim() : ''
+    const short = summary ? truncateLabel(summary, 48) : ''
+    return [status ? `立即执行${status}` : '已提交立即执行', short].filter(Boolean).join(' · ')
+  }
+
+  const job = r.job && typeof r.job === 'object' ? r.job as Record<string, unknown> : null
+  if (job) {
+    const line = summarizeScheduledJob(job)
+    if (tool === 'create_scheduled_job') return `已创建 · ${line}`
+    if (tool === 'update_scheduled_job') return `已更新 · ${line}`
+    if (tool === 'enable_scheduled_job') return `已启用 · ${line}`
+    if (tool === 'disable_scheduled_job') return `已暂停 · ${line}`
+    if (tool === 'get_scheduled_job') return line
+    return line
+  }
+
+  return null
+}
+
+function summarizeToolResult(tool: string, result: unknown): string | null {
+  if (result && typeof result === 'object' && 'error' in result && !('success' in result)) {
+    const err = (result as { error?: unknown }).error
+    return typeof err === 'string' ? err : '执行失败'
+  }
+
+  const envelope = asResearchEnvelope(result)
+  if (envelope?.success === false) {
+    return envelope.message || '执行失败'
+  }
+
+  const data = envelope?.data ?? result
+  const message = envelope?.message
+
+  switch (tool) {
+    case 'batch_instrument_snapshots':
+    case 'batch_stock_snapshots':
+      return summarizeBatchSnapshot(data, message)
+    case 'get_instrument_snapshot':
+    case 'get_stock_detail':
+    case 'get_us_snapshot':
+    case 'get_crypto_snapshot':
+      return summarizeInstrumentSnapshot(data, message)
+    case 'get_instrument_quotes':
+    case 'get_stock_quotes':
+      return summarizeInstrumentQuotes(data, message)
+    case 'search_stocks':
+    case 'search_instruments':
+    case 'search_us_stocks':
+    case 'search_crypto_pairs':
+      return summarizeInstrumentSearch(data, message)
+    case 'ask_user': {
+      if (!result || typeof result !== 'object') return null
+      const r = result as Record<string, unknown>
+      if (r.kind === 'custom' && typeof r.custom_text === 'string' && r.custom_text.trim()) {
+        return `已选择：${r.custom_text.trim()}`
+      }
+      const labels = Array.isArray(r.selected_labels)
+        ? r.selected_labels.filter((l): l is string => typeof l === 'string' && l.trim().length > 0)
+        : []
+      if (labels.length) return `已选择：${labels.join('、')}`
+      return '已收到你的确认'
+    }
+    case 'schedule_turn_wake': {
+      if (!result || typeof result !== 'object') return null
+      const r = result as Record<string, unknown>
+      if (r.ok === false) {
+        return typeof r.error === 'string' ? r.error : '未能安排稍后继续'
+      }
+      const sec = typeof r.seconds === 'number' ? r.seconds : Number(r.seconds)
+      if (Number.isFinite(sec) && sec > 0) return formatWakeSecondsLabel(sec)
+      return '已安排稍后继续检查'
+    }
+    case 'opptrix_run':
+    case 'shell_run':
+    case 'opptrix_install':
+    case 'shell_install':
+    case 'shell_platform_status':
+    case 'python_env_status':
+    case 'ensure_python':
+      return summarizeShellRunResult(result)
+    case 'code_preflight': {
+      if (!result || typeof result !== 'object') return null
+      const r = result as Record<string, unknown>
+      if (r.ok === true) return '脚本检查通过'
+      const errs = Array.isArray(r.errors) ? r.errors.filter((e): e is string => typeof e === 'string') : []
+      if (errs.length) {
+        const first = errs[0]
+        return first.length > 80 ? `${first.slice(0, 80)}…` : first
+      }
+      return '脚本检查未通过'
+    }
+    case 'list_scheduled_jobs':
+    case 'get_scheduled_job':
+    case 'create_scheduled_job':
+    case 'update_scheduled_job':
+    case 'enable_scheduled_job':
+    case 'disable_scheduled_job':
+    case 'delete_scheduled_job':
+    case 'run_scheduled_job_now':
+    case 'list_scheduled_job_runs':
+      return summarizeScheduleToolResult(tool, result)
+    default:
+      return null
+  }
+}
+
+/**
+ * 格式化工具结果预览与详情 — preview 180 字符、detail 4000 字符。
+ * 对 instrument_* / batch_* 等工具生成面向投资者的可读摘要。
+ */
+export function formatResultPreview(
+  result: unknown,
+  tool?: string,
+): { preview: string; detail: string } {
+  const summarized = tool ? summarizeToolResult(tool, result) : null
+  let text = ''
+  if (typeof result === 'string') {
+    text = result
+  } else {
+    try {
+      text = JSON.stringify(result, null, 2)
+    } catch {
+      text = String(result)
+    }
+  }
+  const detail = text.length <= 4000 ? text : `${text.slice(0, 4000)}…`
+  if (summarized) {
+    const preview = summarized.length <= 180 ? summarized : `${summarized.slice(0, 180)}…`
+    return { preview, detail }
+  }
+  const preview = text.length <= 180 ? text : `${text.slice(0, 180)}…`
+  return { preview, detail }
+}
+
+/** 从工具结果映射截断/落盘字段（供 SSE；不实现落盘本身） */
+function extractTruncationFields(result: unknown): Pick<
+  ChatToolStep,
+  'truncated' | 'resultTruncated' | 'ui_hint' | 'saved_rel_path'
+> {
+  if (!result || typeof result !== 'object' || Array.isArray(result)) return {}
+  const r = result as Record<string, unknown>
+  const out: Pick<ChatToolStep, 'truncated' | 'resultTruncated' | 'ui_hint' | 'saved_rel_path'> = {}
+  if (r.truncated === true) out.truncated = true
+  if (r.resultTruncated === true) out.resultTruncated = true
+  if (typeof r.ui_hint === 'string' && r.ui_hint.trim()) {
+    out.ui_hint = r.ui_hint.trim()
+  }
+  const saved =
+    (typeof r.saved_rel_path === 'string' && r.saved_rel_path.trim())
+      ? r.saved_rel_path.trim()
+      : (typeof r.savedRelPath === 'string' && r.savedRelPath.trim())
+        ? r.savedRelPath.trim()
+        : (typeof r.relative_path === 'string' && r.relative_path.trim())
+          ? r.relative_path.trim()
+          : ''
+  if (saved) out.saved_rel_path = saved
+  return out
+}
+
+/**
+ * 用工具执行结果补全步骤信息 — 更新标签、状态、预览文本和完成时间。
+ */
+export function enrichStepFromResult(step: ChatToolStep, result: unknown): ChatToolStep {
+  let args: Record<string, unknown> = {}
+  try {
+    args = step.argsPreview ? JSON.parse(step.argsPreview) as Record<string, unknown> : {}
+  } catch { /* empty */ }
+  const label = formatToolLabel(step.tool, args, result)
+  const { preview, detail } = formatResultPreview(result, step.tool)
+  const isError = Boolean(
+    (result && typeof result === 'object' && 'error' in result)
+    || (result && typeof result === 'object' && 'success' in result && (result as { success?: boolean }).success === false),
+  )
+  const truncation = extractTruncationFields(result)
+  return {
+    ...step,
+    label,
+    status: isError ? 'error' : 'done',
+    resultPreview: preview,
+    resultDetail: detail,
+    finishedAt: new Date().toISOString(),
+    ...truncation,
+  }
+}

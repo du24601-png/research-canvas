@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Keep in sync with scripts/lib/ci-pins.env
+  CI_UBUNTU_RUNNER: ubuntu-24.04
+
+jobs:
+  build-and-test:
+    name: Build & test (server / selfhost)
+    runs-on: ubuntu-24.04  # pin: scripts/lib/ci-pins.env CI_UBUNTU_RUNNER
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Load CI pin config
+        run: grep -v '^#' scripts/lib/ci-pins.env | grep -v '^$' >> "$GITHUB_ENV"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.OPPTRIX_NODE_PATCH_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build packages
+        run: npm run build:packages
+
+      - name: Build client UI
+        run: npm run build -w research-canvas-client
+
+      - name: Check client UI
+        run: npm run check:ui
+
+      - name: Gate tests
+        run: npm run test:gate
+        env:
+          CI: true

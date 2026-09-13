@@ -1,0 +1,112 @@
+import { Capability } from '../../core/capabilities.js'
+import { CN_ETF_CAPABILITIES } from '../../core/bindings.js'
+import { type ProviderManifestSpec } from '../common/types.js'
+import { providerManifestEntry } from '../common/manifest.js'
+import { TONGHUASHUN_SETTINGS } from './settings.js'
+import { cnEquityEtfIndex, cnLofBindings } from '../common/bindings.js'
+import { TONGHUASHUN_CN_FUND_CAPABILITIES } from './fund-capabilities.js'
+import { TONGHUASHUN_MARKET_CAPABILITIES } from '../../core/market-capabilities.js'
+
+export const TONGHUASHUN_CAPS = [
+  Capability.STOCK_REALTIME,
+  Capability.STOCK_KLINE,
+  Capability.STOCK_LIST,
+  Capability.STOCK_PROFILE,
+  Capability.FINANCIAL_SUMMARY,
+  Capability.INCOME_STMT,
+  Capability.BALANCE_SHEET,
+  Capability.CASH_FLOW,
+  Capability.DIVIDEND,
+  Capability.TRADE_CALENDAR,
+  Capability.INDEX_REALTIME,
+  Capability.INDEX_KLINE,
+  Capability.INDEX_CONST,
+  Capability.DRAGON_TIGER,
+  Capability.LIMIT_UPDOWN,
+  Capability.SENTIMENT,
+]
+
+const INDEX_CAPS = [
+  Capability.INDEX_REALTIME,
+  Capability.INDEX_KLINE,
+  Capability.INDEX_CONST,
+]
+
+const EQUITY_CAPS = TONGHUASHUN_CAPS.filter(c => !INDEX_CAPS.includes(c))
+
+export const TONGHUASHUN_SPEC: ProviderManifestSpec = {
+  id: 'tonghuashun',
+  title: '同花顺',
+  subtitle: '同花顺行情与基本面数据',
+  marketGroup: 'CN',
+  defaultPriority: 120,
+  maxConcurrent: 5,
+  capabilities: [...new Set([
+    ...TONGHUASHUN_CAPS,
+    ...CN_ETF_CAPABILITIES,
+    ...TONGHUASHUN_CN_FUND_CAPABILITIES,
+    ...TONGHUASHUN_MARKET_CAPABILITIES,
+  ])],
+  bindingsFor: (p, maxConcurrent) => [
+    ...cnEquityEtfIndex(
+      EQUITY_CAPS,
+      INDEX_CAPS,
+      p,
+      CN_ETF_CAPABILITIES,
+      maxConcurrent,
+    ),
+    // v3：市场级标准能力（原 ths* 自定义方法）——指数/板块类绑 CN/INDEX
+    ...TONGHUASHUN_MARKET_CAPABILITIES.filter(c => [
+      Capability.INDEX_CATALOG, Capability.INDEX_PRICES_SNAPSHOT, Capability.INDEX_CONSTITUENTS_RAW,
+    ].includes(c)).map(capability => ({
+      market: 'CN' as const,
+      assetClass: 'INDEX' as const,
+      capability,
+      defaultPriority: p,
+      ...(maxConcurrent !== undefined ? { maxConcurrent } : {}),
+    })),
+    // 其余情绪/竞价/财务指标类绑 CN/EQUITY
+    ...TONGHUASHUN_MARKET_CAPABILITIES.filter(c => ![
+      Capability.INDEX_CATALOG, Capability.INDEX_PRICES_SNAPSHOT, Capability.INDEX_CONSTITUENTS_RAW,
+    ].includes(c)).map(capability => ({
+      market: 'CN' as const,
+      assetClass: 'EQUITY' as const,
+      capability,
+      defaultPriority: p,
+      ...(maxConcurrent !== undefined ? { maxConcurrent } : {}),
+    })),
+    ...TONGHUASHUN_CN_FUND_CAPABILITIES.map(capability => ({
+      market: 'CN' as const,
+      assetClass: 'FUND' as const,
+      capability,
+      defaultPriority: p,
+      ...(maxConcurrent !== undefined ? { maxConcurrent } : {}),
+    })),
+    ...cnLofBindings(p, maxConcurrent),
+    ...TONGHUASHUN_CN_FUND_CAPABILITIES.map(capability => ({
+      market: 'CN' as const,
+      assetClass: 'REIT' as const,
+      capability,
+      defaultPriority: p,
+      ...(maxConcurrent !== undefined ? { maxConcurrent } : {}),
+    })),
+    ...([Capability.STOCK_REALTIME, Capability.STOCK_KLINE] as const).map(capability => ({
+      market: 'CN' as const,
+      assetClass: 'REIT' as const,
+      capability,
+      defaultPriority: p,
+      ...(maxConcurrent !== undefined ? { maxConcurrent } : {}),
+    })),
+  ],
+  settings: TONGHUASHUN_SETTINGS,
+  supportsTest: true,
+}
+
+export const TONGHUASHUN_MANIFEST = providerManifestEntry(
+  'tonghuashun',
+  '同花顺',
+  '同花顺行情与基本面数据',
+  'CN',
+  120,
+  TONGHUASHUN_SETTINGS,
+)

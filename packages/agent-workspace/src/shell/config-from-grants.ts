@@ -1,0 +1,304 @@
+import fsSync from 'node:fs'
+import fs from 'node:fs/promises'
+import os from 'node:os'
+import path from 'node:path'
+import {
+  getDefaultWritePaths,
+  type SandboxRuntimeConfig,
+} from '@anthropic-ai/sandbox-runtime'
+import { resolveUserDataRoot, resolvePythonRuntimeRoot } from '@opptrix/shared'
+import { buildGlobalDenyPaths } from '../deny.js'
+import type { WorkspaceGrant } from '../grants.js'
+import { bundledCaCertAllowReadPaths } from './bundled-cacert.js'
+import {
+  getGrantableMergedAllowedDomains,
+  getGrantableMergedAllowedDomainsSync,
+  mergeAllowedNetworkDomains,
+} from './network-policy.js'
+import { nodeRuntimeAllowReadPaths } from '../node/resolve-node.js'
+import { resolvePythonRuntime } from '../python/resolve-python.js'
+import { resolveBundledSandboxBinConfig } from './resolve-sandbox-bins.js'
+import { finalizeFilesystemPathsForPlatform } from './windows-acl-path-policy.js'
+
+async function realpathSafe(p: string): Promise<string> {
+  try {
+    return await fs.realpath(p)
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code
+    if (code === 'ENOENT') return path.resolve(p)
+    throw err
+  }
+}
+
+function uniquePaths(paths: readonly string[]): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const p of paths) {
+    const norm = path.resolve(p)
+    if (seen.has(norm)) continue
+    seen.add(norm)
+    out.push(norm)
+  }
+  return out
+}
+
+/**
+ * Windows 系统只读路径（可注入 env 便于单测；一律用 path.win32）。
+ * 勿整棵 APPDATA / LOCALAPPDATA；勿 stamp WINDIR / Program Files*。
+ */
+export function win32SystemReadAllowPaths(env: NodeJS.ProcessEnv = process.env): string[] {
+  const local = env.LOCALAPPDATA?.trim()
+  const candidates = [
+    env.TEMP?.trim() ?? '',
+    env.TMP?.trim() ?? '',
+    local ? path.win32.join(local, 'Programs', 'Python') : '',
+  ].filter(Boolean)
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const p of candidates) {
+    const norm = path.win32.resolve(p)
+    const key = norm.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(norm)
+  }
+  return out
+}
+
+/** active Python 所在目录（及 Scripts/bin 旁父级）— 覆盖 conda 等非 Store 路径 */
+export function pythonActiveAllowReadPaths(activePath: string | null | undefined): string[] {
+  if (!activePath?.trim()) return []
+  let resolved = path.resolve(activePath.trim())
+  try {
+    resolved = fsSync.realpathSync(resolved)
+  } catch {
+    // 路径不存在时保留 resolve 结果（单测 / 未安装解释器）
+  }
+  const dir = path.dirname(resolved)
+  const out = [dir]
+  const base = path.basename(dir).toLowerCase()
+  if (base === 'scripts' || base === 'bin') {
+    out.push(path.dirname(dir))
+  }
+  // darwin：Homebrew 窄路径兜底（非整盘 / 非 homedir）；主 CA 仍走自带 pem
+  if (process.platform === 'darwin') {
+    if (resolved.includes('/Cellar/') || resolved.includes('/opt/homebrew/')) {
+      out.push('/opt/homebrew/etc', '/opt/homebrew/opt')
+    }
+  }
+  return uniquePaths(out)
+}
+
+async function resolvePythonActiveAllowReadPaths(): Promise<string[]> {
+  try {
+    const runtime = await resolvePythonRuntime()
+    return pythonActiveAllowReadPaths(runtime.active_path)
+  } catch {
+    return []
+  }
+}
+
+/** 解释器/系统只读路径 — 供 sandbox 内 python/node 启动 */
+function systemReadAllowPaths(): string[] {
+  const platform = os.platform()
+  if (platform === 'win32') {
+    return win32SystemReadAllowPaths()
+  }
+  if (platform === 'darwin') {
+    return uniquePaths([
+      '/usr/bin',
+      '/bin',
+      '/usr/sbin',
+      '/sbin',
+      '/usr/local/bin',
+      '/usr/local/etc',
+      '/opt/homebrew/bin',
+      '/opt/homebrew/sbin',
+      '/opt/homebrew/etc',
+      '/opt/homebrew/opt',
+      '/Library/Frameworks/Python.framework',
+      '/System/Library',
+      '/private/tmp',
+      '/var/folders',
+    ])
+  }
+  return uniquePaths([
+    '/usr/bin',
+    '/bin',
+    '/usr/sbin',
+    '/sbin',
+    '/usr/local/bin',
+    '/lib',
+    '/lib64',
+    '/usr/lib',
+    '/tmp',
+    '/var/tmp',
+  ])
+}
+
+function systemWriteAllowPaths(): string[] {
+  const platform = os.platform()
+  if (platform === 'win32') {
+    // 仅 TEMP/TMP；勿整棵 LOCALAPPDATA（过宽且易与 deny/策略冲突）
+    return uniquePaths([
+      process.env.TEMP ?? '',
+      process.env.TMP ?? '',
+    ].filter(Boolean))
+  }
+  return uniquePaths(['/tmp', '/var/tmp', '/private/tmp'])
+}
+
+export interface BuildSandboxConfigOptions {
+  grants: readonly WorkspaceGrant[]
+  allowNetworkInstall: boolean
+  /** 用户确认后的 ping/traceroute 目标主机 */
+  diagnosticTargetHosts?: readonly string[]
+  /** 本会话已 grant 的出站 host */
+  sessionEgress?: { hosts: readonly string[] }
+  /** 仅此一次 grant 的 host（不写入 session store） */
+  onceEgressHosts?: readonly string[]
+  /** 用于有效 LAN（全局 \|\| 会话） */
+  sessionId?: string
+  /** 当前 pip 镜像 URL；联网安装时并入 allowlist（边界先行） */
+  pipIndexUrls?: readonly string[]
+}
+
+/** 从 session grants 构建 SandboxRuntimeConfig */
+export async function buildSandboxConfigFromGrants(
+  opts: BuildSandboxConfigOptions,
+): Promise<SandboxRuntimeConfig> {
+  const userData = path.resolve(resolveUserDataRoot())
+  const homedir = os.homedir()
+  const grantRealpaths = await Promise.all(
+    opts.grants.map(g => realpathSafe(g.abs_path)),
+  )
+
+  // 必须用原始 grants 下标对齐 grantRealpaths；filter 后再用 i 会错位
+  const rwPaths = uniquePaths(
+    opts.grants.flatMap((g, i) => (g.mode === 'rw' ? [grantRealpaths[i]] : [])),
+  )
+
+  const roPaths = uniquePaths(
+    opts.grants.flatMap((g, i) => (g.mode === 'ro' ? [grantRealpaths[i]] : [])),
+  )
+
+  const denyRead = uniquePaths([
+    userData,
+    homedir,
+    path.join(homedir, '.ssh'),
+    ...buildGlobalDenyPaths(),
+  ])
+
+  const [nodeReadPaths, pythonActivePaths] = await Promise.all([
+    nodeRuntimeAllowReadPaths(),
+    resolvePythonActiveAllowReadPaths(),
+  ])
+
+  const allowRead = finalizeFilesystemPathsForPlatform(uniquePaths([
+    ...grantRealpaths,
+    ...systemReadAllowPaths(),
+    resolvePythonRuntimeRoot(),
+    ...pythonActivePaths,
+    ...nodeReadPaths,
+    ...bundledCaCertAllowReadPaths(),
+  ]))
+
+  const allowWrite = finalizeFilesystemPathsForPlatform(uniquePaths([
+    ...rwPaths,
+    ...systemWriteAllowPaths(),
+    ...getDefaultWritePaths(),
+  ]))
+
+  const denyWrite = uniquePaths([
+    ...buildGlobalDenyPaths(),
+    ...roPaths,
+  ])
+
+  const sessionHosts = [
+    ...(opts.sessionEgress?.hosts ?? []),
+    ...(opts.onceEgressHosts ?? []),
+  ]
+  const configuredDomains = await getGrantableMergedAllowedDomains(opts.sessionId)
+  const allowedDomains = mergeAllowedNetworkDomains({
+    allowInstall: opts.allowNetworkInstall,
+    diagnosticTargets: opts.diagnosticTargetHosts,
+    sessionHosts,
+    configuredDomains,
+    pipIndexUrls: opts.pipIndexUrls,
+  })
+
+  return {
+    ...resolveBundledSandboxBinConfig(),
+    network: {
+      allowedDomains,
+      deniedDomains: [],
+    },
+    filesystem: {
+      denyRead,
+      allowRead,
+      allowWrite,
+      denyWrite,
+    },
+    git: {
+      safeDirectories: grantRealpaths,
+    },
+  }
+}
+
+/** 测试辅助：grants 路径（不 realpath）；allowRead 与 buildSandboxConfigFromGrants 对齐 */
+export async function buildSandboxConfigFromGrantPaths(
+  grants: Array<{ abs_path: string; mode: 'ro' | 'rw' }>,
+  allowNetworkInstall: boolean,
+  diagnosticTargetHosts?: readonly string[],
+  sessionEgress?: { hosts: readonly string[] },
+  onceEgressHosts?: readonly string[],
+  pipIndexUrls?: readonly string[],
+): Promise<SandboxRuntimeConfig> {
+  const userData = path.resolve(resolveUserDataRoot())
+  const homedir = os.homedir()
+  const rwPaths = grants.filter(g => g.mode === 'rw').map(g => path.resolve(g.abs_path))
+  const roPaths = grants.filter(g => g.mode === 'ro').map(g => path.resolve(g.abs_path))
+  const grantPaths = grants.map(g => path.resolve(g.abs_path))
+  const [nodeReadPaths, pythonActivePaths] = await Promise.all([
+    nodeRuntimeAllowReadPaths(),
+    resolvePythonActiveAllowReadPaths(),
+  ])
+
+  const sessionHosts = [
+    ...(sessionEgress?.hosts ?? []),
+    ...(onceEgressHosts ?? []),
+  ]
+  const configuredDomains = getGrantableMergedAllowedDomainsSync()
+
+  return {
+    ...resolveBundledSandboxBinConfig(),
+    network: {
+      allowedDomains: mergeAllowedNetworkDomains({
+        allowInstall: allowNetworkInstall,
+        diagnosticTargets: diagnosticTargetHosts,
+        sessionHosts,
+        configuredDomains,
+        pipIndexUrls,
+      }),
+      deniedDomains: [],
+    },
+    filesystem: {
+      denyRead: uniquePaths([userData, homedir, path.join(homedir, '.ssh'), ...buildGlobalDenyPaths()]),
+      allowRead: finalizeFilesystemPathsForPlatform(uniquePaths([
+        ...grantPaths,
+        ...systemReadAllowPaths(),
+        resolvePythonRuntimeRoot(),
+        ...pythonActivePaths,
+        ...nodeReadPaths,
+        ...bundledCaCertAllowReadPaths(),
+      ])),
+      allowWrite: finalizeFilesystemPathsForPlatform(uniquePaths([
+        ...rwPaths,
+        ...systemWriteAllowPaths(),
+        ...getDefaultWritePaths(),
+      ])),
+      denyWrite: uniquePaths([...buildGlobalDenyPaths(), ...roPaths]),
+    },
+    git: { safeDirectories: grantPaths },
+  }
+}

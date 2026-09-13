@@ -1,0 +1,143 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# CNB（cnb.cool）平台原生 CI 配置 — 仅手动通道
+#
+# 制品以 GitHub 为准：多架构镜像一律由 GitHub Actions
+# (.github/workflows/publish-selfhost-image.yml) 构建并发布到 GHCR。
+# 本文件不配置 push 自动构建，避免与 GitHub CI 重复构建；
+# 此处只提供两个人工通道（按钮见 .cnb/web_trigger.yml）：
+#
+#   1. web_trigger_sync_image — 同步：把 GHCR 已发布镜像（含多架构 manifest，
+#      digest 不变）复制到本仓制品库 docker.cnb.cool/travisun/opptrix。
+#   2. web_trigger_build_image — 应急：GitHub 不可用时在 CNB 单平台构建并推送
+#      本仓制品库（多架构镜像仍以 GitHub 发布为准）。
+#
+# 制品路径说明：CNB 仓库 Travisun/Opptrix → 制品路径强制全小写
+#   docker.cnb.cool/travisun/opptrix（常量与共用逻辑见 scripts/cnb/image-common.sh）。
+# 登录说明：CNB 流水线内置注入 CNB_TOKEN；skopeo 通道用
+#   docker.cnb.cool + cnb + $CNB_TOKEN 登录，docker 通道由 services: [docker]
+#   自动 docker login 本仓制品库。
+# ─────────────────────────────────────────────────────────────────────────────
+
+main:
+  # 通道一：同步 GHCR 权威镜像 → 本仓制品库（服务器间复制，不重新构建）
+  web_trigger_sync_image:
+    - name: 同步镜像到制品库
+      docker:
+        image: alpine:3.20
+      env:
+        IMAGE_TAG: selfhost  # 支持 opptrix-selfhost-vX.Y.Z / X.Y.Z / 浮动标签 selfhost
+      stages:
+        - name: 安装 skopeo
+          script: |
+            set -euo pipefail
+            apk add --no-cache skopeo
+            skopeo --version
+        - name: 解析镜像标签
+          script: |
+            set -euo pipefail
+            . ./scripts/cnb/image-common.sh
+            normalize_image_tag "${IMAGE_TAG:-selfhost}"
+        - name: 登录本仓制品库
+          script: |
+            set -euo pipefail
+            . ./scripts/cnb/image-common.sh
+            cnb_login
+        - name: 逐标签同步（多架构 digest 不变）
+          script: |
+            set -euo pipefail
+            . ./scripts/cnb/image-common.sh
+            normalize_image_tag "${IMAGE_TAG:-selfhost}"
+            # IMAGE_TAGS 为空格分隔的标签串，此处有意按词展开迭代
+            for tag in $IMAGE_TAGS; do
+              sync_tag "$tag"
+            done
+        - name: 校验 digest 并输出摘要
+          script: |
+            set -euo pipefail
+            . ./scripts/cnb/image-common.sh
+            normalize_image_tag "${IMAGE_TAG:-selfhost}"
+            for tag in $IMAGE_TAGS; do
+              verify_tag "$tag"
+            done
+            echo "同步完成，以下标签已可在国内直接拉取（与 GHCR 同 digest）："
+            for tag in $IMAGE_TAGS; do
+              echo "  docker pull ${CNB_IMAGE}:${tag}"
+            done
+
+  # 通道二：应急构建镜像（仅 GitHub 不可用时使用；多架构以 GitHub 发布为准）
+  web_trigger_build_image:
+    - name: 应急构建镜像
+      services:
+        - docker  # 提供 docker 守护进程，并自动 docker login 本仓制品库
+      docker:
+        image: docker:27  # docker CLI（Alpine 系，busybox ash，与 alpine:3.20 同源）
+      env:
+        IMAGE_TAG: selfhost
+        PLATFORM: linux/amd64
+        # 国内源默认值（见 Dockerfile 头部 build-args 说明），可被按钮 inputs/
+        # 环境变量覆盖；置空则回退官方源（Dockerfile 对空值已兼容）
+        NODE_IMAGE_PREFIX: docker.1ms.run/library/  # 必须以 / 结尾
+        NPM_REGISTRY: https://registry.npmmirror.com
+        APT_MIRROR: mirrors.aliyun.com  # 仅主机名，无 scheme
+      stages:
+        - name: 安装依赖并读取版本 pin
+          script: |
+            set -euo pipefail
+            apk add --no-cache git
+            . ./scripts/lib/ci-pins.env
+            echo "NODE_VERSION=${OPPTRIX_NODE_PATCH_VERSION}（来自 scripts/lib/ci-pins.env，勿在此硬编码）"
+        - name: 检出与标签对应的源码
+          script: |
+            set -euo pipefail
+            . ./scripts/cnb/image-common.sh
+            normalize_image_tag "${IMAGE_TAG:-selfhost}"
+            if [ -n "${FULL_TAG}" ]; then
+              # 版本号输入：必须检出对应源码标签，禁止用 main 顶点冒充版本号
+              if ! git rev-parse -q --verify "refs/tags/${FULL_TAG}" >/dev/null 2>&1; then
+                git fetch --tags origin || {
+                  echo "[cnb] 无法拉取 tags（浅克隆或网络受限），请改用 GitHub 权威构建" >&2
+                  exit 1
+                }
+              fi
+              git checkout -q --detach "refs/tags/${FULL_TAG}" || {
+                echo "[cnb] 仓库中不存在标签 ${FULL_TAG}，请确认已通过 GitHub 发布该版本" >&2
+                exit 1
+              }
+              echo "已检出源码标签 ${FULL_TAG}"
+            else
+              echo "浮动标签 selfhost：以当前 main 顶点构建（不写入版本号 build-args）"
+            fi
+        - name: 构建镜像（单平台，同时打齐标签）
+          script: |
+            set -euo pipefail
+            . ./scripts/lib/ci-pins.env
+            . ./scripts/cnb/image-common.sh
+            normalize_image_tag "${IMAGE_TAG:-selfhost}"
+            set -- --platform "${PLATFORM:-linux/amd64}"
+            for tag in $IMAGE_TAGS; do
+              set -- "$@" -t "${CNB_IMAGE}:${tag}"
+            done
+            set -- "$@" \
+              --build-arg "NODE_VERSION=${OPPTRIX_NODE_PATCH_VERSION}" \
+              --build-arg "NODE_IMAGE_PREFIX=${NODE_IMAGE_PREFIX-}" \
+              --build-arg "NPM_REGISTRY=${NPM_REGISTRY-}" \
+              --build-arg "APT_MIRROR=${APT_MIRROR-}"
+            if [ -n "${VERSION}" ]; then
+              set -- "$@" \
+                --build-arg "OPPTRIX_BASE_VERSION=${FULL_TAG}" \
+                --build-arg "OPPTRIX_RELEASE_TAG=${FULL_TAG}"
+            fi
+            docker build "$@" .
+        - name: 推送镜像并输出摘要
+          script: |
+            set -euo pipefail
+            . ./scripts/cnb/image-common.sh
+            normalize_image_tag "${IMAGE_TAG:-selfhost}"
+            # services: [docker] 已自动登录本仓制品库
+            for tag in $IMAGE_TAGS; do
+              docker push "${CNB_IMAGE}:${tag}"
+            done
+            echo "应急构建完成（单平台 ${PLATFORM:-linux/amd64}；多架构镜像以 GitHub 发布为准）："
+            for tag in $IMAGE_TAGS; do
+              echo "  docker pull ${CNB_IMAGE}:${tag}"
+            done

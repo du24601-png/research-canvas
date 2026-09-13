@@ -1,0 +1,98 @@
+{
+  "name": "@opptrix/shared",
+  "version": "0.4.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./product-brand": {
+      "types": "./dist/product-brand.d.ts",
+      "import": "./dist/product-brand.js"
+    },
+    "./onboarding": {
+      "types": "./dist/onboarding.d.ts",
+      "import": "./dist/onboarding.js"
+    },
+    "./portfolio-fees": {
+      "types": "./dist/portfolio-fees.d.ts",
+      "import": "./dist/portfolio-fees.js"
+    },
+    "./portfolio-return": {
+      "types": "./dist/portfolio-return.d.ts",
+      "import": "./dist/portfolio-return.js"
+    },
+    "./fx-rates": {
+      "types": "./dist/fx-rates.d.ts",
+      "import": "./dist/fx-rates.js"
+    },
+    "./portfolio-profile": {
+      "types": "./dist/portfolio-profile.d.ts",
+      "import": "./dist/portfolio-profile.js"
+    },
+    "./instrument-capabilities": {
+      "types": "./dist/instrument-capabilities.d.ts",
+      "import": "./dist/instrument-capabilities.js"
+    },
+    "./instrument-symbol": {
+      "types": "./dist/instrument-symbol.d.ts",
+      "import": "./dist/instrument-symbol.js"
+    },
+    "./instrument-ref": {
+      "types": "./dist/instrument-ref.d.ts",
+      "import": "./dist/instrument-ref.js"
+    },
+    "./instrument-param": {
+      "types": "./dist/instrument-param.d.ts",
+      "import": "./dist/instrument-param.js"
+    },
+    "./chat-title-display": {
+      "types": "./dist/chat-title-display.d.ts",
+      "import": "./dist/chat-title-display.js"
+    },
+    "./builtin-skill-titles": {
+      "types": "./dist/builtin-skill-titles.d.ts",
+      "import": "./dist/builtin-skill-titles.js"
+    },
+    "./proxy-config": {
+      "types": "./dist/proxy-config.d.ts",
+      "import": "./dist/proxy-config.js"
+    },
+    "./auth-credentials": {
+      "types": "./dist/auth-credentials.d.ts",
+      "import": "./dist/auth-credentials.js"
+    },
+    "./ui-cache-policy": {
+      "types": "./dist/ui-cache-policy.d.ts",
+      "import": "./dist/ui-cache-policy.js"
+    },
+    "./research-view-recommendation": {
+      "types": "./dist/research-view-recommendation.d.ts",
+      "import": "./dist/research-view-recommendation.js"
+    },
+    "./research-view-params": {
+      "types": "./dist/research-view-params.d.ts",
+      "import": "./dist/research-view-params.js"
+    },
+    "./research-view-title": {
+      "types": "./dist/research-view-title.d.ts",
+      "import": "./dist/research-view-title.js"
+    },
+    "./research-chart-style": {
+      "types": "./dist/research-chart-style.d.ts",
+      "import": "./dist/research-chart-style.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch"
+  },
+  "dependencies": {
+    "https-proxy-agent": "^7.0.6",
+    "socks-proxy-agent": "^8.0.5"
+  }
+}

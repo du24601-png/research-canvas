@@ -1,0 +1,72 @@
+import { Capability } from '../../core/capabilities.js'
+import { type ProviderManifestSpec } from '../common/types.js'
+import { providerManifestEntry } from '../common/manifest.js'
+import { TUSHARE_SETTINGS } from './settings.js'
+import {
+  cnEquityEtfIndex,
+} from '../common/bindings.js'
+import { cnFundBindings } from '../../core/bindings.js'
+import { TUSHARE_CN_FUND_CAPABILITIES } from './fund-capabilities.js'
+import { TUSHARE_MARKET_CAPABILITIES } from '../../core/market-capabilities.js'
+
+export const TUSHARE_CAPS = [
+      Capability.STOCK_BASIC,
+      Capability.STOCK_LIST,
+      Capability.STOCK_REALTIME,
+      Capability.STOCK_KLINE,
+      Capability.INDEX_REALTIME,
+      Capability.INDEX_KLINE,
+      Capability.STOCK_PROFILE,
+      Capability.FINANCIAL_SUMMARY,
+      Capability.DIVIDEND,
+      Capability.SHAREHOLDER,
+      Capability.PERF_FORECAST,
+      Capability.INST_HOLDING,
+      Capability.INSIDER_TRADE,
+      Capability.BUYBACK,
+      Capability.MAIN_BUSINESS,
+      Capability.TRADE_CALENDAR,
+      Capability.SHAREHOLDER_NUM,
+      ...TUSHARE_CN_FUND_CAPABILITIES,
+      ...TUSHARE_MARKET_CAPABILITIES,
+    ]
+
+export const TUSHARE_SPEC: ProviderManifestSpec = {
+  id: 'tushare',
+  title: 'Tushare Pro',
+  subtitle: '专业 A 股基本面与行情',
+  marketGroup: 'CN',
+  defaultPriority: 105,
+  maxConcurrent: 5,
+  capabilities: TUSHARE_CAPS,
+  bindingsFor: (p, maxConcurrent) => [
+    ...cnEquityEtfIndex(
+      TUSHARE_CAPS.filter(c => ![
+        Capability.INDEX_REALTIME, Capability.INDEX_KLINE, Capability.INDEX_CONST,
+        Capability.GLOBAL_INDEX, Capability.EXCHANGE_RATE, Capability.MACRO_INDICATOR,
+        ...TUSHARE_CN_FUND_CAPABILITIES,
+      ].includes(c)),
+      TUSHARE_CAPS.filter(c => [
+        Capability.INDEX_REALTIME, Capability.INDEX_KLINE,
+      ].includes(c)),
+      p,
+      [],
+      maxConcurrent,
+    ),
+    ...cnFundBindings(p, maxConcurrent),
+    // v3：市场级标准能力（原 tushareFund* 自定义方法）——基金深挖原始形状，绑 CN/FUND
+    ...TUSHARE_MARKET_CAPABILITIES.map(capability => ({
+      market: 'CN' as const,
+      assetClass: 'FUND' as const,
+      capability,
+      defaultPriority: p,
+      ...(maxConcurrent !== undefined ? { maxConcurrent } : {}),
+    })),
+  ],
+  settings: TUSHARE_SETTINGS,
+  supportsTest: true,
+}
+
+export const TUSHARE_MANIFEST = providerManifestEntry(
+  'tushare', 'Tushare Pro', '专业 A 股基本面与行情', 'CN', 105, TUSHARE_SETTINGS,
+)

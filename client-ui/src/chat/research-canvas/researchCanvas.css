@@ -1,0 +1,132 @@
+.research-canvas-root {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  box-sizing: border-box;
+}
+
+.research-canvas-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px 8px 0;
+}
+
+.research-canvas-root .react-grid-layout {
+  min-height: 100%;
+}
+
+.research-canvas-root .react-grid-item {
+  transition: transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1), width 160ms cubic-bezier(0.2, 0.8, 0.2, 1), height 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.research-canvas-root[data-interacting] .react-grid-item {
+  transition: none;
+}
+
+.research-canvas-root .react-grid-item.react-draggable-dragging,
+.research-canvas-root .react-grid-item.resizing {
+  transition: none;
+  will-change: transform;
+  z-index: 4;
+}
+
+.research-canvas-root .react-grid-item:not(.react-draggable-dragging):not(.resizing) {
+  will-change: auto;
+}
+
+.research-canvas-root .react-grid-item.react-draggable-dragging .research-canvas-widget {
+  border-color: var(--opptrix-border-strong);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--opptrix-text-primary) 12%, transparent);
+  opacity: 0.98;
+  transform: scale(1.004);
+}
+
+.research-canvas-root .react-grid-item.react-grid-placeholder {
+  background: var(--opptrix-accent-soft);
+  opacity: 0.28;
+  border-radius: 10px;
+  outline: 1px solid color-mix(in srgb, var(--opptrix-accent) 35%, transparent);
+  outline-offset: -1px;
+}
+
+.research-canvas-widget[data-selected='true'] {
+  border-color: var(--opptrix-accent);
+  outline: 1px solid color-mix(in srgb, var(--opptrix-accent) 55%, transparent);
+  outline-offset: 0;
+}
+
+.research-canvas-root .react-grid-item.react-draggable-dragging .research-canvas-widget[data-selected='true'],
+.research-canvas-root .react-grid-item.resizing .research-canvas-widget[data-selected='true'] {
+  outline: none;
+}
+
+.research-canvas-root[data-interacting] .research-canvas-widget-body {
+  pointer-events: none;
+}
+
+.research-canvas-root .react-resizable-handle {
+  opacity: 0;
+  width: 18px;
+  height: 18px;
+}
+
+.research-canvas-root .react-grid-item:hover > .react-resizable-handle,
+.research-canvas-root .react-grid-item.resizing > .react-resizable-handle {
+  opacity: 0.7;
+}
+
+.research-canvas-root .react-resizable-handle-se {
+  cursor: nwse-resize;
+}
+
+.research-canvas-root .react-resizable-handle::after {
+  width: 7px;
+  height: 7px;
+  border-right: 1px solid var(--opptrix-text-tertiary);
+  border-bottom: 1px solid var(--opptrix-text-tertiary);
+  right: 4px;
+  bottom: 4px;
+}
+
+.research-canvas-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 100%;
+  min-height: 120px;
+  padding: 24px;
+  color: var(--opptrix-text-secondary);
+  font-size: 13px;
+  text-align: center;
+}
+
+.research-canvas-empty strong { font-size: 16px; line-height: 1.5; }
+.research-canvas-empty p { max-width: 26em; margin: 4px 0 10px; line-height: 1.6; }
+
+.research-canvas-root[data-compact] .research-canvas-drag-handle { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .research-canvas-root .react-grid-item { transition: none; }
+  .research-canvas-widget[data-focus-pulse='true'] { animation: none; }
+}
+
+@keyframes research-canvas-focus-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--opptrix-accent) 45%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 8px color-mix(in srgb, var(--opptrix-accent) 0%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--opptrix-accent) 0%, transparent);
+  }
+}
+
+.research-canvas-widget[data-focus-pulse='true'] {
+  animation: research-canvas-focus-pulse 1.2s ease-out 2;
+}

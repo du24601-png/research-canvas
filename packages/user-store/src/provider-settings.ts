@@ -1,0 +1,418 @@
+import type Database from 'better-sqlite3'
+import {
+  REMOVED_SCRAPING_PROVIDER_IDS,
+  REMOVED_TEMP_PROVIDER_IDS,
+  type ProviderPriorityMode,
+  type ProviderSettingsPatch,
+  type ProviderSettingsRow,
+  type ProviderBindingOverrideRow,
+  type ProviderBindingOverridePatch,
+} from '@opptrix/shared'
+import {
+  assignSortOrders,
+  defaultManifestTierPriority,
+  RECOMMENDED_PROVIDER_DISPLAY_ORDER,
+  sortOrderToEffectivePriority,
+} from '@opptrix/shared'
+
+const MIGRATION_KEY = 'provider_settings_v1'
+const WEBFEED_REMOVED_KEY = 'webfeed_removed_v1'
+const SCRAPING_PROVIDERS_REMOVED_KEY = 'scraping_providers_removed_v2'
+/**
+ * 名单外内置源（baostock / zzshare / yfinance）已随数据层 v3 删除源码。
+ * 键名为历史迁移键，勿改——改名会导致已迁移实例重复 purge（违反幂等）。
+ */
+export const TEMP_PROVIDERS_REMOVED_KEY = 'temp_providers_baostock_zzshare_removed_v1'
+/** 一次性：无 Key 的 tickflow 默认开启公开免费档 */
+export const TICKFLOW_PUBLIC_FREE_DEFAULT_ENABLED_KEY = 'tickflow_public_free_default_enabled_v1'
+/** 一次性：按推荐栈回写内置源 sortOrder，纠正旧脏序 / 缺序 */
+export const PROVIDER_RECOMMENDED_DISPLAY_ORDER_KEY = 'provider_recommended_display_order_v1'
+
+export function initProviderSettingsSchema(db: Database.Database) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS provider_settings (
+      provider_id     TEXT PRIMARY KEY,
+      enabled         INTEGER NOT NULL DEFAULT 1,
+      priority_mode   TEXT NOT NULL DEFAULT 'manifest',
+      priority        INTEGER,
+      sort_order      INTEGER,
+      extra_json      TEXT NOT NULL DEFAULT '{}',
+      updated_at      TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_provider_settings_enabled
+      ON provider_settings(enabled);
+
+    CREATE TABLE IF NOT EXISTS provider_binding_overrides (
+      provider_id     TEXT NOT NULL,
+      market          TEXT NOT NULL,
+      asset_class     TEXT NOT NULL,
+      capability      TEXT NOT NULL,
+      enabled         INTEGER,
+      priority        INTEGER,
+      updated_at      TEXT NOT NULL,
+      PRIMARY KEY (provider_id, market, asset_class, capability),
+      FOREIGN KEY (provider_id) REFERENCES provider_settings(provider_id) ON DELETE CASCADE
+    );
+  `)
+}
+
+function rowToModel(row: {
+  provider_id: string
+  enabled: number
+  priority_mode: string
+  priority: number | null
+  sort_order: number | null
+  extra_json: string
+  updated_at: string
+}): ProviderSettingsRow {
+  let extra: Record<string, unknown> = {}
+  try {
+    extra = JSON.parse(row.extra_json) as Record<string, unknown>
+  } catch { /* empty */ }
+  delete extra.enabled
+  return {
+    providerId: row.provider_id,
+    enabled: row.enabled !== 0,
+    priorityMode: row.priority_mode === 'custom' ? 'custom' : 'manifest',
+    priority: row.priority,
+    sortOrder: row.sort_order,
+    extra,
+    updatedAt: row.updated_at,
+  }
+}
+
+export class ProviderSettingsRepository {
+  constructor(private db: Database.Database) {}
+
+  migrateFromLegacy(hasMigration: (key: string) => boolean, markMigration: (key: string) => void, getDocument: <T>(ns: string, id: string) => T | null) {
+    if (hasMigration(MIGRATION_KEY)) return
+    const legacy = getDocument<{ enabled?: boolean; token?: string }>('tushare_config', 'default')
+    if (legacy) {
+      const token = String(legacy.token ?? '').trim()
+      this.save('tushare', {
+        enabled: legacy.enabled ?? false,
+        priorityMode: 'manifest',
+        extra: token ? { token } : {},
+      })
+    }
+    markMigration(MIGRATION_KEY)
+  }
+
+  /** 清理已下线爬虫源在本地库中的配置、限流与测速残留 */
+  purgeRemovedScrapingProviders(
+    hasMigration: (key: string) => boolean,
+    markMigration: (key: string) => void,
+  ) {
+    if (hasMigration(SCRAPING_PROVIDERS_REMOVED_KEY)) return
+
+    for (const id of REMOVED_SCRAPING_PROVIDER_IDS) {
+      this.db.prepare('DELETE FROM provider_binding_overrides WHERE provider_id = ?').run(id)
+      this.db.prepare('DELETE FROM provider_settings WHERE provider_id = ?').run(id)
+      this.db.prepare('DELETE FROM free_provider_throttle WHERE provider_id = ?').run(id)
+      this.db.prepare('DELETE FROM free_provider_throttle_log WHERE provider_id = ?').run(id)
+      this.db.prepare('DELETE FROM provider_speed_ranking WHERE provider_id = ?').run(id)
+    }
+    this.db.prepare('DELETE FROM provider_ranking_cache').run()
+
+    markMigration(SCRAPING_PROVIDERS_REMOVED_KEY)
+    markMigration(WEBFEED_REMOVED_KEY)
+  }
+
+  /** 清理名单外内置源（baostock / zzshare / yfinance）在本地库中的配置、限流与测速残留 */
+  purgeRemovedTempProviders(
+    hasMigration: (key: string) => boolean,
+    markMigration: (key: string) => void,
+  ) {
+    if (hasMigration(TEMP_PROVIDERS_REMOVED_KEY)) return
+
+    for (const id of REMOVED_TEMP_PROVIDER_IDS) {
+      this.db.prepare('DELETE FROM provider_binding_overrides WHERE provider_id = ?').run(id)
+      this.db.prepare('DELETE FROM provider_settings WHERE provider_id = ?').run(id)
+      this.db.prepare('DELETE FROM free_provider_throttle WHERE provider_id = ?').run(id)
+      this.db.prepare('DELETE FROM free_provider_throttle_log WHERE provider_id = ?').run(id)
+      this.db.prepare('DELETE FROM provider_speed_ranking WHERE provider_id = ?').run(id)
+    }
+    this.db.prepare('DELETE FROM provider_ranking_cache').run()
+
+    markMigration(TEMP_PROVIDERS_REMOVED_KEY)
+  }
+
+
+  /**
+   * 一次性：把「未配 Key 故关闭」的 tickflow 翻成公开免费档默认开启。
+   * - 无行 → 写入 enabled=true（extra 空）
+   * - 有行、无 apiKey、enabled=false → enabled=true
+   * - 已有 apiKey → 保持用户原 enabled
+   */
+  migrateTickflowPublicFreeDefaultEnabled(
+    hasMigration: (key: string) => boolean,
+    markMigration: (key: string) => void,
+  ) {
+    if (hasMigration(TICKFLOW_PUBLIC_FREE_DEFAULT_ENABLED_KEY)) return
+
+    const existing = this.get('tickflow')
+    if (!existing) {
+      this.save('tickflow', {
+        enabled: true,
+        priorityMode: 'manifest',
+        extra: {},
+      })
+    } else {
+      const apiKey = String(existing.extra.apiKey ?? '').trim()
+      if (!apiKey && !existing.enabled) {
+        this.save('tickflow', { enabled: true })
+      }
+    }
+
+    markMigration(TICKFLOW_PUBLIC_FREE_DEFAULT_ENABLED_KEY)
+  }
+
+  /**
+   * 一次性：对仍存在的推荐栈内置 id 按固定顺序写入 sortOrder。
+   * 覆盖旧脏数据；无行的源跳过（展示侧用派生 key）。幂等。
+   * 用完整推荐表下标赋值，避免缺项时把后续源挤到错误位置。
+   */
+  migrateRecommendedProviderDisplayOrder(
+    hasMigration: (key: string) => boolean,
+    markMigration: (key: string) => void,
+  ) {
+    if (hasMigration(PROVIDER_RECOMMENDED_DISPLAY_ORDER_KEY)) return
+
+    for (const { providerId, sortOrder } of assignSortOrders([...RECOMMENDED_PROVIDER_DISPLAY_ORDER])) {
+      if (this.get(providerId) == null) continue
+      this.save(providerId, { sortOrder })
+    }
+
+    markMigration(PROVIDER_RECOMMENDED_DISPLAY_ORDER_KEY)
+  }
+
+  /** @deprecated 使用 purgeRemovedScrapingProviders */
+  migrateWebfeedRemoved(
+    hasMigration: (key: string) => boolean,
+    markMigration: (key: string) => void,
+  ) {
+    this.purgeRemovedScrapingProviders(hasMigration, markMigration)
+  }
+
+  /** @deprecated 使用 purgeRemovedScrapingProviders */
+  migrateWebfeedToSinafinance(
+    hasMigration: (key: string) => boolean,
+    markMigration: (key: string) => void,
+  ) {
+    this.purgeRemovedScrapingProviders(hasMigration, markMigration)
+  }
+
+  get(providerId: string): ProviderSettingsRow | null {
+    const row = this.db.prepare(
+      'SELECT * FROM provider_settings WHERE provider_id = ?',
+    ).get(providerId) as {
+      provider_id: string
+      enabled: number
+      priority_mode: string
+      priority: number | null
+      sort_order: number | null
+      extra_json: string
+      updated_at: string
+    } | undefined
+    return row ? rowToModel(row) : null
+  }
+
+  getOrDefaults(providerId: string): ProviderSettingsRow {
+    return this.get(providerId) ?? {
+      providerId,
+      enabled: true,
+      priorityMode: 'manifest',
+      priority: null,
+      sortOrder: null,
+      extra: {},
+      updatedAt: '',
+    }
+  }
+
+  listAll(): ProviderSettingsRow[] {
+    const rows = this.db.prepare(
+      'SELECT * FROM provider_settings ORDER BY sort_order ASC, provider_id ASC',
+    ).all() as Array<{
+      provider_id: string
+      enabled: number
+      priority_mode: string
+      priority: number | null
+      sort_order: number | null
+      extra_json: string
+      updated_at: string
+    }>
+    return rows.map(rowToModel)
+  }
+
+  save(providerId: string, patch: ProviderSettingsPatch): ProviderSettingsRow {
+    const current = this.getOrDefaults(providerId)
+    const extra = { ...current.extra }
+    if (patch.extra) {
+      for (const [key, value] of Object.entries(patch.extra)) {
+        if (value === '' && typeof current.extra[key] === 'string' && current.extra[key]) {
+          continue
+        }
+        if (value !== undefined) extra[key] = value
+      }
+    }
+    delete extra.enabled
+    const next: ProviderSettingsRow = {
+      providerId,
+      enabled: patch.enabled ?? current.enabled,
+      priorityMode: patch.priorityMode ?? current.priorityMode,
+      priority: patch.priority !== undefined ? patch.priority : current.priority,
+      sortOrder: patch.sortOrder !== undefined ? patch.sortOrder : current.sortOrder,
+      extra,
+      updatedAt: new Date().toISOString(),
+    }
+    this.db.prepare(`
+      INSERT INTO provider_settings(
+        provider_id, enabled, priority_mode, priority, sort_order, extra_json, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(provider_id) DO UPDATE SET
+        enabled = excluded.enabled,
+        priority_mode = excluded.priority_mode,
+        priority = excluded.priority,
+        sort_order = excluded.sort_order,
+        extra_json = excluded.extra_json,
+        updated_at = excluded.updated_at
+    `).run(
+      next.providerId,
+      next.enabled ? 1 : 0,
+      next.priorityMode,
+      next.priority,
+      next.sortOrder,
+      JSON.stringify(next.extra),
+      next.updatedAt,
+    )
+    return next
+  }
+
+  listBindingOverrides(providerId: string): ProviderBindingOverrideRow[] {
+    const rows = this.db.prepare(`
+      SELECT provider_id, market, asset_class, capability, enabled, priority, updated_at
+      FROM provider_binding_overrides
+      WHERE provider_id = ?
+      ORDER BY market, asset_class, capability
+    `).all(providerId) as Array<{
+      provider_id: string
+      market: string
+      asset_class: string
+      capability: string
+      enabled: number | null
+      priority: number | null
+      updated_at: string
+    }>
+    return rows.map(r => ({
+      providerId: r.provider_id,
+      market: r.market as ProviderBindingOverrideRow['market'],
+      assetClass: r.asset_class as ProviderBindingOverrideRow['assetClass'],
+      capability: r.capability,
+      enabled: r.enabled == null ? null : r.enabled !== 0,
+      priority: r.priority,
+      updatedAt: r.updated_at,
+    }))
+  }
+
+  getBindingOverride(
+    providerId: string,
+    market: string,
+    assetClass: string,
+    capability: string,
+  ): ProviderBindingOverrideRow | null {
+    const row = this.db.prepare(`
+      SELECT provider_id, market, asset_class, capability, enabled, priority, updated_at
+      FROM provider_binding_overrides
+      WHERE provider_id = ? AND market = ? AND asset_class = ? AND capability = ?
+    `).get(providerId, market, assetClass, capability) as {
+      provider_id: string
+      market: string
+      asset_class: string
+      capability: string
+      enabled: number | null
+      priority: number | null
+      updated_at: string
+    } | undefined
+    if (!row) return null
+    return {
+      providerId: row.provider_id,
+      market: row.market as ProviderBindingOverrideRow['market'],
+      assetClass: row.asset_class as ProviderBindingOverrideRow['assetClass'],
+      capability: row.capability,
+      enabled: row.enabled == null ? null : row.enabled !== 0,
+      priority: row.priority,
+      updatedAt: row.updated_at,
+    }
+  }
+
+  saveBindingOverride(
+    providerId: string,
+    market: string,
+    assetClass: string,
+    capability: string,
+    patch: ProviderBindingOverridePatch,
+  ): ProviderBindingOverrideRow {
+    const current = this.getBindingOverride(providerId, market, assetClass, capability)
+    const next = {
+      providerId,
+      market: market as ProviderBindingOverrideRow['market'],
+      assetClass: assetClass as ProviderBindingOverrideRow['assetClass'],
+      capability,
+      enabled: patch.enabled !== undefined ? patch.enabled : (current?.enabled ?? null),
+      priority: patch.priority !== undefined ? patch.priority : (current?.priority ?? null),
+      updatedAt: new Date().toISOString(),
+    }
+    this.db.prepare(`
+      INSERT INTO provider_binding_overrides(
+        provider_id, market, asset_class, capability, enabled, priority, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(provider_id, market, asset_class, capability) DO UPDATE SET
+        enabled = excluded.enabled,
+        priority = excluded.priority,
+        updated_at = excluded.updated_at
+    `).run(
+      providerId,
+      market,
+      assetClass,
+      capability,
+      next.enabled == null ? null : (next.enabled ? 1 : 0),
+      next.priority,
+      next.updatedAt,
+    )
+    return next
+  }
+}
+
+export function computeEffectivePriority(
+  manifestDefault: number,
+  runtime: ProviderSettingsRow,
+  secretsOk: boolean,
+  opts?: { requiresApiKey?: boolean; providerId?: string },
+): number {
+  if (!runtime.enabled) return 0
+  if (!secretsOk) return 0
+  if (runtime.sortOrder != null) {
+    return sortOrderToEffectivePriority(runtime.sortOrder)
+  }
+  if (runtime.priorityMode === 'custom' && runtime.priority != null) {
+    return runtime.priority
+  }
+  if (opts?.requiresApiKey !== undefined) {
+    return defaultManifestTierPriority(
+      opts.providerId ?? runtime.providerId,
+      opts.requiresApiKey,
+      manifestDefault,
+    )
+  }
+  return manifestDefault
+}
+
+export function tushareSecretsOk(extra: Record<string, unknown>, envToken = ''): boolean {
+  return !!String(extra.token ?? envToken).trim()
+}
+
+/** 公开免费档无需 secret；有无 apiKey 均可启用 */
+export function tickflowSecretsOk(_extra: Record<string, unknown>, _envKey = ''): boolean {
+  return true
+}

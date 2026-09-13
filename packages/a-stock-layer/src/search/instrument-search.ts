@@ -1,0 +1,464 @@
+/**
+ * 跨市场标的搜索 — A 股名称/代码优先 Tushare stock_basic（含简称）；
+ * 跨市场与补缺走自配检索服务 `GET /api/v1/instruments`。
+ */
+
+import type { AssetClass, InstrumentRef, Market, StockListItem } from '@opptrix/shared'
+import {
+  canonicalCnSymbol,
+  canonicalSymbolForMarket,
+  inferCnAssetClassFromSymbol,
+  instrumentRefKey,
+  normalizeInstrumentRef,
+  resolveInstrumentSearchDisplayCode,
+} from '@opptrix/shared'
+import type { MarketDataEngine } from '../engine.js'
+import { opptrixInstrumentSearch } from '../providers/stockindex/api/client.js'
+import { OpptrixQuantApiError, StockIndexHttpClient } from '../providers/stockindex/api/http-client.js'
+import {
+  opptrixInstrumentToStockIndexItem,
+  stockIndexItemToInstrumentRef,
+} from '../providers/stockindex/normalize.js'
+import { parseYahooSearchQuotes } from '../utils/yahoo-search.js'
+import { isTushareEnabled } from '../providers/tushare/config.js'
+import { searchTushareCnNames } from '../providers/tushare/name-directory.js'
+
+export interface InstrumentSearchHit {
+  code: string
+  name: string | null
+  market: Market
+  assetClass: AssetClass
+  exchange: string | null
+  instrument: InstrumentRef
+  refLabel: string
+  source: 'stock_index' | 'online'
+}
+
+const SEARCH_CACHE_MS = 5 * 60 * 1000
+/** bump：OpptrixQuant 不传 market 即跨 CN/HK/US 单次检索 */
+const SEARCH_CACHE_VERSION = 10
+const searchCache = new Map<string, { expires: number; items: InstrumentSearchHit[] }>()
+
+export type InstrumentSearchErrorReason = 'no_api_key' | 'quota_exceeded' | 'auth' | 'upstream'
+
+/** 搜索不可用（缺密钥 / 配额 / 鉴权）— 须向用户展示，不可静默为空 */
+export class InstrumentSearchError extends Error {
+  readonly reason: InstrumentSearchErrorReason
+
+  constructor(message: string, reason: InstrumentSearchErrorReason) {
+    super(message)
+    this.name = 'InstrumentSearchError'
+    this.reason = reason
+  }
+}
+
+export function toInstrumentSearchError(err: unknown): InstrumentSearchError {
+  if (err instanceof InstrumentSearchError) return err
+  if (err instanceof OpptrixQuantApiError) {
+    if (err.status === 429) {
+      return new InstrumentSearchError('今日搜索次数已达上限，请明天再试', 'quota_exceeded')
+    }
+    if (err.status === 401 || err.status === 403) {
+      return new InstrumentSearchError('数据密钥无效或未授权，请在设置中重新填写', 'auth')
+    }
+    const upstream = err.message.replace(/^(Opptrix量化|该数据源)[^：]*：?/, '').trim()
+    return new InstrumentSearchError(
+      upstream || '暂时无法搜索标的，请稍后再试',
+      'upstream',
+    )
+  }
+  const msg = err instanceof Error ? err.message.trim() : ''
+  return new InstrumentSearchError(msg || '暂时无法搜索标的，请稍后再试', 'upstream')
+}
+
+/** 常见中文别名 → 美/港标的（本地名录未灌满时兜底） */
+export interface SearchAliasTarget {
+  market: Market
+  symbol: string
+  displayName: string
+}
+
+const SEARCH_ALIAS_TABLE: ReadonlyArray<{ aliases: readonly string[]; targets: readonly SearchAliasTarget[] }> = [
+  {
+    aliases: ['腾讯', '腾讯控股'],
+    targets: [{ market: 'HK', symbol: '00700', displayName: '腾讯控股' }],
+  },
+  {
+    aliases: ['阿里', '阿里巴巴'],
+    targets: [
+      { market: 'US', symbol: 'BABA', displayName: '阿里巴巴' },
+      { market: 'HK', symbol: '09988', displayName: '阿里巴巴-SW' },
+    ],
+  },
+  {
+    aliases: ['苹果'],
+    targets: [{ market: 'US', symbol: 'AAPL', displayName: 'Apple' }],
+  },
+]
+
+function makeHit(
+  market: Market,
+  symbol: string,
+  name: string | null,
+  assetClass: AssetClass,
+  exchange?: string | null,
+): InstrumentSearchHit {
+  const instrument = normalizeInstrumentRef({
+    market,
+    assetClass,
+    symbol,
+    exchange: exchange ?? (market === 'HK' ? 'HK' : undefined),
+  })
+  const displayCode = resolveInstrumentSearchDisplayCode(instrument)
+  return {
+    code: displayCode,
+    name: name ?? symbol,
+    market: instrument.market,
+    assetClass: instrument.assetClass,
+    exchange: instrument.exchange ?? exchange ?? null,
+    instrument,
+    refLabel: displayCode,
+    source: 'stock_index',
+  }
+}
+
+function hitFromTushareCnName(row: {
+  symbol: string
+  exchange: 'SH' | 'SZ' | 'BJ'
+  name: string
+}): InstrumentSearchHit {
+  return makeHit('CN', row.symbol, row.name, inferCnAssetClassFromSymbol(row.symbol, row.exchange), row.exchange)
+}
+
+function pushUniqueHit(hits: InstrumentSearchHit[], seen: Set<string>, hit: InstrumentSearchHit, limit: number): void {
+  if (hits.length >= limit) return
+  const key = instrumentRefKey(hit.instrument)
+  if (seen.has(key)) return
+  seen.add(key)
+  hits.push(hit)
+}
+
+function stripLeadingZeros(s: string): string {
+  const t = s.replace(/^0+/, '')
+  return t || '0'
+}
+
+function symbolMatchForms(market: Market, symbol: string): { canon: string; stripped: string } {
+  const canon = canonicalSymbolForMarket(market, symbol).toUpperCase()
+  return { canon, stripped: stripLeadingZeros(canon) }
+}
+
+function keywordDigitForms(kw: string): { raw: string; stripped: string; isPureDigits: boolean } {
+  const raw = kw.trim().toUpperCase()
+  const digitsOnly = /^\d+$/.test(raw)
+  return {
+    raw,
+    stripped: digitsOnly ? stripLeadingZeros(raw) : raw,
+    isPureDigits: digitsOnly,
+  }
+}
+
+/**
+ * 相关性分：精确 symbol（含港股 5 位 / 去前导 0）> 前缀 > 名称包含；
+ * 纯数字码时压低无关 FUND（如 000700 货币基金压在 00700 腾讯之后）。
+ */
+export function scoreInstrumentSearchHit(hit: InstrumentSearchHit, keyword: string): number {
+  const kw = keyword.trim()
+  if (!kw) return 0
+  const forms = keywordDigitForms(kw)
+  const { canon, stripped } = symbolMatchForms(hit.market, hit.instrument.symbol)
+  const name = (hit.name ?? '').toUpperCase()
+  const kwUpper = forms.raw
+
+  let score = 0
+  if (canon === kwUpper || (forms.isPureDigits && stripped === forms.stripped)) {
+    score = 1000
+  } else if (
+    canon.startsWith(kwUpper)
+    || (forms.isPureDigits && stripped.startsWith(forms.stripped))
+  ) {
+    score = 800
+  } else if (name.includes(kwUpper) || (hit.name ?? '').includes(kw)) {
+    score = 400
+  } else {
+    score = 100
+  }
+
+  if (score >= 1000 && hit.assetClass === 'EQUITY') score += 20
+  if (score >= 1000 && hit.assetClass === 'ETF') score += 10
+
+  if (forms.isPureDigits && hit.assetClass === 'FUND' && score < 1000) {
+    score -= 500
+  }
+
+  const aliasBoost = resolveSearchAliasTargets(kw).some(t => {
+    if (t.market !== hit.market) return false
+    return canonicalSymbolForMarket(t.market, t.symbol)
+      === canonicalSymbolForMarket(hit.market, hit.instrument.symbol)
+  })
+  if (aliasBoost) score = Math.max(score, 950)
+
+  return score
+}
+
+export function rankInstrumentSearchHits(
+  hits: InstrumentSearchHit[],
+  keyword: string,
+): InstrumentSearchHit[] {
+  return hits
+    .map((hit, index) => ({ hit, index, score: scoreInstrumentSearchHit(hit, keyword) }))
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .map(x => x.hit)
+}
+
+export function resolveSearchAliasTargets(keyword: string): SearchAliasTarget[] {
+  const kw = keyword.trim()
+  if (!kw) return []
+  for (const row of SEARCH_ALIAS_TABLE) {
+    if (row.aliases.some(a => a === kw || kw.includes(a))) {
+      return [...row.targets]
+    }
+  }
+  return []
+}
+
+/** 关键词是否像交易代码 */
+export function looksLikeInstrumentCode(keyword: string): boolean {
+  const kw = keyword.trim()
+  if (!kw || kw.length > 16) return false
+  // 美股 ticker
+  if (/^[A-Za-z][A-Za-z0-9.-]{0,11}$/.test(kw) && /[A-Za-z]/.test(kw)) return true
+  // A 股 6 位 / 港股短码（1–5 位，精确补强 pad 五位）
+  if (/^\d{1,6}$/.test(kw)) return true
+  // 带交易所后缀
+  if (/^[A-Za-z0-9]+\.(SH|SZ|BJ|US|HK)$/i.test(kw)) return true
+  return false
+}
+
+
+function equityListRef(market: Market): InstrumentRef {
+  const symbol = market === 'CN' ? '000001' : market === 'HK' ? '00700' : 'AAPL'
+  return normalizeInstrumentRef({ market, assetClass: 'EQUITY', symbol })
+}
+
+function cacheKey(keyword: string, limit: number, markets?: Market[]): string {
+  return `v${SEARCH_CACHE_VERSION}|${keyword.toLowerCase()}|${limit}|${(markets ?? []).join(',')}`
+}
+
+function hitFromStockIndexItem(item: Parameters<typeof stockIndexItemToInstrumentRef>[0]): InstrumentSearchHit | null {
+  const instrument = stockIndexItemToInstrumentRef(item)
+  if (!instrument) return null
+  const displayCode = resolveInstrumentSearchDisplayCode(instrument, item.instrumentId)
+  return {
+    code: displayCode,
+    name: item.nameCn ?? item.code,
+    market: instrument.market,
+    assetClass: instrument.assetClass,
+    exchange: instrument.exchange ?? item.exchange ?? null,
+    instrument,
+    refLabel: displayCode,
+    source: 'stock_index',
+  }
+}
+
+function isCnFundListRow(row: StockListItem): boolean {
+  const m = String(row.market ?? '').toUpperCase()
+  const ind = String(row.industry ?? '')
+  return row.industry === 'FUND' || m === 'PF' || m === 'OF' || ind === 'FUND' || /基金/.test(ind)
+}
+
+function hitFromStockListItem(row: StockListItem, market: Market): InstrumentSearchHit | null {
+  const rawCode = String(row.code ?? '').trim()
+  if (!rawCode) return null
+  const code = market === 'CN' ? canonicalCnSymbol(rawCode) : rawCode
+  if (market === 'CN' && isCnFundListRow(row)) {
+    const instrument = normalizeInstrumentRef({
+      market: 'CN',
+      assetClass: 'FUND',
+      symbol: code,
+      exchange: 'PF',
+    })
+    const displayCode = resolveInstrumentSearchDisplayCode(instrument)
+    return {
+      code: displayCode,
+      name: row.name ?? code,
+      market: 'CN',
+      assetClass: 'FUND',
+      exchange: 'PF',
+      instrument,
+      refLabel: displayCode,
+      source: 'stock_index',
+    }
+  }
+  const exchange = market === 'HK'
+    ? 'HK'
+    : row.market === 'SH' || row.market === 'SZ' || row.market === 'BJ'
+      ? row.market
+      : undefined
+  const instrument = normalizeInstrumentRef({
+    market,
+    assetClass: market === 'CN' ? inferCnAssetClassFromSymbol(code, exchange) : 'EQUITY',
+    symbol: code,
+    exchange,
+  })
+  const displayCode = resolveInstrumentSearchDisplayCode(instrument)
+  return {
+    code: displayCode,
+    name: row.name ?? code,
+    market,
+    assetClass: instrument.assetClass,
+    exchange: instrument.exchange ?? exchange ?? null,
+    instrument,
+    refLabel: displayCode,
+    source: 'stock_index',
+  }
+}
+
+const DEFAULT_ONLINE_SEARCH_MARKETS: Market[] = ['CN', 'US', 'HK']
+
+function normalizeOnlineSearchMarkets(markets?: Market[]): Market[] {
+  if (!markets?.length) return DEFAULT_ONLINE_SEARCH_MARKETS
+  return markets.filter(m => m === 'CN' || m === 'US' || m === 'HK')
+}
+
+async function appendTushareCnHits(
+  keyword: string,
+  limit: number,
+  hits: InstrumentSearchHit[],
+  seen: Set<string>,
+): Promise<void> {
+  if (!isTushareEnabled()) return
+  const cnRows = await searchTushareCnNames(keyword, limit)
+  for (const row of cnRows) {
+    pushUniqueHit(hits, seen, hitFromTushareCnName(row), limit)
+  }
+}
+
+async function appendQuantHits(
+  keyword: string,
+  limit: number,
+  markets: Market[],
+  hits: InstrumentSearchHit[],
+  seen: Set<string>,
+): Promise<void> {
+  const allowed = new Set(markets)
+  const apiMarket = markets.length === 1 ? markets[0] : undefined
+  const quantHits = await searchStockIndexOnline(keyword, limit, apiMarket)
+  for (const hit of quantHits) {
+    if (!allowed.has(hit.market)) continue
+    pushUniqueHit(hits, seen, hit, limit)
+  }
+}
+
+async function searchStockIndexOnline(
+  keyword: string,
+  limit: number,
+  market?: Market,
+): Promise<InstrumentSearchHit[]> {
+  if (!StockIndexHttpClient.fromConfig()) {
+    throw new InstrumentSearchError(
+      '请先在设置中填写检索服务地址和密钥，才能搜索非 A 股标的',
+      'no_api_key',
+    )
+  }
+  let raw: Awaited<ReturnType<typeof opptrixInstrumentSearch>>
+  try {
+    raw = await opptrixInstrumentSearch(keyword, {
+      market,
+      limit: Math.min(limit, 50),
+    })
+  } catch (err) {
+    throw toInstrumentSearchError(err)
+  }
+  if (!raw) return []
+  return raw
+    .map(opptrixInstrumentToStockIndexItem)
+    .map(hitFromStockIndexItem)
+    .filter((h): h is InstrumentSearchHit => h != null)
+    .slice(0, limit)
+}
+
+/**
+ * 关键词搜索 — A 股走 Tushare 名录（可无检索密钥）；其余市场仍走 OpptrixQuant。
+ */
+export async function searchInstrumentsOnline(
+  _de: MarketDataEngine,
+  keyword: string,
+  limit = 30,
+  markets?: Market[],
+): Promise<InstrumentSearchHit[]> {
+  const kw = keyword.trim()
+  if (kw.length < 1) return []
+
+  const ck = cacheKey(kw, limit, markets)
+  const cached = searchCache.get(ck)
+  if (cached && cached.expires > Date.now()) return cached.items.slice(0, limit)
+
+  const targetMarkets = normalizeOnlineSearchMarkets(markets)
+  if (!targetMarkets.length) return []
+
+  const hits: InstrumentSearchHit[] = []
+  const seen = new Set<string>()
+  const wantCn = targetMarkets.includes('CN')
+
+  if (wantCn) await appendTushareCnHits(kw, limit, hits, seen)
+
+  const needQuant = hits.length < limit && (
+    !wantCn
+    || targetMarkets.some(market => market !== 'CN')
+    || !hits.length
+  )
+  if (needQuant && StockIndexHttpClient.fromConfig()) {
+    try {
+      await appendQuantHits(kw, limit, targetMarkets, hits, seen)
+    } catch (err) {
+      if (!hits.length) throw err
+    }
+  } else if (!hits.length) {
+    throw new InstrumentSearchError(
+      '请先在设置中填写检索服务地址和密钥，才能搜索非 A 股标的',
+      'no_api_key',
+    )
+  }
+
+  const result = hits.slice(0, limit)
+  searchCache.set(ck, { expires: Date.now() + SEARCH_CACHE_MS, items: result })
+  return result
+}
+
+/** Discover 初选 — 标准 stock_list（StockIndex handler，经 Engine 路由） */
+export async function listInstrumentsOnline(
+  de: MarketDataEngine,
+  market: 'CN' | 'US' | 'HK',
+  opts: {
+    keyword?: string
+    board?: string
+    page?: number
+    pageSize?: number
+    topN?: number
+  } = {},
+): Promise<{ total_universe: number; passed: number; items: InstrumentSearchHit[] }> {
+  const pageSize = Math.min(Math.max(opts.pageSize ?? opts.topN ?? 50, 1), 100)
+  const r = await de.queryInstrumentData(equityListRef(market), 'stock_list', {
+    keyword: opts.keyword?.trim(),
+    page: opts.page ?? 1,
+    pageSize,
+    boardKey: opts.board,
+  })
+  if (!r.success) {
+    const err = 'error' in r && r.error ? String(r.error) : '标的列表获取失败'
+    throw new Error(err)
+  }
+  const rows = ('data' in r && Array.isArray(r.data) ? r.data : []) as StockListItem[]
+  const items = rows
+    .map(row => hitFromStockListItem(row, market))
+    .filter((h): h is InstrumentSearchHit => h != null)
+  return {
+    total_universe: items.length,
+    passed: items.length,
+    items,
+  }
+}
+
+/** @deprecated Yahoo 解析保留供测试；搜索不再使用 */
+export { parseYahooSearchQuotes }

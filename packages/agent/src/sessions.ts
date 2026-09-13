@@ -1,0 +1,867 @@
+import { randomUUID } from 'node:crypto'
+import { getUserDataStore } from '@opptrix/user-store'
+import type { ChatMessage } from './llm/provider.js'
+import { chatMessageContentToText } from './content-parts.js'
+import type { ChatToolStep } from './chat-progress.js'
+import type { TokenUsage } from './llm/token-usage.js'
+import { SessionArchiveFolderStore } from './archive-folders.js'
+import {
+  contextProjectionToRef,
+  hydrateContextProjection,
+  isContextProjectionRef,
+  writeContextProjectionToDisk,
+} from './context/session-projection-disk.js'
+import { applySessionPersistSoftCap } from './context/session-persist-soft-cap.js'
+
+import type { ChatAttachmentMeta } from './media-types.js'
+import type { ExpertIcon } from '@opptrix/shared'
+import {
+  joinReasoningSegments,
+  normalizeReasoningSegments,
+  type ReasoningSegment,
+} from './reasoning-timeline.js'
+import {
+  sanitizeCheckpointTurnsForApply,
+  type CheckpointApplyInput,
+} from './turn-checkpoint.js'
+
+export type { ReasoningSegment }
+
+export type { ChatToolStep, ChatAttachmentMeta }
+
+const NAMESPACE = 'session'
+
+/** OpenAI 兼容会话级采样参数（未设字段走 LLM 默认：温度 1、max_tokens 4096） */
+export type ReasoningEffort = 'low' | 'medium' | 'high'
+
+export interface SessionLlmParams {
+  temperature?: number
+  maxTokens?: number
+  /** 未设则请求体不带 reasoning_effort */
+  reasoningEffort?: ReasoningEffort
+}
+
+export const DEFAULT_SESSION_TEMPERATURE = 1
+/** 与 output-budget ORDINARY_OUTPUT_TOKENS（普模默认 32k）对齐 */
+export const DEFAULT_SESSION_MAX_TOKENS = 32_768
+
+export function normalizeSessionLlmParams(raw: unknown): SessionLlmParams | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined
+  const o = raw as Record<string, unknown>
+  const out: SessionLlmParams = {}
+  if (typeof o.temperature === 'number' && Number.isFinite(o.temperature)) {
+    out.temperature = Math.min(2, Math.max(0, o.temperature))
+  }
+  if (typeof o.maxTokens === 'number' && Number.isFinite(o.maxTokens) && o.maxTokens >= 1) {
+    out.maxTokens = Math.min(1_000_000, Math.floor(o.maxTokens))
+  }
+  if (o.reasoningEffort === 'low' || o.reasoningEffort === 'medium' || o.reasoningEffort === 'high') {
+    out.reasoningEffort = o.reasoningEffort
+  }
+  return out.temperature !== undefined || out.maxTokens !== undefined || out.reasoningEffort !== undefined
+    ? out
+    : undefined
+}
+
+/** 合并补丁；`reasoningEffort: null` 清除该字段 */
+export function mergeSessionLlmParams(
+  current: SessionLlmParams | undefined,
+  patch: {
+    temperature?: number
+    maxTokens?: number
+    reasoningEffort?: ReasoningEffort | null
+  },
+): SessionLlmParams | undefined {
+  const next: SessionLlmParams = { ...(current ?? {}) }
+  if (patch.temperature !== undefined) next.temperature = patch.temperature
+  if (patch.maxTokens !== undefined) next.maxTokens = patch.maxTokens
+  if (patch.reasoningEffort === null) delete next.reasoningEffort
+  else if (patch.reasoningEffort !== undefined) next.reasoningEffort = patch.reasoningEffort
+  return normalizeSessionLlmParams(next)
+}
+
+export type SessionKind = 'user' | 'subagent'
+
+export interface SessionMeta {
+  id: string
+  title: string
+  createdAt: string
+  updatedAt: string
+  /** providerId:modelName */
+  model?: string
+  /** 会话级 LLM 参数（旧会话可能缺失） */
+  llmParams?: SessionLlmParams
+  archivedAt?: string | null
+  archiveFolderId?: string | null
+  expertId?: string | null
+  expertIcon?: ExpertIcon | null
+  /** 会话累计用量（列表 meta 可含） */
+  usageTotals?: TokenUsage
+  /**
+   * 会话种类：缺省 / user = 用户侧栏会话；subagent = 父委派子会话（不进侧栏）。
+   */
+  kind?: SessionKind
+  /** 子会话的直接父会话 id */
+  parentSessionId?: string | null
+  /** 授权/工作区根会话 id（子继承；用户会话通常等于自身） */
+  rootSessionId?: string | null
+  /** 用户在输入框加号中打开「报告与脑图」后为 true；默认关闭 */
+  artifactsEnabled?: boolean
+}
+
+export interface CreateSessionOptions {
+  title?: string
+  expertId?: string | null
+  expertIcon?: ExpertIcon | null
+  /** 会话级技能专长快照（已消毒） */
+  rolePersona?: string | null
+  /** providerId:modelName；省略时可由 AgentEngine 填入当前 defaultModel */
+  model?: string
+  kind?: SessionKind
+  parentSessionId?: string | null
+  rootSessionId?: string | null
+}
+
+/** UI 展示来源；缺省 = 用户/助手正常气泡。模型侧仍按 role 进 LLM。 */
+export type TurnOrigin = 'wake_resume'
+
+export interface DisplayMessage {
+  role: 'user' | 'assistant'
+  content: string
+  toolsUsed?: string[]
+  toolSteps?: ChatToolStep[]
+  at: string
+  usage?: TokenUsage
+  usageEstimated?: boolean
+  attachments?: ChatAttachmentMeta[]
+  /** 整轮思考时间线（工具轮+终轮 reasoning 拼接；旧会话可能仅终轮） */
+  reasoningContent?: string
+  /** 结构化思考分段（优先）；缺省时由 reasoningContent 按 SEP 降级 */
+  reasoningSegments?: ReasoningSegment[]
+  /** 系统续跑/回调注入；UI 降展示为状态条，旧 turns 可能缺失 */
+  origin?: TurnOrigin
+}
+
+/** 是否应按「续跑状态条」而非用户气泡展示（含旧数据「系统续跑」启发） */
+export function isWakeResumeDisplayMessage(msg: {
+  origin?: string
+  role?: string
+  content?: string
+}): boolean {
+  if (msg.origin === 'wake_resume') return true
+  if (msg.role === 'user' && typeof msg.content === 'string' && msg.content.startsWith('系统续跑')) {
+    return true
+  }
+  return false
+}
+
+export interface SessionForkContextRef {
+  kind: 'fork'
+  sourceSessionId: string
+  sourceSessionTitle: string
+  anchorIndex: number
+  anchorAt: string
+  preview: string
+  turns: DisplayMessage[]
+}
+
+export interface SessionSelectionContextRef {
+  kind: 'selection'
+  selectedText: string
+  sourceMessageIndex: number
+  sourceRole: 'user' | 'assistant'
+  anchorAt: string
+  preview: string
+  turns: DisplayMessage[]
+}
+
+export interface SessionArticleContextRef {
+  kind: 'article'
+  articleId: string
+  title: string
+  sourceTitle: string
+  link: string
+  pubDate: string
+  bodyText: string
+  anchorAt: string
+  preview: string
+}
+
+export type SessionContextRef = SessionForkContextRef | SessionSelectionContextRef | SessionArticleContextRef
+
+export interface SessionRecord extends SessionMeta {
+  messages: ChatMessage[]
+  /** UI-visible turns (user/assistant only) */
+  turns: {
+    role: 'user' | 'assistant'
+    content: string
+    toolsUsed?: string[]
+    toolSteps?: ChatToolStep[]
+    at: string
+    usage?: TokenUsage
+    usageEstimated?: boolean
+    attachments?: ChatAttachmentMeta[]
+    /** 整轮思考时间线（工具轮+终轮拼接；旧会话可能仅终轮） */
+    reasoningContent?: string
+    /** 结构化思考分段；与 reasoningContent 双写（派生字符串兼容旧读） */
+    reasoningSegments?: ReasoningSegment[]
+    /** 系统续跑/回调注入；旧 turns 可能缺失 */
+    origin?: TurnOrigin
+  }[]
+  contextRef?: SessionContextRef | null
+  /**
+   * 会话级 Layer1 技能专长快照。创建时从专家/默认研究员复制；之后与目录解耦。
+   * 列表 meta 不返回此字段全文。
+   */
+  rolePersona?: string | null
+  /**
+   * 结构化会话工作记忆（压缩产物）。列表 meta 不返回；UI transcript 仍用 turns。
+   */
+  sessionMemory?: import('./context/session-memory.js').SessionMemory | null
+  /**
+   * Model-visible 上下文投影 sidecar（soft/micro/structured）。
+   * 引擎内存为完整 ContextProjection；SQLite 仅存 ContextProjectionRef 指针；列表 meta / API 不下发全文。
+   */
+  contextProjection?: import('./context/projection.js').ContextProjection | null
+}
+
+function previewText(content: string, max = 72): string {
+  const oneLine = content.replace(/\s+/g, ' ').trim()
+  if (!oneLine) return '空消息'
+  return oneLine.length <= max ? oneLine : `${oneLine.slice(0, max)}…`
+}
+
+let sessionPersistHook: ((record: SessionRecord) => void) | null = null
+let sessionDeleteHook: ((sessionId: string) => void) | null = null
+
+export function setSessionPersistHooks(hooks: {
+  onPersist?: (record: SessionRecord) => void
+  onDelete?: (sessionId: string) => void
+}) {
+  sessionPersistHook = hooks.onPersist ?? null
+  sessionDeleteHook = hooks.onDelete ?? null
+}
+
+function writeRecord(record: SessionRecord) {
+  record.updatedAt = new Date().toISOString()
+  // Soft disk cap: only extreme sessions; keeps recent UI turns + sessionMemory.
+  applySessionPersistSoftCap(record)
+  const full = record.contextProjection ?? null
+  // 盘上全文；SQLite 仅指针（引擎内存仍保留完整投影）
+  writeContextProjectionToDisk(record.id, full)
+  const forStore: Omit<SessionRecord, 'contextProjection'> & {
+    contextProjection: ReturnType<typeof contextProjectionToRef> | null
+  } = {
+    ...record,
+    contextProjection: full ? contextProjectionToRef(full) : null,
+  }
+  getUserDataStore().setDocument(NAMESPACE, record.id, forStore)
+  sessionPersistHook?.(record)
+}
+
+/** 旧全文 / 指针 → 引擎内存完整投影；必要时把 SQLite 改成指针（幂等） */
+function rewriteSqliteProjectionPointer(
+  sessionId: string,
+  full: import('./context/projection.js').ContextProjection,
+): void {
+  try {
+    const raw = getUserDataStore().getDocument<SessionRecord>(NAMESPACE, sessionId)
+    if (!raw) return
+    if (isContextProjectionRef(raw.contextProjection)) return
+    const next: Omit<SessionRecord, 'contextProjection'> & {
+      contextProjection: ReturnType<typeof contextProjectionToRef>
+    } = {
+      ...raw,
+      contextProjection: contextProjectionToRef(full),
+    }
+    getUserDataStore().setDocument(NAMESPACE, sessionId, next)
+  } catch {
+    /* 迁移失败不影响主路径 */
+  }
+}
+
+function normalizeRecord(raw: SessionRecord): SessionRecord {
+  const llmParams = normalizeSessionLlmParams(raw.llmParams)
+  const { projection, needsPointerRewrite } = hydrateContextProjection(
+    raw.id,
+    raw.contextProjection,
+  )
+  if (needsPointerRewrite && projection) {
+    rewriteSqliteProjectionPointer(raw.id, projection)
+  }
+  const record: SessionRecord = {
+    ...raw,
+    turns: raw.turns ?? [],
+    contextRef: raw.contextRef ?? null,
+    expertId: raw.expertId ?? null,
+    expertIcon: raw.expertIcon ?? null,
+    rolePersona: raw.rolePersona ?? null,
+    sessionMemory: raw.sessionMemory ?? null,
+    contextProjection: projection,
+    llmParams,
+    kind: raw.kind === 'subagent' ? 'subagent' : (raw.kind ?? 'user'),
+    parentSessionId: raw.parentSessionId ?? null,
+    rootSessionId: raw.rootSessionId
+      ?? (raw.kind === 'subagent' && raw.parentSessionId ? raw.parentSessionId : raw.id),
+    artifactsEnabled: raw.artifactsEnabled === true,
+  }
+  return backfillTurnReasoning(migrateTurns(record))
+}
+
+/** 终轮助手消息（无 tool_calls）的思考链，按 display 顺序 */
+function finalAssistantReasonings(messages: ChatMessage[]): Array<string | undefined> {
+  const out: Array<string | undefined> = []
+  for (const m of messages) {
+    if (m.role !== 'assistant') continue
+    if (m.tool_calls?.length) continue
+    const r = typeof m.reasoningContent === 'string' ? m.reasoningContent.trim() : ''
+    out.push(r || undefined)
+  }
+  return out
+}
+
+function migrateTurns(record: SessionRecord): SessionRecord {
+  if (record.turns?.length) return record
+
+  const turns: SessionRecord['turns'] = []
+  for (const m of record.messages) {
+    if ((m.role === 'user' || m.role === 'assistant') && m.content != null) {
+      const reasoning = m.role === 'assistant'
+        && typeof m.reasoningContent === 'string'
+        && m.reasoningContent.trim()
+        ? m.reasoningContent
+        : undefined
+      turns.push({
+        role: m.role,
+        content: chatMessageContentToText(m.content),
+        at: record.updatedAt,
+        ...(reasoning ? { reasoningContent: reasoning } : {}),
+      })
+    }
+  }
+  if (!turns.length) return record
+
+  record.turns = turns
+  writeRecord(record)
+  return record
+}
+
+/** 旧会话 turns 缺思考时，从同轮终助手 messages 回填并持久化 */
+function backfillTurnReasoning(record: SessionRecord): SessionRecord {
+  if (!record.turns?.length) return record
+  const fromMsgs = finalAssistantReasonings(record.messages)
+  let ai = 0
+  let changed = false
+  const turns = record.turns.map(t => {
+    if (t.role !== 'assistant') return t
+    const msgReasoning = fromMsgs[ai++]
+    if (t.reasoningContent?.trim()) return t
+    if (!msgReasoning) return t
+    changed = true
+    return { ...t, reasoningContent: msgReasoning }
+  })
+  if (!changed) return record
+  record.turns = turns
+  writeRecord(record)
+  return record
+}
+
+function toMeta(raw: SessionRecord): SessionMeta {
+  return {
+    id: raw.id,
+    title: raw.title,
+    createdAt: raw.createdAt,
+    updatedAt: raw.updatedAt,
+    model: raw.model,
+    llmParams: raw.llmParams,
+    archivedAt: raw.archivedAt ?? null,
+    archiveFolderId: raw.archiveFolderId ?? null,
+    expertId: raw.expertId ?? null,
+    expertIcon: raw.expertIcon ?? null,
+    usageTotals: raw.usageTotals,
+    kind: raw.kind ?? 'user',
+    parentSessionId: raw.parentSessionId ?? null,
+    rootSessionId: raw.rootSessionId ?? null,
+    artifactsEnabled: raw.artifactsEnabled === true,
+  }
+}
+
+/** 侧栏可见：非归档且非子会话 */
+export function isSidebarSession(meta: Pick<SessionMeta, 'kind' | 'parentSessionId' | 'archivedAt'>): boolean {
+  if (meta.archivedAt) return false
+  if (meta.kind === 'subagent') return false
+  if (meta.parentSessionId) return false
+  return true
+}
+
+export function sessionToMeta(raw: SessionRecord): SessionMeta {
+  return toMeta(raw)
+}
+
+function isArchived(record: SessionRecord): boolean {
+  return Boolean(record.archivedAt)
+}
+
+export class SessionStore {
+  private folderStore = new SessionArchiveFolderStore()
+
+  listArchiveFolders() {
+    return this.folderStore.ensureDefaults()
+  }
+
+  /** Active (non-archived) sessions for sidebar — 隐藏 kind=subagent */
+  listActive(): SessionMeta[] {
+    return this.listAll().filter(s => isSidebarSession(s))
+  }
+
+  /** @deprecated Use listActive — kept for compatibility */
+  list(): SessionMeta[] {
+    return this.listActive()
+  }
+
+  listAll(): SessionMeta[] {
+    const sessions = getUserDataStore()
+      .listDocuments<SessionRecord>(NAMESPACE)
+      .map(toMeta)
+    return sessions.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+  }
+
+  listArchivedGrouped(): Array<{ folder: import('./archive-folders.js').SessionArchiveFolder; sessions: SessionMeta[] }> {
+    const folders = this.folderStore.ensureDefaults()
+    const archived = this.listAll().filter(s => s.archivedAt)
+    return folders.map(folder => ({
+      folder,
+      sessions: archived
+        .filter(s => (s.archiveFolderId || 'other') === folder.id)
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+    })).filter(g => g.sessions.length > 0)
+  }
+
+  /** 归档侧栏：展示全部文件夹（含空文件夹） */
+  listArchivedByFolderAll(): Array<{ folder: import('./archive-folders.js').SessionArchiveFolder; sessions: SessionMeta[] }> {
+    const folders = this.folderStore.ensureDefaults()
+    const archived = this.listAll().filter(s => s.archivedAt)
+    return folders.map(folder => ({
+      folder,
+      sessions: archived
+        .filter(s => (s.archiveFolderId || 'other') === folder.id)
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+    }))
+  }
+
+  createArchiveFolder(title: string) {
+    return this.folderStore.create(title)
+  }
+
+  renameArchiveFolder(id: string, title: string) {
+    return this.folderStore.rename(id, title)
+  }
+
+  deleteArchiveFolder(id: string): { ok: boolean; movedCount: number } {
+    const folder = this.folderStore.get(id)
+    if (!folder || folder.isDefault) return { ok: false, movedCount: 0 }
+    let movedCount = 0
+    for (const meta of this.listAll()) {
+      if (!meta.archivedAt || (meta.archiveFolderId || 'other') !== id) continue
+      const record = this.get(meta.id)
+      if (!record) continue
+      record.archiveFolderId = 'other'
+      writeRecord(record)
+      movedCount += 1
+    }
+    const ok = this.folderStore.delete(id)
+    return { ok, movedCount }
+  }
+
+  clearArchiveFolder(id: string): { ok: boolean; deletedCount: number } {
+    const folder = this.folderStore.get(id)
+    if (!folder) return { ok: false, deletedCount: 0 }
+    let deletedCount = 0
+    for (const meta of this.listAll()) {
+      if (!meta.archivedAt || (meta.archiveFolderId || 'other') !== id) continue
+      this.delete(meta.id)
+      deletedCount += 1
+    }
+    return { ok: true, deletedCount }
+  }
+
+  get(id: string): SessionRecord | null {
+    const raw = getUserDataStore().getDocument<SessionRecord>(NAMESPACE, id)
+    if (!raw) return null
+    return normalizeRecord(raw)
+  }
+
+  /** 按 id 批量取 meta；不去全表 listDocuments（供 SearchHub 等按命中补全）。 */
+  getMany(ids: string[]): Map<string, SessionMeta> {
+    const out = new Map<string, SessionMeta>()
+    for (const id of ids) {
+      if (!id || out.has(id)) continue
+      const record = this.get(id)
+      if (record) out.set(id, toMeta(record))
+    }
+    return out
+  }
+
+  create(opts?: string | CreateSessionOptions): SessionRecord {
+    const normalized: CreateSessionOptions = typeof opts === 'string'
+      ? { title: opts }
+      : opts ?? {}
+    const title = normalized.title?.trim() || '新对话'
+    const now = new Date().toISOString()
+    const model = normalized.model?.trim() || undefined
+    const id = randomUUID()
+    const kind = normalized.kind === 'subagent' ? 'subagent' as const : 'user' as const
+    const parentSessionId = normalized.parentSessionId?.trim() || null
+    const rootSessionId = normalized.rootSessionId?.trim()
+      || (kind === 'subagent' && parentSessionId ? parentSessionId : id)
+    const record: SessionRecord = {
+      id,
+      title,
+      createdAt: now,
+      updatedAt: now,
+      messages: [],
+      turns: [],
+      contextRef: null,
+      expertId: normalized.expertId ?? null,
+      expertIcon: normalized.expertIcon ?? null,
+      rolePersona: normalized.rolePersona ?? null,
+      kind,
+      parentSessionId,
+      rootSessionId,
+      ...(model ? { model } : {}),
+    }
+    writeRecord(record)
+    return record
+  }
+
+  save(record: SessionRecord) {
+    writeRecord(record)
+  }
+
+  delete(id: string) {
+    getUserDataStore().deleteDocument(NAMESPACE, id)
+    sessionDeleteHook?.(id)
+  }
+
+  archive(id: string, folderId: string): SessionRecord | null {
+    const record = this.get(id)
+    if (!record) return null
+    const folder = this.folderStore.get(folderId) ?? this.folderStore.get('other')
+    if (!folder) return null
+    if (!isArchived(record)) {
+      record.archivedAt = new Date().toISOString()
+    }
+    record.archiveFolderId = folder.id
+    record.updatedAt = new Date().toISOString()
+    writeRecord(record)
+    return record
+  }
+
+  unarchive(id: string): SessionRecord | null {
+    const record = this.get(id)
+    if (!record || !isArchived(record)) return null
+    record.archivedAt = null
+    record.archiveFolderId = null
+    writeRecord(record)
+    return record
+  }
+
+  rename(id: string, title: string) {
+    const record = this.get(id)
+    if (!record) return null
+    record.title = title.trim() || record.title
+    this.save(record)
+    return record
+  }
+
+  /**
+   * Hard checkpoint restore (Wave 51+): metadata + turns snapshot (W52) or turn truncate.
+   * When `turns` is present, it replaces transcript (precedence over turnCount).
+   */
+  applyCheckpoint(
+    input: CheckpointApplyInput,
+  ): { ok: true; truncated: boolean } | { ok: false; error: string } {
+    const sid = typeof input.sessionId === 'string' ? input.sessionId.trim() : ''
+    if (!sid) return { ok: false, error: 'sessionId required' }
+    const record = this.get(sid)
+    if (!record) return { ok: false, error: 'session not found' }
+
+    let truncated = false
+
+    if (typeof input.title === 'string') {
+      const title = input.title.trim()
+      if (title) record.title = title
+    }
+    if (typeof input.model === 'string') {
+      const model = input.model.trim()
+      if (model) record.model = model
+    }
+
+    if (input.turns !== undefined) {
+      if (!Array.isArray(input.turns)) {
+        return { ok: false, error: 'turns must be an array' }
+      }
+      const next = sanitizeCheckpointTurnsForApply(input.turns)
+      const now = new Date().toISOString()
+      record.turns = next.map((t) => ({
+        role: t.role === 'assistant' ? 'assistant' as const : 'user' as const,
+        content: t.content,
+        at: typeof t.at === 'string' && t.at.trim() ? t.at : now,
+      }))
+      record.messages = next.map((t) => ({
+        role: t.role === 'assistant' ? 'assistant' as const : 'user' as const,
+        content: t.content,
+      }))
+      record.sessionMemory = null
+      record.contextProjection = null
+      truncated = true
+    } else {
+      const target = input.turnCount
+      if (typeof target === 'number' && Number.isFinite(target) && target >= 0) {
+        const keep = Math.floor(target)
+        const turns = record.turns ?? []
+        if (turns.length > keep) {
+          truncated = true
+          record.turns = turns.slice(0, keep)
+
+          if (keep === 0) {
+            record.messages = []
+          } else {
+            let displayCount = 0
+            let messageCut = -1
+            for (let i = 0; i < record.messages.length; i++) {
+              const m = record.messages[i]!
+              const isDisplayMsg = m.role === 'user'
+                || (m.role === 'assistant' && !(m.tool_calls?.length))
+              if (!isDisplayMsg) continue
+              displayCount += 1
+              if (displayCount === keep) {
+                messageCut = i + 1
+                break
+              }
+            }
+            if (messageCut >= 0) {
+              record.messages = record.messages.slice(0, messageCut)
+            } else {
+              // Fallback: rebuild messages from remaining turns
+              record.messages = record.turns.map((t) => ({
+                role: t.role,
+                content: t.content,
+              }))
+            }
+          }
+
+          record.sessionMemory = null
+          record.contextProjection = null
+        }
+      }
+    }
+
+    record.updatedAt = new Date().toISOString()
+    try {
+      this.save(record)
+    } catch (err) {
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : 'checkpoint apply save failed',
+      }
+    }
+    return { ok: true, truncated }
+  }
+
+  /** 更新会话级技能专长（调用方须已消毒） */
+  updateRolePersona(id: string, rolePersona: string): SessionRecord | null {
+    const record = this.get(id)
+    if (!record) return null
+    record.rolePersona = rolePersona
+    this.save(record)
+    return record
+  }
+
+  /** 更新会话级 OpenAI 兼容采样参数 */
+  updateLlmParams(
+    id: string,
+    patch: {
+      temperature?: number
+      maxTokens?: number
+      reasoningEffort?: ReasoningEffort | null
+    },
+  ): SessionRecord | null {
+    const record = this.get(id)
+    if (!record) return null
+    record.llmParams = mergeSessionLlmParams(record.llmParams, patch)
+    this.save(record)
+    return record
+  }
+
+  /** 用户在输入框加号中开关「报告与脑图」 */
+  updateArtifactsEnabled(id: string, enabled: boolean): SessionRecord | null {
+    const record = this.get(id)
+    if (!record) return null
+    record.artifactsEnabled = enabled === true
+    this.save(record)
+    return record
+  }
+
+  toDisplayMessages(record: SessionRecord): DisplayMessage[] {
+    if (record.turns?.length) {
+      return record.turns.map(t => {
+        const segments = normalizeReasoningSegments(t.reasoningSegments)
+        const reasoningContent = t.reasoningContent?.trim()
+          || (segments ? joinReasoningSegments(segments) : undefined)
+          || undefined
+        return {
+          role: t.role,
+          content: t.content,
+          toolsUsed: t.toolsUsed,
+          toolSteps: t.toolSteps,
+          at: t.at,
+          usage: t.usage,
+          usageEstimated: t.usageEstimated,
+          attachments: t.attachments,
+          reasoningContent,
+          ...(segments ? { reasoningSegments: segments } : {}),
+          ...(t.origin ? { origin: t.origin } : {}),
+        }
+      })
+    }
+    const out: DisplayMessage[] = []
+    for (const m of record.messages) {
+      if ((m.role === 'user' || m.role === 'assistant') && m.content != null) {
+        const reasoning = m.role === 'assistant'
+          && typeof m.reasoningContent === 'string'
+          && m.reasoningContent.trim()
+          ? m.reasoningContent
+          : undefined
+        out.push({
+          role: m.role,
+          content: chatMessageContentToText(m.content),
+          at: record.updatedAt,
+          ...(reasoning ? { reasoningContent: reasoning } : {}),
+        })
+      }
+    }
+    return out
+  }
+
+  fork(source: SessionRecord, throughDisplayIndex: number): SessionRecord | null {
+    const display = this.toDisplayMessages(source)
+    if (throughDisplayIndex < 0 || throughDisplayIndex >= display.length) return null
+
+    const anchor = display[throughDisplayIndex]
+    if (anchor.role !== 'assistant') return null
+
+    const now = new Date().toISOString()
+    const baseTitle = source.title.trim() || '新对话'
+    const record: SessionRecord = {
+      id: randomUUID(),
+      title: `研讨 · ${baseTitle.length > 24 ? `${baseTitle.slice(0, 24)}…` : baseTitle}`,
+      createdAt: now,
+      updatedAt: now,
+      model: source.model,
+      llmParams: source.llmParams,
+      artifactsEnabled: source.artifactsEnabled === true,
+      expertId: source.expertId ?? null,
+      expertIcon: source.expertIcon ?? null,
+      rolePersona: source.rolePersona ?? null,
+      messages: [],
+      turns: [],
+      contextRef: {
+        kind: 'fork',
+        sourceSessionId: source.id,
+        sourceSessionTitle: baseTitle,
+        anchorIndex: throughDisplayIndex,
+        anchorAt: anchor.at,
+        preview: previewText(anchor.content),
+        turns: [{
+          role: 'assistant',
+          content: anchor.content,
+          toolsUsed: anchor.toolsUsed,
+          at: anchor.at,
+        }],
+      },
+    }
+    writeRecord(record)
+    return record
+  }
+
+  /**
+   * 从指定 display turn 起截断会话（含该条及之后）。
+   * `displayIndex` 必须指向 user 气泡；与 UI transcript 索引一致。
+   * messages 按与 turns 对齐的 user / 最终 assistant（无 tool_calls）计数切开。
+   */
+  truncateFromDisplayIndex(id: string, displayIndex: number): SessionRecord | null {
+    const record = this.get(id)
+    if (!record) return null
+
+    const display = this.toDisplayMessages(record)
+    if (displayIndex < 0 || displayIndex >= display.length) return null
+    if (display[displayIndex]!.role !== 'user') return null
+
+    let displayCount = 0
+    let messageCut = -1
+    for (let i = 0; i < record.messages.length; i++) {
+      const m = record.messages[i]!
+      const isDisplayMsg = m.role === 'user'
+        || (m.role === 'assistant' && !(m.tool_calls?.length))
+      if (!isDisplayMsg) continue
+      if (displayCount === displayIndex) {
+        messageCut = i
+        break
+      }
+      displayCount += 1
+    }
+    if (messageCut < 0) return null
+
+    record.turns = (record.turns?.length ? record.turns : display).slice(0, displayIndex)
+    record.messages = record.messages.slice(0, messageCut)
+    record.sessionMemory = null
+    record.contextProjection = null
+    this.save(record)
+    return record
+  }
+
+  clearContextRef(id: string): SessionRecord | null {
+    const record = this.get(id)
+    if (!record) return null
+    record.contextRef = null
+    this.save(record)
+    return record
+  }
+
+  setContextRef(id: string, contextRef: SessionContextRef | null): SessionRecord | null {
+    const record = this.get(id)
+    if (!record) return null
+    record.contextRef = contextRef
+    this.save(record)
+    return record
+  }
+
+  shouldMaterializeContext(record: SessionRecord): boolean {
+    const ref = record.contextRef
+    if (!ref || ref.kind === 'article' || !ref.turns?.length) return false
+    const anchorAt = ref.anchorAt
+    return !(record.turns ?? []).some(t => t.at === anchorAt)
+  }
+
+  materializeContextRef(record: SessionRecord): SessionRecord {
+    const ref = record.contextRef
+    if (!ref || ref.kind === 'article' || !ref.turns?.length) return record
+
+    const prefix = ref.turns
+    record.turns = [
+      ...prefix.map(t => ({
+        role: t.role,
+        content: t.content,
+        toolsUsed: t.toolsUsed,
+        at: t.at,
+      })),
+      ...(record.turns ?? []),
+    ]
+    const prefixMessages = prefix.map(t => ({ role: t.role, content: t.content }))
+    record.messages = [...prefixMessages, ...record.messages]
+    record.contextRef = null
+    this.save(record)
+    return record
+  }
+}

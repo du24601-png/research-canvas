@@ -1,0 +1,3006 @@
+import { randomUUID } from 'node:crypto'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import Fastify from 'fastify'
+import { createBrowserSessionManager, registerBrowserShutdownHooks } from '@opptrix/agent-browser'
+import { AgentEngine, buildAgentSafeProjectInfo, fetchOpenAiModelList, getModelsDevCatalog, initOutboundNetwork, pruneOrphanChatAttachments, configureTurnWakeRuntime, setTurnWakeResumeHandler, onTurnWakeFired, scheduleTurnWake, clearSessionTurnWakes, listPendingTurnWakes, TURN_WAKE_BUSY_DEFER_SECONDS, registerDefaultJobAdapters, sessionResumeBus, clearSessionJobWaitsAndWatches, listPendingJobWatches, jobRegistry, watchRegistry, JOB_PROGRESS_THROTTLE_MS, userFacingJobLabel, userPromptAnswerFromApprovalDecision, createUserPromptId, type ChatProgressEvent, type SessionContextRef, type ResumeRequest } from '@opptrix/agent'
+import { getWorkspaceService, assertAllowedShellArgv, getSessionSecretAccessStore, PathEscapeError, DenyPathError, WorkspaceError, pruneOrphanSessionState, listMountRoots, emptyMountsReason, browseWorkspaceDirs } from '@opptrix/agent-workspace'
+import { ResearchHub } from '@opptrix/research-hub'
+import { createHubDiskCache, getUserDataStore } from '@opptrix/user-store'
+import { registerAuthRoutes } from './auth-routes.js'
+import { registerOwnerAuthHook, shouldExposeFullHealth } from './auth-hook.js'
+import {
+  registerSystemUpdateLockHook,
+  registerSystemUpdateRoutes,
+  startSystemUpdateAfterListen,
+} from './system-update-routes.js'
+import { resolveHealthVersionFields } from './system-update-service.js'
+import {
+  loadConfig, saveConfig, publicConfig, toAgentProviders,
+  resolveProviderPresets, parseSystemProxyInput, parseProviderProxyFields,
+  type StoredProvider,
+} from './config.js'
+import { registerStaticUi, shouldServeUi, isApiPath, resolveUiDist } from './static-ui.js'
+import { cancelSessionChat, clearSessionChat, hasActiveSessionChat, registerSessionChat } from './session-chat-runs.js'
+import { publishSessionProgress, subscribeSessionProgress } from './session-progress-bus.js'
+import { getUserPreference, setUserPreference } from './user-preferences.js'
+import {
+  getLatestStockAnalysis,
+  parseStockAnalysisBody,
+  saveStockAnalysis,
+} from './stock-analysis-store.js'
+import { getStockPrep, startStockPrep } from './stock-prep-jobs.js'
+import { mcpToolCatalog } from '@opptrix/agent'
+import {
+  applySystemProxyAsDefault,
+  PRODUCT_BRAND,
+  resolveOpptrixAppVersion,
+  resolveOutboundProxyInit,
+  resolveProjectRoot,
+} from '@opptrix/shared'
+import { registerNewsSettingsRoutes } from './news-settings-routes.js'
+import { registerSandboxSettingsRoutes } from './sandbox-settings-routes.js'
+import { registerPythonSettingsRoutes } from './python-settings-routes.js'
+import { registerCoreModelsRoutes } from './core-models-routes.js'
+import { buildCoreModelsStatusDto, isCoreModelsFeatureRequired } from './core-models-service.js'
+import { registerHarnessSettingsRoutes } from './harness-settings-routes.js'
+import { registerEnrichmentRoutes } from './enrichment-routes.js'
+import { registerSearchRoutes } from './search-routes.js'
+import {
+  ATTACHMENT_UPLOAD_BODY_LIMIT,
+  registerSessionAttachmentRoutes,
+} from './session-attachment-routes.js'
+import { registerOpptrixVendorRoutes } from './opptrix-vendor-routes.js'
+import { registerMcpServerRoutes } from './mcp-server-routes.js'
+import { registerAgentSkillRoutes } from './agent-skill-routes.js'
+import { registerSpeechRoutes } from './speech-routes.js'
+import { ensureMediaTranscriptBridge } from './media-transcript-bridge.js'
+import {
+  startNewsFeedScheduler,
+  stopNewsFeedScheduler,
+  getNewsSettings,
+  setNewsArticlePersistHook,
+  setNewsArticleDeleteHook,
+  getArticle,
+} from '@opptrix/news-feed'
+import { maybeBootstrapTranslationModel, llamaRuntime } from '@opptrix/local-inference'
+import { startEnrichmentScheduler, stopEnrichmentScheduler, getEnrichmentStore, setEnrichmentPersistHook } from '@opptrix/article-enrichment'
+import { setSessionPersistHooks } from '@opptrix/agent'
+import { createJobExecutor, getScheduleService, createScheduleNotificationDispatcher } from '@opptrix/schedule'
+import {
+  removeNewsSearchIndex,
+  removeSessionSearchIndex,
+  syncNewsSearchIndex,
+  syncSessionSearchIndex,
+} from '@opptrix/search-hub'
+import { fetchUserAgreementHtml } from './legal-document.js'
+import { startRetentionMaintenance, stopRetentionMaintenance } from './retention-maintenance.js'
+import { runSidecarShutdown, resolveSidecarForceExitMs } from './sidecar-shutdown.js'
+import { registerExtensionsHttp } from './extensions-http.js'
+import { registerStoreHttp } from './store-http.js'
+import { registerChannelsHttp } from './channels-http.js'
+import { bindLateBoundServices } from './platform/extensions/late-bound-handlers.js'
+import { bindMarketPlane, getMarketPlane } from './market-data-plane.js'
+import {
+  admitAndRememberJobWake,
+  admitChatBestEffort,
+  admitAcknowledgeAlert,
+  admitCheckpointGet,
+  admitCheckpointLatest,
+  admitCheckpointList,
+  admitCheckpointRestore,
+  admitPlatformAlerts,
+  admitCancelSessionApprovals,
+  admitPlatformApprovals,
+  admitPlatformInfo,
+  admitPlatformJobs,
+  admitPlatformMemory,
+  admitPromoteMemory,
+  admitPlatformExtensions,
+  admitPlatformHostWorker,
+  admitPlatformHands,
+  admitRegisterExtension,
+  admitRegisterOpx,
+  admitActivateExtension,
+  admitDeactivateExtension,
+  OPX_ZIP_MAX_BYTES,
+  admitPlatformMeterDenials,
+  admitPlatformPacks,
+  admitResolveApproval,
+  createPlatformContext,
+  setPlatformPackEnabled,
+} from './platform/index.js'
+import { SystemEvents } from '@opptrix/event-bus'
+import {
+  closeHttpsServer,
+  ensureSelfSignedTlsMaterials,
+  listenHttpsAlongsideHttp,
+  resolveHttpPort,
+  resolveHttpsPort,
+} from './selfhost-https.js'
+import type { Server as HttpsServer } from 'node:https'
+import { createRequire } from 'node:module'
+
+const require = createRequire(import.meta.url)
+const { cleanupStaleApiListeners } = require('../../../scripts/lib/resolve-ports.cjs') as {
+  cleanupStaleApiListeners: (port: number, opts?: { aggressive?: boolean }) => Promise<boolean>
+}
+
+const platform = createPlatformContext()
+
+const HTTP_PORT = resolveHttpPort()
+const HTTPS_PORT = resolveHttpsPort()
+const PORT = HTTP_PORT ?? HTTPS_PORT ?? 8711
+const PUBLIC_PROTO = HTTPS_PORT != null ? 'https' : 'http'
+const PUBLIC_PORT = HTTPS_PORT ?? HTTP_PORT ?? PORT
+const HOST = process.env.STOCK_RESEARCH_HOST ?? '127.0.0.1'
+/** 绑定 0.0.0.0/:: 时，进程内回调须用 loopback（fetch 不能访问 0.0.0.0） */
+function connectHostForBind(bindHost: string): string {
+  const raw = (bindHost || '127.0.0.1').trim()
+  if (raw === '::' || raw === '0.0.0.0' || raw === '::ffff:0.0.0.0') return '127.0.0.1'
+  if (raw.startsWith('::ffff:')) return raw.slice('::ffff:'.length)
+  return raw
+}
+const CONNECT_HOST = connectHostForBind(HOST)
+const APP_VERSION = resolveOpptrixAppVersion()
+
+const hub = new ResearchHub({ diskCache: createHubDiskCache() })
+let cfg = loadConfig()
+applySystemProxyAsDefault(cfg.system_proxy)
+
+function syncAgentProviders() {
+  agent.setProviders(toAgentProviders(cfg), cfg.default_model)
+}
+
+let agent!: AgentEngine
+const serverAppContext = {
+  getAppSettings: async () => publicConfig(cfg),
+  getProjectInfo: async () => buildAgentSafeProjectInfo({
+    app: PRODUCT_BRAND.name,
+    version: APP_VERSION,
+    runtime: process.env.OPPTRIX_DESKTOP === '1' ? 'desktop' : 'node',
+    desktop: process.env.OPPTRIX_DESKTOP === '1',
+    server: { host: HOST, port: PUBLIC_PORT, connect_host: CONNECT_HOST, proto: PUBLIC_PROTO },
+    tool_count: agent.tools.list().length,
+    mining_tool_count: agent.tools.miningTools().length,
+  }),
+}
+
+agent = new AgentEngine(hub, {
+  providers: toAgentProviders(cfg),
+  defaultModel: cfg.default_model,
+  defaultScorecard: cfg.default_scorecard,
+  defaultTopN: cfg.default_top_n,
+  appContext: serverAppContext,
+  capabilityGate: platform.gate,
+  // Phase B: extension-platform hooks (read-only observations, fire-and-forget;
+  // bounded inside the hook registry ≤500ms so the chat hot path never waits).
+  extensionHooks: {
+    toolPreExecute: (payload) =>
+      platform.extensions
+        .hooksDispatch('agent.toolPreExecute', payload)
+        .then(() => undefined),
+    sessionMessageCommitted: (payload) =>
+      platform.extensions
+        .hooksDispatch('session.messageCommitted', payload)
+        .then(() => undefined),
+  },
+  // Wave 56: approval queue owns ask_user; bridge is waiter (id ≡ promptId ≡ approval.id)
+  approvalTracker: {
+    track(input) {
+      platform.approval.request({
+        id: input.id,
+        sessionId: input.sessionId,
+        kind: input.kind,
+        title: input.title,
+        meta: { promptId: input.id },
+      })
+    },
+    resolve(id, decision) {
+      platform.approval.resolve(id, decision)
+    },
+    cancelSession(sessionId) {
+      platform.approval.cancelSession(sessionId)
+    },
+  },
+  turnCheckpoint: {
+    save(snapshot) {
+      platform.checkpoint.save(snapshot.sessionId, { ...snapshot })
+    },
+  },
+  usageMeter: {
+    record(usage) {
+      platform.meter.recordUsage(usage)
+    },
+  },
+})
+// Wave 51A: hard restore apply — checkpoint metadata → SessionStore
+platform.bindCheckpointApply({
+  apply(input) {
+    return agent.applyCheckpoint(input)
+  },
+})
+// Wave 50A: soft reverse mirror — approval.resolve → UserPromptBridge (id ≡ promptId)
+platform.approval.bindUserPromptResolve(({ id, sessionId, decision }) => {
+  agent.userPromptBridge.submit(
+    sessionId,
+    id,
+    userPromptAnswerFromApprovalDecision(decision),
+  )
+})
+// SF-thin-A: grant file overwrite/delete no longer wire Hands confirm (avoids unused ask_user)
+platform.memory.bindWorkingSource((sessionId) => {
+  const s = agent.getSession(sessionId)
+  return s?.sessionMemory ?? null
+})
+agent.setApiBaseUrl(`${PUBLIC_PROTO}://${CONNECT_HOST}:${PUBLIC_PORT}/api`)
+
+/** 协作任务会话只读：禁止外部 REST 打断（Runner 仍可直调 engine.chat） */
+function isReadonlyCollaborationSession(sessionId: string): boolean {
+  const s = agent.getSession(sessionId)
+  if (!s) return false
+  return s.kind === 'subagent' || Boolean(s.parentSessionId)
+}
+
+const COLLAB_SESSION_READONLY_ERROR = '该会话由系统代为推进，请在主对话中继续操作'
+
+configureTurnWakeRuntime({
+  isSessionAlive: (sessionId) => Boolean(agent.getSession(sessionId)),
+  isChatBusy: hasActiveSessionChat,
+})
+
+/** Best-effort job.wake Ingress envelope before TurnWake resume (observability only). */
+onTurnWakeFired((job) => {
+  try {
+    admitAndRememberJobWake(platform, {
+      sessionId: job.sessionId,
+      text: job.prompt,
+      jobId: job.id,
+    })
+  } catch {
+    /* admit must not gate resume */
+  }
+})
+
+registerDefaultJobAdapters()
+
+async function resumeSessionChat(opts: {
+  sessionId: string
+  wakeMessage: string
+  model?: string
+  reason?: string
+  prompt: string
+}): Promise<void> {
+  if (!agent.getSession(opts.sessionId)) return
+  if (hasActiveSessionChat(opts.sessionId)) {
+    // 纯延时 busy-defer；有 Job 依赖时由 ResumeBus 自有 defer，勿传 job_id
+    scheduleTurnWake({
+      sessionId: opts.sessionId,
+      prompt: opts.prompt,
+      seconds: TURN_WAKE_BUSY_DEFER_SECONDS,
+      reason: opts.reason,
+      model: opts.model,
+    })
+    return
+  }
+  const ac = registerSessionChat(opts.sessionId)
+  const onProgress = (event: ChatProgressEvent) => {
+    publishSessionProgress(opts.sessionId, event)
+  }
+  try {
+    onProgress({ type: 'thinking', round: 0, label: '正在继续' })
+    await agent.chat(opts.sessionId, opts.wakeMessage, opts.model, {
+      signal: ac.signal,
+      unattended: false,
+      wakeResume: true,
+      onProgress,
+    })
+  } finally {
+    clearSessionChat(opts.sessionId, ac)
+  }
+}
+
+setTurnWakeResumeHandler(async (job, wakeMessage) => {
+  await resumeSessionChat({
+    sessionId: job.sessionId,
+    wakeMessage,
+    model: job.model,
+    reason: job.reason,
+    prompt: job.prompt,
+  })
+})
+
+sessionResumeBus.configureRuntime({
+  isSessionAlive: (sessionId) => Boolean(agent.getSession(sessionId)),
+  isChatBusy: hasActiveSessionChat,
+})
+sessionResumeBus.setHandler(async (req: ResumeRequest, wakeMessage: string) => {
+  try {
+    admitAndRememberJobWake(platform, {
+      sessionId: req.sessionId,
+      text: req.prompt,
+      jobId: req.jobId,
+    })
+  } catch {
+    /* admit must not gate resume */
+  }
+  await resumeSessionChat({
+    sessionId: req.sessionId,
+    wakeMessage,
+    model: req.model,
+    reason: req.cause,
+    prompt: req.prompt,
+  })
+})
+
+/** 有会话 watch 时把 Job 进度/终态推到 live-progress（进度节流；终态立即推） */
+{
+  const lastProgressAt = new Map<string, number>()
+  jobRegistry.subscribe((event) => {
+    if (event.type !== 'progress' && event.type !== 'upsert' && event.type !== 'terminal') return
+    const snap = event.snapshot
+    if (event.type === 'terminal') {
+      lastProgressAt.delete(snap.jobId)
+    } else {
+      const now = Date.now()
+      const last = lastProgressAt.get(snap.jobId) ?? 0
+      if (now - last < JOB_PROGRESS_THROTTLE_MS) return
+      lastProgressAt.set(snap.jobId, now)
+    }
+    const sessions = watchRegistry.listSessionsForJob(snap.jobId)
+    if (!sessions.length) return
+    const label = userFacingJobLabel(snap.kind, snap.progress.message)
+    const stdoutTail = typeof snap.meta?.stdout_tail === 'string'
+      ? snap.meta.stdout_tail
+      : undefined
+    for (const sessionId of sessions) {
+      publishSessionProgress(sessionId, {
+        type: 'job_progress',
+        job_id: snap.jobId,
+        kind: snap.kind,
+        state: snap.state,
+        label,
+        percent: snap.progress.percent,
+        title: snap.title,
+        cancelable: snap.cancelable,
+        stdout_tail: stdoutTail || undefined,
+      })
+    }
+  })
+}
+setSessionPersistHooks({
+  onPersist: syncSessionSearchIndex,
+  onDelete: removeSessionSearchIndex,
+})
+
+setNewsArticlePersistHook(article => {
+  // 资讯仅写入 user-store FTS（统一搜索 + Agent search_library）；不再双写 doc-library
+  syncNewsSearchIndex(article, getEnrichmentStore().get(article.id))
+})
+setNewsArticleDeleteHook(articleId => {
+  removeNewsSearchIndex(articleId)
+  // retention / 退订 / 去重删文时级联清理 enrichment
+  try {
+    getEnrichmentStore().delete(articleId)
+  } catch {
+    /* best-effort */
+  }
+})
+
+setEnrichmentPersistHook(doc => {
+  const article = getArticle(doc.article_id)
+  if (article) syncNewsSearchIndex(article, doc)
+})
+
+const app = Fastify({ logger: true, bodyLimit: ATTACHMENT_UPLOAD_BODY_LIMIT })
+registerSystemUpdateLockHook(app)
+registerOwnerAuthHook(app)
+registerAuthRoutes(app)
+registerSystemUpdateRoutes(app)
+registerCoreModelsRoutes(app)
+
+const scheduleService = getScheduleService()
+// Phase A: bind real services for extension late-bound capabilities
+// (data.query → hub.dispatch; schedule.list → scheduleService).
+bindLateBoundServices({
+  hub: { dispatch: (feature, params) => hub.dispatch(feature, params as never) },
+  schedule: { listJobs: () => scheduleService.listJobs() as unknown as Array<Record<string, unknown>> },
+})
+
+// Phase B market data plane — demand-driven quote stream for the whole system
+// (UI consumers, extensions via data.subscribe/events market.quote.*).
+bindMarketPlane({
+  events: platform.events,
+  dispatch: (feature, params) => hub.dispatch(feature, params as never),
+  log: { warn: (msg) => app.log.warn(msg) },
+})
+const workspaceService = getWorkspaceService()
+scheduleService.setExecutor(createJobExecutor({
+  agent: {
+    createSession: opts => agent.createSession(opts),
+    chat: (sessionId, message, modelRef, opts) =>
+      agent.chat(sessionId, message, modelRef, {
+        unattended: opts?.unattended === true,
+      }),
+    llmConfigured: agent.llmConfigured,
+  },
+  shell: {
+    // 计划任务必须同步前台 run；禁止 background / bg 返回体
+    run: async (params, confirm) => {
+      const result = await workspaceService.shellRun(
+        { ...params, background: false },
+        confirm,
+      )
+      if (!('exit_code' in result)) {
+        throw new Error('计划任务仅支持同步执行命令，不支持后台任务')
+      }
+      return {
+        ok: result.ok,
+        exit_code: result.exit_code,
+        stdout: result.stdout,
+        stderr: result.stderr,
+      }
+    },
+  },
+  getSettings: () => scheduleService.getSettings(),
+  assertShellArgv: assertAllowedShellArgv,
+  persistAgentSessionId: (jobId, sessionId) => {
+    const job = scheduleService.getJob(jobId)
+    if (!job || job.kind !== 'agent_prompt') return
+    scheduleService.updateJob(jobId, {
+      payload: { ...(job.payload as { prompt: string; session_id?: string }), session_id: sessionId },
+    })
+  },
+  onComplete: createScheduleNotificationDispatcher({
+    getSettings: () => scheduleService.getSettings(),
+    getJob: id => scheduleService.getJob(id),
+    log: (msg, err) => {
+      if (err) app.log.warn({ err }, msg)
+      else app.log.info(msg)
+    },
+  }),
+}))
+
+app.post<{ Params: { code: string }; Body: { force?: boolean } }>('/api/stock/:code/prep', async (req) => {
+  const prep = startStockPrep(hub, req.params.code, { force: Boolean(req.body?.force) })
+  return { prep }
+})
+
+app.get<{ Params: { code: string } }>('/api/stock/:code/prep', async (req) => {
+  return { prep: getStockPrep(req.params.code) }
+})
+
+app.get('/api/health', async (req) => {
+  const versions = resolveHealthVersionFields(APP_VERSION)
+  const publicBody = {
+    status: 'ok' as const,
+    version: versions.version,
+    runtime_version: versions.runtime_version,
+    base_version: versions.base_version,
+  }
+  if (!shouldExposeFullHealth(req)) return publicBody
+  const channel = process.env.OPPTRIX_RELEASE_CHANNEL?.trim() || undefined
+  const releaseTag = process.env.OPPTRIX_RELEASE_TAG?.trim() || undefined
+  let coreModelsRequired = false
+  let coreModelsReady = true
+  if (isCoreModelsFeatureRequired()) {
+    try {
+      const cm = await buildCoreModelsStatusDto()
+      coreModelsRequired = cm.featureRequired
+      coreModelsReady = cm.allReady
+    } catch {
+      coreModelsRequired = true
+      coreModelsReady = false
+    }
+  }
+  return {
+    ...publicBody,
+    ...(channel ? { channel } : {}),
+    ...(releaseTag ? { releaseTag } : {}),
+    runtime: process.env.OPPTRIX_DESKTOP === '1' ? 'desktop' : 'node',
+    desktop: process.env.OPPTRIX_DESKTOP === '1',
+    llm_configured: agent.llmConfigured,
+    model: cfg.default_model ?? null,
+    available_models: agent.listAvailableModels().length,
+    scorecard: cfg.default_scorecard,
+    tools: agent.tools.list().length,
+    mcp_tools: agent.tools.mcpTools().length,
+    mining_tools: agent.tools.miningTools().length,
+    core_models_required: coreModelsRequired,
+    core_models_ready: coreModelsReady,
+  }
+})
+
+/**
+ * Diagnostic: Ingress admit → platform.info(). Flat body for clients:
+ * `{ traceId, origin, abiVersion, packs, packEnforce, extensions, meter, jobsListed }`.
+ * Not attached to `/api/health`; subject to owner auth when claimed.
+ */
+app.get('/api/platform/info', async (_req, reply) => {
+  const result = admitPlatformInfo(platform)
+  if (!result.ok) {
+    return reply.code(400).send({ error: result.error })
+  }
+  return {
+    traceId: result.traceId,
+    origin: result.origin,
+    ...result.info,
+  }
+})
+
+/**
+ * Diagnostic: Ingress admit → meter.listRecentDenials() + meter counters.
+ * Not attached to `/api/health`; subject to owner auth when claimed.
+ * SF4: settings UI reads this for recent denials (fail-open).
+ */
+app.get('/api/platform/meter/denials', async (_req, reply) => {
+  const result = admitPlatformMeterDenials(platform)
+  if (!result.ok) {
+    return reply.code(400).send({ error: result.error })
+  }
+  return {
+    traceId: result.traceId,
+    origin: result.origin,
+    denials: result.denials,
+    recentDenialCount: result.recentDenialCount,
+    denyCount: result.denyCount,
+    submitCount: result.submitCount,
+    errorCount: result.errorCount,
+  }
+})
+
+/**
+ * Diagnostic: Ingress admit → jobs.list() + jobsListed.
+ * Query: optional sessionId (forwarded to admit; list filter if facade supports it).
+ * Not attached to `/api/health`; subject to owner auth when claimed. No cancel.
+ */
+app.get<{
+  Querystring: { sessionId?: string }
+}>('/api/platform/jobs', async (req, reply) => {
+  const rawSession = String(req.query.sessionId ?? '').trim()
+  const result = admitPlatformJobs(platform, {
+    sessionId: rawSession || undefined,
+  })
+  if (!result.ok) {
+    return reply.code(400).send({ error: result.error })
+  }
+  return {
+    traceId: result.traceId,
+    origin: result.origin,
+    jobs: result.jobs,
+    jobsListed: result.jobsListed,
+  }
+})
+
+/**
+ * Diagnostic: Ingress admit → approval.list(sessionId) + approvalsPending.
+ * Query: sessionId **required** (C1 — no global pending dump).
+ * Not attached to `/api/health`; subject to owner auth when claimed.
+ */
+app.get<{
+  Querystring: { sessionId?: string }
+}>('/api/platform/approvals', async (req, reply) => {
+  const rawSession = String(req.query.sessionId ?? '').trim()
+  if (!rawSession) {
+    return reply.code(400).send({ error: 'sessionId required' })
+  }
+  const result = admitPlatformApprovals(platform, {
+    sessionId: rawSession,
+  })
+  if (!result.ok) {
+    return reply.code(400).send({ error: result.error })
+  }
+  return {
+    traceId: result.traceId,
+    origin: result.origin,
+    approvals: result.approvals,
+    approvalsPending: result.approvalsPending,
+  }
+})
+
+/**
+ * Diagnostic: Ingress admit → approval.resolve(id, decision) + approvalsPending.
+ * Body: { approved: boolean; note?: string; sessionId?: string }.
+ * sessionId: body.sessionId, else req.auth.sessionId when claimed (C1 bind).
+ * Soft UserPrompt mirror (Wave 50A): when bindUserPromptResolve is live, resolve
+ * may settle ask_user waiters (approval id ≡ promptId) — fail-open.
+ * Returns 200 with resolved boolean even when id unknown/already resolved (mirrors queue).
+ * session_mismatch → 400. Not attached to `/api/health`; subject to owner auth when claimed.
+ */
+app.post<{
+  Params: { id: string }
+  Body: { approved?: boolean; note?: string; sessionId?: string }
+}>('/api/platform/approvals/:id/resolve', async (req, reply) => {
+  const body = req.body ?? {}
+  if (typeof body.approved !== 'boolean') {
+    return reply.code(400).send({ error: 'approved required' })
+  }
+  const bodySession =
+    typeof body.sessionId === 'string' ? body.sessionId.trim() : ''
+  const authSession =
+    typeof req.auth?.sessionId === 'string' ? req.auth.sessionId.trim() : ''
+  const sessionId = bodySession || authSession || undefined
+  const result = admitResolveApproval(
+    platform,
+    req.params.id,
+    {
+      approved: body.approved,
+      ...(typeof body.note === 'string' ? { note: body.note } : {}),
+    },
+    sessionId ? { sessionId } : undefined,
+  )
+  if (!result.ok) {
+    return reply.code(400).send({ error: result.error })
+  }
+  return {
+    traceId: result.traceId,
+    origin: result.origin,
+    resolved: result.resolved,
+    approvalsPending: result.approvalsPending,
+  }
+})
+
+/**
+ * Diagnostic: Ingress admit → approval.cancelSession(sessionId) + approvalsPending.
+ * Cancels all pending approvals for the session; returns cancelled count (0 if none).
+ * Not attached to `/api/health`; subject to owner auth when claimed. No ask_user bridge. No UI.
+ */
+app.post<{
+  Params: { sessionId: string }
+}>('/api/platform/sessions/:sessionId/approvals/cancel', async (req, reply) => {
+  const result = admitCancelSessionApprovals(platform, req.params.sessionId)
+  if (!result.ok) {
+    return reply.code(400).send({ error: result.error })
+  }
+  return {
+    traceId: result.traceId,
+    origin: result.origin,
+    cancelled: result.cancelled,
+    approvalsPending: result.approvalsPending,
+  }
+})
+
+/**
+ * Diagnostic: Ingress admit → alerts.list() + alertsPending.
+ * Query: optional includeAcknowledged=1|true, limit=<number>.
+ * Not attached to `/api/health`; subject to owner auth when claimed.
+ */
+app.get<{
+  Querystring: { includeAcknowledged?: string; limit?: string }
+}>('/api/platform/alerts', async (req, reply) => {
+  const rawAck = String(req.query.includeAcknowledged ?? '').trim().toLowerCase()
+  const includeAcknowledged =
+    rawAck === '1' || rawAck === 'true'
+      ? true
+      : rawAck === '0' || rawAck === 'false'
+        ? false
+        : undefined
+  const rawLimit = req.query.limit
+  let limit: number | undefined
+  if (rawLimit !== undefined && String(rawLimit).trim() !== '') {
+    const n = Number(rawLimit)
+    if (Number.isFinite(n) && n >= 0) limit = Math.trunc(n)
+  }
+  const result = admitPlatformAlerts(platform, { includeAcknowledged, limit })
+  if (!result.ok) {
+    return reply.code(400).send({ error: result.error })
+  }
+  return {
+    traceId: result.traceId,
+    origin: result.origin,
+    alerts: result.alerts,
+    alertsPending: result.alertsPending,
+  }
+})
+
+/**
+ * Diagnostic: Ingress admit → alerts.acknowledge(id) + alertsPending.
+ * Returns 200 with acknowledged boolean even when id is unknown (mirrors facade).
+ * Not attached to `/api/health`; subject to owner auth when claimed.
+ */
+app.post<{
+  Params: { id: string }
+}>('/api/platform/alerts/:id/acknowledge', async (req, reply) => {
+  const result = admitAcknowledgeAlert(platform, req.params.id)
+  if (!result.ok) {
+    return reply.code(400).send({ error: result.error })
+  }
+  return {
+    traceId: result.traceId,
+    origin: result.origin,
+    acknowledged: result.acknowledged,
+    alertsPending: result.alertsPending,
+  }
+})
+
+/**
+ * Diagnostic: Ingress admit → checkpoint.list(sessionId).
+ * Returns 200 with checkpoints [{ id, at }, ...]; does not restore into chat.
+ * Not attached to `/api/health`; subject to owner auth when claimed.
+ */
+app.get<{
+  Params: { sessionId: string }
+}>('/api/platform/sessions/:sessionId/checkpoint', async (req, reply) => {
+  const result = admitCheckpointList(platform, req.params.sessionId)
+  if (!result.ok) {
+    return reply.code(400).send({ error: result.error })
+  }
+  return {
+    traceId: result.traceId,
+    origin: result.origin,
+    checkpoints: result.checkpoints,
+  }
+})
+
+/**
+ * Diagnostic: Ingress admit → checkpoint.latest(sessionId).
+ * Returns 200 with latest null or { id, at, payload }; does not restore into chat.
+ * Not attached to `/api/health`; subject to owner auth when claimed.
+ */
+app.get<{
+  Params: { sessionId: string }
+}>('/api/platform/sessions/:sessionId/checkpoint/latest', async (req, reply) => {
+  const result = admitCheckpointLatest(platform, req.params.sessionId)
+  if (!result.ok) {
+    return reply.code(400).send({ error: result.error })
+  }
+  return {
+    traceId: result.traceId,
+    origin: result.origin,
+    latest: result.latest,
+  }
+})
+
+/**
+ * Soft/hard restore: Ingress admit → checkpoint payload (id or latest).
+ * Body: { checkpointId?, apply?, confirm? } — omit apply / false → soft (applied false);
+ * apply:true requires confirm:true → SessionStore mutation via bound hook;
+ * apply without confirm → 400 confirm_required (C3).
+ * Not attached to `/api/health`; subject to owner auth when claimed.
+ */
+app.post<{
+  Params: { sessionId: string }
+  Body: { checkpointId?: string; apply?: boolean; confirm?: boolean }
+}>('/api/platform/sessions/:sessionId/checkpoint/restore', async (req, reply) => {
+  const body = req.body ?? {}
+  const result = admitCheckpointRestore(platform, {
+    sessionId: req.params.sessionId,
+    ...(typeof body.checkpointId === 'string' ? { checkpointId: body.checkpointId } : {}),
+    ...(body.apply === true ? { apply: true } : {}),
+    ...(body.confirm === true ? { confirm: true } : {}),
+  })
+  if (!result.ok) {
+    return reply.code(400).send({ error: result.error })
+  }
+  return {
+    traceId: result.traceId,
+    origin: result.origin,
+    checkpoint: result.checkpoint,
+    applied: result.applied,
+    ...(result.truncated !== undefined ? { truncated: result.truncated } : {}),
+    note: result.note,
+  }
+})
+
+/**
+ * Diagnostic: Ingress admit → checkpoint.get(id).
+ * Returns 200 with payload null|object; does not restore into chat.
+ * Not attached to `/api/health`; subject to owner auth when claimed.
+ */
+app.get<{
+  Params: { id: string }
+}>('/api/platform/checkpoint/:id', async (req, reply) => {
+  const result = admitCheckpointGet(platform, req.params.id)
+  if (!result.ok) {
+    return reply.code(400).send({ error: result.error })
+  }
+  return {
+    traceId: result.traceId,
+    origin: result.origin,
+    payload: result.payload,
+  }
+})
+
+/**
+ * Diagnostic: Ingress admit → memory.getWorking + durable counts.
+ * Returns 200 with working null|snapshot; does not promote. Not on `/api/health`.
+ * Subject to owner auth when claimed.
+ */
+app.get<{
+  Params: { sessionId: string }
+}>('/api/platform/sessions/:sessionId/memory', async (req, reply) => {
+  const result = admitPlatformMemory(platform, {
+    sessionId: req.params.sessionId,
+  })
+  if (!result.ok) {
+    return reply.code(400).send({ error: result.error })
+  }
+  return {
+    traceId: result.traceId,
+    origin: result.origin,
+    working: result.working,
+    durableCount: result.durableCount,
+    memoryDurable: result.memoryDurable,
+  }
+})
+
+/**
+ * Diagnostic: Ingress admit → memory.promote (requires provenance).
+ * Body: { kind, content, provenance: { source, at?, ref? }, origin? }.
+ * Returns 200 with id + entry + memoryDurable; 400 on validation/admit/promote fail.
+ * Not on `/api/health`. No UI. No compact rewrite.
+ */
+app.post<{
+  Params: { sessionId: string }
+  Body: {
+    kind?: string
+    content?: string
+    provenance?: { source?: string; at?: string; ref?: string }
+    origin?: string
+  }
+}>('/api/platform/sessions/:sessionId/memory/promote', async (req, reply) => {
+  const body = req.body ?? {}
+  const provenance =
+    body.provenance && typeof body.provenance === 'object'
+      ? {
+          source:
+            typeof body.provenance.source === 'string'
+              ? body.provenance.source
+              : '',
+          ...(typeof body.provenance.at === 'string'
+            ? { at: body.provenance.at }
+            : {}),
+          ...(typeof body.provenance.ref === 'string'
+            ? { ref: body.provenance.ref }
+            : {}),
+        }
+      : undefined
+  const result = admitPromoteMemory(
+    platform,
+    {
+      sessionId: req.params.sessionId,
+      kind: typeof body.kind === 'string' ? body.kind : '',
+      content: typeof body.content === 'string' ? body.content : '',
+      provenance,
+    },
+    typeof body.origin === 'string' ? { origin: body.origin } : undefined,
+  )
+  if (!result.ok) {
+    return reply.code(400).send({
+      error: result.error,
+      ...(result.denialCode ? { denialCode: result.denialCode } : {}),
+    })
+  }
+  return {
+    traceId: result.traceId,
+    origin: result.origin,
+    id: result.id,
+    entry: result.entry,
+    memoryDurable: result.memoryDurable,
+  }
+})
+
+/**
+ * Diagnostic: Ingress admit → extensions.registerFromManifest (in-memory JSON only).
+ * Body: { id, name?, version?, capabilities?, trusted?, origin? }.
+ * SF1: requires `trusted: true` (install-time trust). Rejects file-path fields;
+ * never loads/evals extension code. No UI. No .opx.
+ */
+app.post<{
+  Body: {
+    id?: string
+    name?: string
+    version?: string
+    capabilities?: string[]
+    trusted?: boolean
+    origin?: string
+    sourcePath?: string
+    path?: string
+    [key: string]: unknown
+  }
+}>('/api/platform/extensions/register', async (req, reply) => {
+  const body = req.body ?? {}
+  const { origin, ...manifest } = body
+  const result = admitRegisterExtension(
+    platform,
+    manifest,
+    {
+      ...(typeof origin === 'string' ? { origin } : {}),
+      ...(manifest.trusted === true ? { trusted: true } : {}),
+    },
+  )
+  if (!result.ok) {
+    return reply.code(400).send({ error: result.error })
+  }
+  return {
+    traceId: result.traceId,
+    origin: result.origin,
+    extension: result.extension,
+    extensions: result.extensions,
+    extensionsActive: result.extensionsActive,
+  }
+})
+
+/**
+ * Diagnostic: Ingress admit → parse .opx zip → registerFromManifest (inactive).
+ * Body: `{ zipBase64: string, trusted?: boolean, origin? }`.
+ * SF1: requires `trusted: true` (install-time trust).
+ * Limits: zip ≤ 2MB (`OPX_ZIP_MAX_BYTES`), manifest ≤ 64KB.
+ * Root `manifest.json` or `opx.manifest.json` only — never extracts/evals JS/CSS. No UI.
+ */
+app.post<{
+  Body: { zipBase64?: string; trusted?: boolean; origin?: string }
+}>('/api/platform/extensions/register-opx', async (req, reply) => {
+  const body = req.body ?? {}
+  const zipBase64 = typeof body.zipBase64 === 'string' ? body.zipBase64.trim() : ''
+  if (!zipBase64) {
+    return reply.code(400).send({ error: 'zipBase64 required' })
+  }
+  let buffer: Buffer
+  try {
+    buffer = Buffer.from(zipBase64, 'base64')
+  } catch {
+    return reply.code(400).send({ error: 'zipBase64 is not valid base64' })
+  }
+  if (buffer.byteLength === 0) {
+    return reply.code(400).send({ error: 'empty zip' })
+  }
+  if (buffer.byteLength > OPX_ZIP_MAX_BYTES) {
+    return reply.code(400).send({
+      error: `zip exceeds ${OPX_ZIP_MAX_BYTES} bytes`,
+    })
+  }
+  const result = admitRegisterOpx(platform, buffer, {
+    ...(typeof body.origin === 'string' ? { origin: body.origin } : {}),
+    ...(body.trusted === true ? { trusted: true } : {}),
+  })
+  if (!result.ok) {
+    return reply.code(400).send({ error: result.error })
+  }
+  return {
+    traceId: result.traceId,
+    origin: result.origin,
+    extension: result.extension,
+    extensions: result.extensions,
+    extensionsActive: result.extensionsActive,
+  }
+})
+
+// NOTE: Extension activate / deactivate / list HTTP endpoints live in
+// `extensions-http.ts` (product surface: install/activate/deactivate/uninstall/
+// list/storage-export + /api/ext/:pluginId/* proxy). Registering the same
+// method+path twice throws FST_ERR_DUPLICATED_ROUTE at boot.
+
+/**
+ * Diagnostic: Ingress admit → info().hostWorker status only.
+ * Not attached to `/api/health`; subject to owner auth when claimed. No UI.
+ * Does not start/stop/restart the worker or load .opx.
+ */
+app.get('/api/platform/host-worker', async (_req, reply) => {
+  const result = admitPlatformHostWorker(platform)
+  if (!result.ok) {
+    return reply.code(400).send({ error: result.error })
+  }
+  return {
+    traceId: result.traceId,
+    origin: result.origin,
+    hostWorker: result.hostWorker,
+  }
+})
+
+/**
+ * Diagnostic: Ingress admit → handsTicketsPending + pendingCount (count only).
+ * Not attached to `/api/health`; subject to owner auth when claimed. No UI.
+ * Does not list ticket ids/tokens; does not issue/invoke.
+ */
+app.get('/api/platform/hands', async (_req, reply) => {
+  const result = admitPlatformHands(platform)
+  if (!result.ok) {
+    return reply.code(400).send({ error: result.error })
+  }
+  return {
+    traceId: result.traceId,
+    origin: result.origin,
+    handsTicketsPending: result.handsTicketsPending,
+    pendingCount: result.pendingCount,
+  }
+})
+
+/**
+ * Diagnostic: Ingress admit → packs.list() + packEnforce.
+ * Not attached to `/api/health`; subject to owner auth when claimed.
+ * Does not flip env OPPTRIX_PLATFORM_PACK_ENFORCE.
+ */
+app.get('/api/platform/packs', async (_req, reply) => {
+  const result = admitPlatformPacks(platform)
+  if (!result.ok) {
+    return reply.code(400).send({ error: result.error })
+  }
+  return {
+    traceId: result.traceId,
+    origin: result.origin,
+    packs: result.packs,
+    packEnforce: result.packEnforce,
+  }
+})
+
+/**
+ * Diagnostic: admit → enable/disable pack in registry only.
+ * Body: `{ enabled: boolean }`. Does not flip packEnforce env.
+ */
+app.post<{
+  Params: { id: string }
+  Body: { enabled?: boolean }
+}>('/api/platform/packs/:id', async (req, reply) => {
+  const setAdmit = platform.ingress.admit('web.diagnostic', {
+    text: 'platform.packs.set',
+  })
+  if (!setAdmit.ok) {
+    return reply.code(400).send({ error: setAdmit.error })
+  }
+  const enabled = req.body?.enabled
+  if (typeof enabled !== 'boolean') {
+    return reply.code(400).send({ error: 'enabled must be a boolean' })
+  }
+  const setResult = setPlatformPackEnabled(platform, req.params.id, enabled)
+  if (!setResult.ok) {
+    // Soft persist fail: in-memory applied; return 200 + packs so UI keeps toggle.
+    // Unsupported id → 400 (no memory change for unknown ids).
+    if (setResult.error.startsWith('unsupported pack id')) {
+      return reply.code(400).send({
+        ok: false,
+        error: setResult.error,
+        packs: setResult.packs,
+        persisted: false,
+      })
+    }
+    return {
+      ok: false,
+      error: setResult.error,
+      packs: setResult.packs,
+      persisted: false,
+    }
+  }
+  return {
+    ok: true,
+    packs: setResult.packs,
+    persisted: true,
+  }
+})
+
+// Extensions HTTP API — install/activate/deactivate/uninstall/list + route proxy.
+// Registered in Phase A (before listen) so /api/platform/extensions is available early.
+await registerExtensionsHttp(app, {
+  platform,
+  devMode: process.env.OPPTRIX_EXT_DEV === '1',
+})
+
+// Phase B chat channels (external bots: Telegram/Slack/DingTalk/Feishu/WeCom/QQ).
+await registerChannelsHttp(app, { platform, agent })
+
+// Phase B store client endpoints (UI entry hidden until next release).
+await registerStoreHttp(app, {
+  platform,
+  ...(process.env.OPPTRIX_STORE_REGISTRY_BASE
+    ? { baseUrl: process.env.OPPTRIX_STORE_REGISTRY_BASE }
+    : {}),
+})
+
+app.get('/api/legal/user-agreement', async (_req, reply) => {
+  try {
+    return await fetchUserAgreementHtml()
+  } catch (e) {
+    const message = e instanceof Error ? e.message : '协议页面加载失败'
+    return reply.code(502).send({ error: message })
+  }
+})
+
+app.get<{ Querystring: { mining?: string } }>('/api/mcp/tools', async (req) => {
+  const miningOnly = req.query.mining === '1' || req.query.mining === 'true'
+  const catalog = mcpToolCatalog(agent.tools)
+  return {
+    tools: miningOnly ? catalog.filter(t => t.mining_eligible) : catalog,
+    mining_count: catalog.filter(t => t.mining_eligible).length,
+    total: catalog.length,
+  }
+})
+
+app.post<{ Body: { feature: string; params?: Record<string, unknown> } }>(
+  '/api/research',
+  async (req, reply) => {
+    const { feature, params = {} } = req.body ?? {}
+    if (!feature) return reply.code(400).send({ error: 'feature required' })
+    const result = await hub.dispatch(feature, params)
+    return { success: result.success, feature, data: result.data, message: result.message, elapsed: result.elapsed }
+  },
+)
+
+app.get<{ Params: { key: string } }>('/api/preferences/:key', async (req) => {
+  return { key: req.params.key, value: getUserPreference(req.params.key, null) }
+})
+
+app.put<{ Params: { key: string }; Body: { value?: unknown } }>('/api/preferences/:key', async (req) => {
+  const value = setUserPreference(req.params.key, req.body?.value ?? null)
+  return { key: req.params.key, value }
+})
+
+/** 个股分析最近一次报告 — documents namespace `stock_analysis`，id = instrumentKey */
+app.get<{ Params: { instrumentKey: string } }>('/api/stock-analysis/:instrumentKey', async (req) => {
+  const instrumentKey = decodeURIComponent(req.params.instrumentKey)
+  const data = getLatestStockAnalysis(instrumentKey)
+  return { success: true, data }
+})
+
+app.put<{ Params: { instrumentKey: string }; Body: unknown }>(
+  '/api/stock-analysis/:instrumentKey',
+  async (req, reply) => {
+    const instrumentKey = decodeURIComponent(req.params.instrumentKey)
+    const parsed = parseStockAnalysisBody(instrumentKey, req.body)
+    if (!parsed.ok) return reply.code(400).send({ error: parsed.error })
+    const data = saveStockAnalysis(parsed.record)
+    return { success: true, data }
+  },
+)
+
+app.get('/api/tushare/config', async () => {
+  const r = await hub.dispatch('tushare_config', {})
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.post<{ Body: { enabled?: boolean; token?: string } }>('/api/tushare/config', async (req) => {
+  const body = req.body ?? {}
+  const r = await hub.dispatch('tushare_config_save', {
+    enabled: body.enabled,
+    token: body.token,
+  })
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.post<{ Body: { token?: string } }>('/api/tushare/test', async (req) => {
+  const r = await hub.dispatch('tushare_test', { token: req.body?.token })
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.get('/api/data/providers', async () => {
+  const r = await hub.dispatch('provider_list', {})
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.get('/api/data/providers/installed', async () => {
+  const r = await hub.dispatch('provider_installed_list', {})
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.post('/api/data/providers/rescan', async () => {
+  const r = await hub.dispatch('provider_rescan', {})
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+/** 静态路径须在 /:id/* 之前注册，避免被参数路由吞掉 */
+app.put<{
+  Body: {
+    provider_ids: string[]
+  }
+}>('/api/data/providers/order', async (req) => {
+  const body = req.body ?? { provider_ids: [] }
+  const r = await hub.dispatch('provider_order_save', {
+    provider_ids: body.provider_ids,
+  })
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.delete<{ Params: { id: string } }>('/api/data/providers/installed/:id', async (req, reply) => {
+  const r = await hub.dispatch('provider_uninstall', { provider_id: req.params.id })
+  if (!r.success) return reply.code(404).send({ success: false, message: r.message })
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.post<{ Params: { id: string } }>('/api/data/providers/installed/:id/reload', async (req, reply) => {
+  const r = await hub.dispatch('provider_reload', { provider_id: req.params.id })
+  if (!r.success) return reply.code(400).send({ success: false, message: r.message })
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.get<{ Params: { id: string } }>('/api/data/providers/:id/config', async (req) => {
+  const r = await hub.dispatch('provider_config', { provider_id: req.params.id })
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.put<{
+  Params: { id: string }
+  Body: {
+    enabled?: boolean
+    priority_mode?: 'manifest' | 'custom'
+    priority?: number | null
+    sort_order?: number | null
+    extra?: Record<string, unknown>
+  }
+}>('/api/data/providers/:id/config', async (req) => {
+  const body = req.body ?? {}
+  const r = await hub.dispatch('provider_config_save', {
+    provider_id: req.params.id,
+    enabled: body.enabled,
+    priority_mode: body.priority_mode,
+    priority: body.priority,
+    sort_order: body.sort_order,
+    extra: body.extra,
+  })
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.get<{ Params: { id: string } }>('/api/data/providers/:id/bindings', async (req) => {
+  const r = await hub.dispatch('provider_binding_overrides', { provider_id: req.params.id })
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.put<{
+  Params: { id: string }
+  Body: {
+    market: string
+    asset_class: string
+    capability: string
+    enabled?: boolean | null
+    priority?: number | null
+  }
+}>('/api/data/providers/:id/bindings', async (req) => {
+  const body = req.body ?? {}
+  const r = await hub.dispatch('provider_binding_override_save', {
+    provider_id: req.params.id,
+    market: body.market,
+    asset_class: body.asset_class,
+    capability: body.capability,
+    enabled: body.enabled,
+    priority: body.priority,
+  })
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.post<{
+  Params: { id: string }
+  Body: Record<string, unknown>
+}>('/api/data/providers/:id/test', async (req) => {
+  const r = await hub.dispatch('provider_test', {
+    provider_id: req.params.id,
+    ...req.body,
+  })
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.get<{ Querystring: { code?: string; limit?: string } }>('/api/etf/list', async (req) => {
+  const r = await hub.dispatch('local_etf_list', {
+    code: req.query.code,
+    limit: req.query.limit != null ? Number(req.query.limit) : undefined,
+  })
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.get<{ Params: { code: string } }>('/api/etf/:code/snapshot', async (req) => {
+  const r = await hub.dispatch('etf_snapshot', { code: req.params.code })
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.get<{ Params: { code: string }; Querystring: { limit?: string } }>('/api/etf/:code/nav', async (req) => {
+  const r = await hub.dispatch('local_etf_nav', {
+    code: req.params.code,
+    limit: req.query.limit != null ? Number(req.query.limit) : undefined,
+  })
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.get<{ Params: { code: string }; Querystring: { limit?: string } }>('/api/etf/:code/holdings', async (req) => {
+  const r = await hub.dispatch('local_etf_holdings', {
+    code: req.params.code,
+    limit: req.query.limit != null ? Number(req.query.limit) : undefined,
+  })
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.get<{ Querystring: { q?: string; keyword?: string; limit?: string } }>('/api/etf/search', async (req) => {
+  const r = await hub.dispatch('search_etfs', {
+    keyword: req.query.keyword ?? req.query.q,
+    limit: req.query.limit != null ? Number(req.query.limit) : undefined,
+  })
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.get('/api/etf/screen/schema', async () => {
+  const r = await hub.dispatch('local_etf_screen_schema', {})
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.post<{ Body: Record<string, unknown> }>('/api/etf/screen', async (req) => {
+  const r = await hub.dispatch('local_etf_screen', req.body ?? {})
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.get<{ Params: { code: string } }>('/api/etf/:code/scorecard', async (req) => {
+  const r = await hub.dispatch('etf_scorecard', { code: req.params.code })
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.get('/api/etf/scorecard/schema', async () => {
+  const r = await hub.dispatch('etf_scorecard_schema', {})
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.get<{ Querystring: { q?: string; keyword?: string; limit?: string; markets?: string } }>(
+  '/api/instruments/search',
+  async (req) => {
+    const markets = req.query.markets
+      ? req.query.markets.split(',').map(s => s.trim()).filter(Boolean)
+      : undefined
+    const r = await hub.dispatch('instrument_search', {
+      keyword: req.query.keyword ?? req.query.q,
+      limit: req.query.limit != null ? Number(req.query.limit) : undefined,
+      markets,
+    })
+    return { success: r.success, data: r.data, message: r.message }
+  },
+)
+
+app.post<{ Body: Record<string, unknown> }>('/api/instruments/resolve-names', async (req) => {
+  const r = await hub.dispatch('instrument_resolve_names', req.body ?? {})
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.get('/api/instruments/summary', async () => ({
+  success: false,
+  message: '本地标的库索引已下线，请使用 /api/instruments/search',
+}))
+
+app.post<{ Body: Record<string, unknown> }>('/api/instruments/snapshot', async (req) => {
+  const r = await hub.dispatch('instrument_snapshot', req.body ?? {})
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.post<{ Body: Record<string, unknown> }>('/api/instruments/quotes', async (req) => {
+  const r = await hub.dispatch('instrument_quotes', req.body ?? {})
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.post<{ Body: Record<string, unknown> }>('/api/instruments/quote', async (req) => {
+  const r = await hub.dispatch('instrument_quote', req.body ?? {})
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.post<{ Body: Record<string, unknown> }>('/api/instruments/chart', async (req) => {
+  const r = await hub.dispatch('instrument_chart', req.body ?? {})
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.post<{ Body: Record<string, unknown> }>('/api/instruments/capabilities', async (req) => {
+  const r = await hub.dispatch('instrument_capabilities', req.body ?? {})
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.post<{ Body: Record<string, unknown> }>('/api/instruments/cyq', async (req) => {
+  const r = await hub.dispatch('instrument_cyq', req.body ?? {})
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.post<{ Body: Record<string, unknown> }>('/api/instruments/institution-rating', async (req) => {
+  const r = await hub.dispatch('instrument_institution_rating', req.body ?? {})
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.post<{ Body: Record<string, unknown> }>('/api/instruments/institution-report', async (req) => {
+  const r = await hub.dispatch('instrument_institution_report', req.body ?? {})
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.post<{ Body: Record<string, unknown> }>('/api/instruments/batch-snapshots', async (req) => {
+  const r = await hub.dispatch('instrument_batch_snapshots', req.body ?? {})
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.post<{ Body: Record<string, unknown> }>('/api/instruments/evaluation', async (req) => {
+  const r = await hub.dispatch('instrument_evaluation', req.body ?? {})
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.post<{ Body: Record<string, unknown> }>('/api/instruments/strategy-signal', async (req) => {
+  const r = await hub.dispatch('instrument_strategy_signal', req.body ?? {})
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.post<{ Body: Record<string, unknown> }>('/api/instruments/indicators', async (req) => {
+  const r = await hub.dispatch('instrument_indicators', req.body ?? {})
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.post<{ Body: Record<string, unknown> }>('/api/instruments/strategy-verify', async (req) => {
+  const r = await hub.dispatch('instrument_strategy_verify', req.body ?? {})
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.post<{ Body: Record<string, unknown> }>('/api/instruments/latest-evaluation', async (req) => {
+  const r = await hub.dispatch('latest_evaluation', req.body ?? {})
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+function markDeprecatedInstrumentRoute(reply: { header: (name: string, value: string) => void }, successorPath: string) {
+  reply.header('Deprecation', 'true')
+  reply.header('Link', `<${successorPath}>; rel="successor-version"`)
+}
+
+app.get('/api/us/screen/schema', async () => {
+  const r = await hub.dispatch('local_us_screen_schema', {})
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.post<{ Body: Record<string, unknown> }>('/api/us/screen', async (req) => {
+  const r = await hub.dispatch('local_us_screen', req.body ?? {})
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.get<{ Querystring: { keyword?: string; limit?: string } }>('/api/us/list', async (req) => {
+  const r = await hub.dispatch('local_us_list', {
+    keyword: req.query.keyword,
+    limit: req.query.limit != null ? Number(req.query.limit) : undefined,
+  })
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.get<{ Params: { symbol: string } }>('/api/us/:symbol/snapshot', async (req, reply) => {
+  markDeprecatedInstrumentRoute(reply, '/api/instruments/snapshot')
+  const r = await hub.dispatch('instrument_snapshot', {
+    instrument: { market: 'US', assetClass: 'EQUITY', symbol: req.params.symbol },
+  })
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.get<{ Params: { symbol: string } }>('/api/us/:symbol/quote', async (req, reply) => {
+  markDeprecatedInstrumentRoute(reply, '/api/instruments/quotes')
+  const r = await hub.dispatch('instrument_quotes', {
+    instruments: [{ market: 'US', assetClass: 'EQUITY', symbol: req.params.symbol }],
+  })
+  const quotes = r.data && typeof r.data === 'object'
+    ? (r.data as { quotes?: unknown[] }).quotes
+    : undefined
+  return { success: r.success, data: quotes?.[0] ?? null, message: r.message }
+})
+
+app.get<{ Params: { symbol: string }; Querystring: { count?: string } }>('/api/us/:symbol/kline', async (req, reply) => {
+  markDeprecatedInstrumentRoute(reply, '/api/instruments/chart')
+  const r = await hub.dispatch('instrument_chart', {
+    instrument: { market: 'US', assetClass: 'EQUITY', symbol: req.params.symbol },
+    period: 'daily',
+    count: req.query.count != null ? Number(req.query.count) : 120,
+  })
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.get<{ Params: { symbol: string } }>('/api/us/:symbol/profile', async (req) => {
+  const r = await hub.dispatch('us_profile', { symbol: req.params.symbol })
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.get<{ Params: { symbol: string }; Querystring: { report_type?: string; report_date?: string } }>(
+  '/api/us/:symbol/financials',
+  async (req) => {
+    const r = await hub.dispatch('us_financials', {
+      symbol: req.params.symbol,
+      report_type: req.query.report_type,
+      report_date: req.query.report_date,
+    })
+    return { success: r.success, data: r.data, message: r.message }
+  },
+)
+
+app.get<{ Querystring: { q?: string; keyword?: string; limit?: string } }>('/api/us/search', async (req, reply) => {
+  markDeprecatedInstrumentRoute(reply, '/api/instruments/search')
+  const r = await hub.dispatch('instrument_search', {
+    keyword: req.query.keyword ?? req.query.q,
+    limit: req.query.limit != null ? Number(req.query.limit) : undefined,
+    markets: ['US'],
+  })
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.get('/api/crypto/screen/schema', async () => {
+  const r = await hub.dispatch('local_crypto_screen_schema', {})
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.post<{ Body: Record<string, unknown> }>('/api/crypto/screen', async (req) => {
+  const r = await hub.dispatch('local_crypto_screen', req.body ?? {})
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.get<{ Querystring: { keyword?: string; limit?: string } }>('/api/crypto/list', async (req) => {
+  const r = await hub.dispatch('local_crypto_list', {
+    keyword: req.query.keyword,
+    limit: req.query.limit != null ? Number(req.query.limit) : undefined,
+  })
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.get<{ Params: { pair: string } }>('/api/crypto/:pair/snapshot', async (req, reply) => {
+  markDeprecatedInstrumentRoute(reply, '/api/instruments/snapshot')
+  const pair = decodeURIComponent(req.params.pair)
+  const r = await hub.dispatch('instrument_snapshot', { market: 'CRYPTO', pair })
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.get<{ Params: { pair: string } }>('/api/crypto/:pair/quote', async (req, reply) => {
+  markDeprecatedInstrumentRoute(reply, '/api/instruments/quotes')
+  const pair = decodeURIComponent(req.params.pair)
+  const r = await hub.dispatch('instrument_quotes', {
+    instruments: [{ market: 'CRYPTO', pair }],
+  })
+  const quotes = r.data && typeof r.data === 'object'
+    ? (r.data as { quotes?: unknown[] }).quotes
+    : undefined
+  return { success: r.success, data: quotes?.[0] ?? null, message: r.message }
+})
+
+app.get<{ Params: { pair: string }; Querystring: { count?: string } }>('/api/crypto/:pair/kline', async (req, reply) => {
+  markDeprecatedInstrumentRoute(reply, '/api/instruments/chart')
+  const pair = decodeURIComponent(req.params.pair)
+  const r = await hub.dispatch('instrument_chart', {
+    market: 'CRYPTO',
+    pair,
+    period: 'daily',
+    count: req.query.count != null ? Number(req.query.count) : 120,
+  })
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.get<{ Querystring: { q?: string; keyword?: string; limit?: string } }>('/api/crypto/search', async (req, reply) => {
+  markDeprecatedInstrumentRoute(reply, '/api/instruments/search')
+  const r = await hub.dispatch('instrument_search', {
+    keyword: req.query.keyword ?? req.query.q,
+    limit: req.query.limit != null ? Number(req.query.limit) : undefined,
+    markets: ['CRYPTO'],
+  })
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.get('/api/config', async () => publicConfig(cfg))
+
+app.patch<{ Body: {
+  default_scorecard?: string
+  default_top_n?: number
+  default_model?: string
+  system_proxy?: { enabled?: boolean; url?: string }
+} }>(
+  '/api/config',
+  async (req, reply) => {
+    const b = req.body ?? {}
+    let system_proxy = cfg.system_proxy
+    if (b.system_proxy !== undefined) {
+      try {
+        system_proxy = parseSystemProxyInput(b.system_proxy)
+      } catch (e) {
+        return reply.code(400).send({
+          status: 'error',
+          error: e instanceof Error ? e.message : '网络代理配置无效',
+        })
+      }
+    }
+    cfg = saveConfig({
+      default_scorecard: b.default_scorecard,
+      default_top_n: b.default_top_n,
+      default_model: b.default_model,
+      system_proxy,
+    })
+    applySystemProxyAsDefault(cfg.system_proxy)
+    syncAgentProviders()
+    return { status: 'saved', config: publicConfig(cfg) }
+  },
+)
+
+app.get('/api/providers/presets', async () => ({ presets: await resolveProviderPresets() }))
+
+app.post<{ Body: {
+  base_url: string
+  api_key: string
+  proxy_mode?: string
+  proxy_url?: string
+} }>(
+  '/api/providers/discover-models',
+  async (req, reply) => {
+    const { base_url, api_key, proxy_mode, proxy_url } = req.body ?? {}
+    if (!base_url?.trim() || !api_key?.trim()) {
+      return reply.code(400).send({ error: 'base_url and api_key required' })
+    }
+    let proxyUrl: string | false | undefined
+    try {
+      const proxyFields = parseProviderProxyFields({ proxy_mode, proxy_url })
+      proxyUrl = resolveOutboundProxyInit(
+        { mode: proxyFields.proxy_mode, url: proxyFields.proxy_url },
+        cfg.system_proxy,
+      )
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '代理配置无效'
+      return reply.code(400).send({ error: msg })
+    }
+    try {
+      const models = await fetchOpenAiModelList(base_url.trim(), api_key.trim(), { proxyUrl })
+      return { models }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'fetch models failed'
+      return reply.code(400).send({ error: msg })
+    }
+  },
+)
+
+app.post<{ Body: {
+  name: string
+  base_url: string
+  api_key: string
+  models: string[]
+  proxy_mode?: string
+  proxy_url?: string
+} }>(
+  '/api/providers',
+  async (req, reply) => {
+    const { name, base_url, api_key, models, proxy_mode, proxy_url } = req.body ?? {}
+    if (!name?.trim() || !base_url?.trim() || !api_key?.trim()) {
+      return reply.code(400).send({ error: 'name, base_url and api_key required' })
+    }
+    if (!models?.length) return reply.code(400).send({ error: '至少启用一个模型' })
+    let proxyFields: Pick<StoredProvider, 'proxy_mode' | 'proxy_url'> = { proxy_mode: 'inherit' }
+    try {
+      proxyFields = parseProviderProxyFields({ proxy_mode, proxy_url })
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '代理配置无效'
+      return reply.code(400).send({ error: msg })
+    }
+    const provider: StoredProvider = {
+      id: randomUUID(),
+      name: name.trim(),
+      base_url: base_url.trim(),
+      api_key: api_key.trim(),
+      models: [...new Set(models.map(m => m.trim()).filter(Boolean))],
+      ...proxyFields,
+    }
+    cfg = saveConfig({ providers: [...cfg.providers, provider] })
+    if (!cfg.default_model) {
+      cfg = saveConfig({ default_model: `${provider.id}:${provider.models[0]}` })
+    }
+    syncAgentProviders()
+    return { status: 'created', provider: publicConfig(cfg).providers.find(p => p.id === provider.id) }
+  },
+)
+
+app.patch<{ Params: { id: string }; Body: Partial<StoredProvider> }>(
+  '/api/providers/:id',
+  async (req, reply) => {
+    const idx = cfg.providers.findIndex(p => p.id === req.params.id)
+    if (idx < 0) return reply.code(404).send({ error: 'provider not found' })
+    const b = req.body ?? {}
+    const current = cfg.providers[idx]
+    let proxyFields: Pick<StoredProvider, 'proxy_mode' | 'proxy_url'> = {
+      proxy_mode: current.proxy_mode ?? 'inherit',
+      proxy_url: current.proxy_url,
+    }
+    if (b.proxy_mode !== undefined || b.proxy_url !== undefined) {
+      try {
+        proxyFields = parseProviderProxyFields({
+          proxy_mode: b.proxy_mode ?? current.proxy_mode,
+          proxy_url: b.proxy_url ?? current.proxy_url,
+        })
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : '代理配置无效'
+        return reply.code(400).send({ error: msg })
+      }
+    }
+    const next: StoredProvider = {
+      ...current,
+      name: b.name?.trim() || current.name,
+      base_url: b.base_url?.trim() || current.base_url,
+      api_key: b.api_key?.trim() || current.api_key,
+      models: b.models?.length
+        ? [...new Set(b.models.map(m => m.trim()).filter(Boolean))]
+        : current.models,
+      ...proxyFields,
+    }
+    if (!next.models.length) return reply.code(400).send({ error: '至少启用一个模型' })
+    const providers = [...cfg.providers]
+    providers[idx] = next
+    cfg = saveConfig({ providers })
+    syncAgentProviders()
+    return { status: 'updated', provider: publicConfig(cfg).providers.find(p => p.id === next.id) }
+  },
+)
+
+app.delete<{ Params: { id: string } }>('/api/providers/:id', async (req, reply) => {
+  const idx = cfg.providers.findIndex(p => p.id === req.params.id)
+  if (idx < 0) return reply.code(404).send({ error: 'provider not found' })
+  const removed = cfg.providers[idx]
+  const providers = cfg.providers.filter(p => p.id !== req.params.id)
+  let default_model = cfg.default_model
+  if (default_model?.startsWith(`${removed.id}:`)) {
+    const first = providers[0]
+    default_model = first ? `${first.id}:${first.models[0]}` : undefined
+  }
+  cfg = saveConfig({ providers, default_model })
+  syncAgentProviders()
+  return { status: 'deleted' }
+})
+
+/**
+ * 聊天选模型列表：同步列表即可选；models.dev 富化（context/media）仅在缓存已热时附带。
+ * 禁止冷启动阻塞拉 models.dev（否则客户端 10s 超时清空下拉，表现为「要先进设置才可选」）。
+ */
+app.get('/api/models/available', async () => {
+  const sync = agent.listAvailableModels()
+  const default_model = cfg.default_model ?? null
+  try {
+    const enriched = await Promise.race([
+      agent.listAvailableModelsAsync(),
+      new Promise<null>((resolve) => {
+        setTimeout(() => resolve(null), 400)
+      }),
+    ])
+    return { models: enriched ?? sync, default_model }
+  } catch {
+    return { models: sync, default_model }
+  }
+})
+
+app.get('/api/sessions', async () => ({ sessions: agent.listSessions() }))
+
+app.post<{ Body: { title?: string; expertId?: string } }>('/api/sessions', async (req, reply) => {
+  try {
+    const session = await agent.createSession({
+      title: req.body?.title,
+      expertId: req.body?.expertId,
+    })
+    return { session: agent.sessionMeta(session) }
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'create session failed'
+    if (message.includes('未知专家')) return reply.code(400).send({ error: message })
+    throw e
+  }
+})
+
+app.get<{ Params: { id: string } }>('/api/sessions/:id', async (req, reply) => {
+  const session = agent.getSession(req.params.id)
+  if (!session) return reply.code(404).send({ error: 'session not found' })
+  // 仅读缓存；miss 不阻塞（UI 再异步拉 /context-usage）
+  const contextUsage = agent.getCachedSessionContextUsage(req.params.id)
+  return {
+    session: agent.sessionMeta(session),
+    messages: agent.getDisplayMessages(req.params.id),
+    contextRef: session.contextRef ?? null,
+    contextUsage,
+  }
+})
+
+app.get<{ Params: { id: string }; Querystring: { force?: string } }>(
+  '/api/sessions/:id/context-usage',
+  async (req, reply) => {
+    const force = req.query.force === '1' || req.query.force === 'true'
+    const contextUsage = await agent.getSessionContextUsage(req.params.id, { force })
+    if (!contextUsage) return reply.code(404).send({ error: 'session not found' })
+    return { contextUsage }
+  },
+)
+
+app.get<{ Params: { id: string } }>('/api/sessions/:id/role-persona', async (req, reply) => {
+  try {
+    const result = agent.getSessionRolePersona(req.params.id)
+    if (!result) return reply.code(404).send({ error: 'session not found' })
+    return result
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'load role persona failed'
+    return reply.code(400).send({ error: message })
+  }
+})
+
+app.put<{ Params: { id: string }; Body: { rolePersona?: string } }>(
+  '/api/sessions/:id/role-persona',
+  async (req, reply) => {
+    const raw = req.body?.rolePersona
+    if (typeof raw !== 'string') {
+      return reply.code(400).send({ error: '请填写技能专长' })
+    }
+    try {
+      const updated = agent.setSessionRolePersona(req.params.id, raw)
+      if (!updated) return reply.code(404).send({ error: 'session not found' })
+      return {
+        rolePersona: updated.rolePersona,
+        expertId: updated.expertId ?? null,
+      }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : '技能专长无效，请修改后重试'
+      return reply.code(400).send({ error: message })
+    }
+  },
+)
+app.patch<{
+  Params: { id: string }
+  Body: {
+    title?: string
+    model?: string | null
+    llmParams?: {
+      temperature?: number
+      maxTokens?: number
+      reasoningEffort?: 'low' | 'medium' | 'high' | null
+    }
+    artifactsEnabled?: boolean
+  }
+}>(
+  '/api/sessions/:id',
+  async (req, reply) => {
+    const { title, model, llmParams } = req.body ?? {}
+    if (title !== undefined) {
+      const updated = await agent.renameSession(req.params.id, title)
+      if (!updated) return reply.code(404).send({ error: 'session not found' })
+      return { session: agent.sessionMeta(updated) }
+    }
+    if (model !== undefined) {
+      const updated = await agent.setSessionModel(req.params.id, model)
+      if (!updated) return reply.code(404).send({ error: 'session not found' })
+      const trimmed = typeof model === 'string' ? model.trim() : ''
+      if (trimmed) {
+        cfg = saveConfig({ default_model: trimmed })
+        syncAgentProviders()
+      }
+      return {
+        session: agent.sessionMeta(updated.session),
+        contextHint: updated.contextHint,
+      }
+    }
+    if (llmParams !== undefined) {
+      if (!llmParams || typeof llmParams !== 'object') {
+        return reply.code(400).send({ error: 'llmParams invalid' })
+      }
+      const updated = agent.setSessionLlmParams(req.params.id, llmParams)
+      if (!updated) return reply.code(404).send({ error: 'session not found' })
+      return { session: agent.sessionMeta(updated) }
+    }
+    if (typeof req.body?.artifactsEnabled === 'boolean') {
+      const updated = await agent.setSessionArtifactsEnabled(req.params.id, req.body.artifactsEnabled)
+      if (!updated) return reply.code(404).send({ error: 'session not found' })
+      return { session: agent.sessionMeta(updated) }
+    }
+    return reply.code(400).send({ error: 'title, model, llmParams or artifactsEnabled required' })
+  },
+)
+
+app.delete<{ Params: { id: string } }>('/api/sessions/:id', async (req, reply) => {
+  if (!agent.getSession(req.params.id)) return reply.code(404).send({ error: 'session not found' })
+  clearSessionTurnWakes(req.params.id)
+  clearSessionJobWaitsAndWatches(req.params.id)
+  agent.deleteSession(req.params.id)
+  return { status: 'deleted' }
+})
+
+app.get<{ Params: { id: string } }>('/api/sessions/:id/pending-wakes', async (req, reply) => {
+  if (!agent.getSession(req.params.id)) return reply.code(404).send({ error: 'session not found' })
+  return {
+    wakes: listPendingTurnWakes(req.params.id),
+    job_watches: listPendingJobWatches(req.params.id),
+  }
+})
+
+app.get<{ Params: { id: string } }>('/api/sessions/:id/pending-job-watches', async (req, reply) => {
+  if (!agent.getSession(req.params.id)) return reply.code(404).send({ error: 'session not found' })
+  return { watches: listPendingJobWatches(req.params.id) }
+})
+
+app.get<{ Params: { id: string } }>('/api/sessions/:id/jobs', async (req, reply) => {
+  if (!agent.getSession(req.params.id)) return reply.code(404).send({ error: 'session not found' })
+  const sessionId = req.params.id
+  const q = req.query as Record<string, unknown>
+  const kindRaw = q.kind != null ? String(q.kind).trim() : ''
+  const kind = kindRaw === 'shell-command' || kindRaw === 'python-install'
+    ? kindRaw
+    : undefined
+  const statesRaw = typeof q.states === 'string'
+    ? q.states.split(',').map(s => s.trim()).filter(Boolean)
+    : Array.isArray(q.states)
+      ? q.states.map(s => String(s).trim()).filter(Boolean)
+      : []
+  const allowedStates = new Set([
+    'queued', 'accepted', 'preparing', 'running', 'completed', 'failed', 'cancelled',
+  ])
+  const states = statesRaw.filter((s): s is 'queued' | 'accepted' | 'preparing' | 'running' | 'completed' | 'failed' | 'cancelled' =>
+    allowedStates.has(s))
+  const limitRaw = q.limit != null ? Number(q.limit) : 20
+  const limit = Number.isFinite(limitRaw) ? Math.min(50, Math.max(1, Math.floor(limitRaw))) : 20
+
+  const watched = new Set(watchRegistry.listSession(sessionId).map(w => w.jobId))
+  let snaps = jobRegistry.list({
+    kind,
+    states: states.length ? states : undefined,
+  }).filter((snap) => {
+    const sid = typeof snap.meta?.session_id === 'string' ? snap.meta.session_id : ''
+    if (sid && sid === sessionId) return true
+    if (watched.has(snap.jobId)) return true
+    return false
+  })
+  snaps = snaps.sort((a, b) => b.updatedAtMs - a.updatedAtMs).slice(0, limit)
+  return {
+    jobs: snaps.map((snap) => {
+      const stdoutTail = typeof snap.meta?.stdout_tail === 'string' ? snap.meta.stdout_tail : undefined
+      const metaSummary: Record<string, unknown> = {}
+      if (typeof snap.meta?.command_summary === 'string') {
+        metaSummary.command_summary = snap.meta.command_summary
+      }
+      if (snap.meta?.exit_code !== undefined) metaSummary.exit_code = snap.meta.exit_code
+      if (snap.meta?.dump_kind !== undefined) metaSummary.dump_kind = snap.meta.dump_kind
+      return {
+        job_id: snap.jobId,
+        kind: snap.kind,
+        title: snap.title
+          ?? (typeof snap.meta?.command_summary === 'string' ? snap.meta.command_summary : undefined),
+        label: snap.progress.message,
+        state: snap.state,
+        percent: snap.progress.percent,
+        cancelable: snap.cancelable,
+        eta_seconds: snap.progress.etaSeconds ?? undefined,
+        stdout_tail: stdoutTail || undefined,
+        meta: Object.keys(metaSummary).length ? metaSummary : undefined,
+      }
+    }),
+  }
+})
+
+app.post<{ Params: { id: string; jobId: string } }>(
+  '/api/sessions/:id/jobs/:jobId/cancel',
+  async (req, reply) => {
+    if (!agent.getSession(req.params.id)) return reply.code(404).send({ error: 'session not found' })
+    const jobId = String(req.params.jobId ?? '').trim()
+    if (!jobId) return reply.code(400).send({ ok: false, error: 'job_id 必填' })
+    const result = await jobRegistry.requestCancel(jobId)
+    if (result.ok) {
+      watchRegistry.clearByJob(req.params.id, jobId)
+      return { ok: true, job_id: jobId, cancelled: true }
+    }
+    return reply.code(400).send({
+      ok: false,
+      job_id: jobId,
+      cancelled: false,
+      error: result.error ?? '无法取消',
+    })
+  },
+)
+
+/** 本会话协作任务（父会话 Subagent runs） */
+app.get<{ Params: { id: string } }>('/api/sessions/:id/subagents', async (req, reply) => {
+  if (!agent.getSession(req.params.id)) return reply.code(404).send({ error: 'session not found' })
+  const runs = agent.listSubagents(req.params.id)
+  return {
+    runs: runs.map((r) => ({
+      run_id: r.run_id,
+      label: r.label,
+      status: r.status,
+      summary: r.summary,
+      child_session_id: r.child_session_id,
+      mode: r.mode,
+      updated_at: r.updated_at,
+    })),
+  }
+})
+
+app.post<{ Params: { id: string; runId: string } }>(
+  '/api/sessions/:id/subagents/:runId/cancel',
+  async (req, reply) => {
+    if (!agent.getSession(req.params.id)) return reply.code(404).send({ error: 'session not found' })
+    const runId = String(req.params.runId ?? '').trim()
+    if (!runId) return reply.code(400).send({ ok: false, error: 'run_id 必填' })
+    const result = await agent.cancelSubagent(req.params.id, runId)
+    const err = typeof result.error === 'string' ? result.error : ''
+    if (err.includes('缺少')) {
+      return reply.code(400).send({
+        ok: false,
+        run_id: result.run_id,
+        status: result.status,
+        cancelled: false,
+        error: err,
+      })
+    }
+    if (err.includes('不存在') || err.includes('不属于')) {
+      return reply.code(404).send({
+        ok: false,
+        run_id: result.run_id,
+        status: result.status,
+        cancelled: false,
+        error: err,
+      })
+    }
+    return {
+      ok: true,
+      run_id: result.run_id,
+      status: result.status,
+      cancelled: result.status === 'cancelled',
+      summary: result.summary,
+      error: result.error,
+    }
+  },
+)
+
+app.get<{ Params: { id: string } }>('/api/sessions/:id/live-progress', async (req, reply) => {
+  if (!agent.getSession(req.params.id)) return reply.code(404).send({ error: 'session not found' })
+
+  reply.hijack()
+  reply.raw.writeHead(200, {
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache, no-transform',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no',
+  })
+
+  const write = (event: ChatProgressEvent) => {
+    if (reply.raw.writableEnded) return
+    reply.raw.write(`data: ${JSON.stringify(event)}\n\n`)
+  }
+
+  // 心跳：避免中间代理断开长连接
+  const heartbeat = setInterval(() => {
+    if (reply.raw.writableEnded) return
+    reply.raw.write(': ping\n\n')
+  }, 25_000)
+  if (typeof heartbeat === 'object' && heartbeat !== null && 'unref' in heartbeat) {
+    try {
+      ;(heartbeat as { unref: () => void }).unref()
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const unsubscribe = subscribeSessionProgress(req.params.id, write)
+  let cleaned = false
+  const cleanup = () => {
+    if (cleaned) return
+    cleaned = true
+    clearInterval(heartbeat)
+    unsubscribe()
+    if (!reply.raw.writableEnded) reply.raw.end()
+  }
+  req.raw.on('aborted', cleanup)
+  reply.raw.on('close', cleanup)
+})
+
+app.get<{ Params: { id: string } }>('/api/sessions/:id/workspace/grants', async (req, reply) => {
+  if (!agent.getSession(req.params.id)) return reply.code(404).send({ error: 'session not found' })
+  const grants = await agent.listWorkspaceGrants(req.params.id)
+  return { grants }
+})
+
+/** 列出 $OPPTRIX_DATA_DIR/mounts 下可授权的已挂载根目录 */
+app.get('/api/workspace/mounts', async () => {
+  const mounts = await listMountRoots()
+  if (mounts.length === 0) {
+    return { mounts, empty_reason: emptyMountsReason() }
+  }
+  return { mounts }
+})
+
+/** 在已挂载根或公共资产下浏览子目录（仅目录） */
+app.get<{
+  Querystring: { root?: string; path?: string }
+}>('/api/workspace/browse', async (req, reply) => {
+  const root = String(req.query.root ?? '').trim()
+  const rel = String(req.query.path ?? '').trim()
+  if (!root) return reply.code(400).send({ error: '请指定浏览根目录' })
+  try {
+    const result = await browseWorkspaceDirs(root, rel)
+    return result
+  } catch (e) {
+    if (e instanceof PathEscapeError || e instanceof DenyPathError) {
+      return reply.code(403).send({ error: e.message })
+    }
+    if (e instanceof WorkspaceError) {
+      return reply.code(400).send({ error: e.message })
+    }
+    const message = e instanceof Error ? e.message : String(e)
+    return reply.code(400).send({ error: message })
+  }
+})
+
+app.post<{
+  Params: { id: string }
+  Body: { path?: string; mode?: string; label?: string }
+}>('/api/sessions/:id/workspace/grants', async (req, reply) => {
+  if (!agent.getSession(req.params.id)) return reply.code(404).send({ error: 'session not found' })
+  const absPath = String(req.body?.path ?? '').trim()
+  if (!absPath) return reply.code(400).send({ error: 'path required' })
+  const modeRaw = String(req.body?.mode ?? 'ro').trim()
+  const mode = modeRaw === 'rw' ? 'rw' : 'ro'
+  try {
+    const grant = agent.addWorkspaceGrant(
+      req.params.id,
+      absPath,
+      mode,
+      req.body?.label != null ? String(req.body.label) : undefined,
+    )
+    if (!grant) return reply.code(404).send({ error: 'session not found' })
+    return { grant }
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e)
+    return reply.code(400).send({ error: message })
+  }
+})
+
+app.delete<{ Params: { id: string; grantId: string } }>(
+  '/api/sessions/:id/workspace/grants/:grantId',
+  async (req, reply) => {
+    if (!agent.getSession(req.params.id)) return reply.code(404).send({ error: 'session not found' })
+    const removed = agent.removeWorkspaceGrant(req.params.id, req.params.grantId)
+    if (!removed) return reply.code(404).send({ error: 'grant not found or cannot remove default' })
+    return { status: 'removed' }
+  },
+)
+
+app.get<{
+  Params: { id: string }
+  Querystring: { root_id?: string; path?: string }
+}>('/api/sessions/:id/workspace/file', async (req, reply) => {
+  if (!agent.getSession(req.params.id)) {
+    return reply.code(404).send({ error: '对话不存在' })
+  }
+  const rootId = String(req.query.root_id ?? '').trim()
+  const relPath = String(req.query.path ?? '').trim()
+  if (!rootId) return reply.code(400).send({ error: '请指定工作区' })
+  if (!relPath) return reply.code(400).send({ error: '请指定文件路径' })
+
+  try {
+    const file = await getWorkspaceService().openReadableFile(req.params.id, rootId, relPath)
+    reply.header('Content-Type', file.mime)
+    reply.header('Content-Length', String(file.size))
+    reply.header('Content-Disposition', `inline; filename="${encodeURIComponent(file.basename)}"`)
+    return reply.send(fs.createReadStream(file.abs))
+  } catch (e) {
+    if (e instanceof PathEscapeError) {
+      return reply.code(403).send({ error: '无法访问该路径' })
+    }
+    if (e instanceof DenyPathError) {
+      return reply.code(403).send({ error: '该路径受保护，无法打开' })
+    }
+    if (e instanceof WorkspaceError) {
+      const message = e.message
+      if (message.includes('未知 root_id')) {
+        return reply.code(403).send({ error: '未授权访问该工作区' })
+      }
+      if (message.includes('不存在') || message.includes('不是文件')) {
+        return reply.code(404).send({ error: '文件不存在' })
+      }
+      if (message.includes('绝对路径') || message.includes('穿越')) {
+        return reply.code(403).send({ error: '无法访问该路径' })
+      }
+      return reply.code(400).send({ error: '无法打开文件' })
+    }
+    return reply.code(400).send({ error: '无法打开文件' })
+  }
+})
+
+app.post<{ Params: { id: string }; Body: { message_index: number } }>(
+  '/api/sessions/:id/fork',
+  async (req, reply) => {
+    const messageIndex = req.body?.message_index
+    if (typeof messageIndex !== 'number' || !Number.isInteger(messageIndex) || messageIndex < 0) {
+      return reply.code(400).send({ error: 'message_index required' })
+    }
+    const forked = agent.forkSession(req.params.id, messageIndex)
+    if (!forked) return reply.code(404).send({ error: 'session or message not found' })
+    return {
+      session: agent.sessionMeta(forked),
+      messages: agent.getDisplayMessages(forked.id),
+      contextRef: forked.contextRef ?? null,
+    }
+  },
+)
+
+app.post<{ Params: { id: string }; Body: { message_index: number } }>(
+  '/api/sessions/:id/truncate',
+  async (req, reply) => {
+    const messageIndex = req.body?.message_index
+    if (typeof messageIndex !== 'number' || !Number.isInteger(messageIndex) || messageIndex < 0) {
+      return reply.code(400).send({ error: 'message_index required' })
+    }
+    const updated = agent.truncateSession(req.params.id, messageIndex)
+    if (!updated) {
+      return reply.code(404).send({ error: 'session or message not found' })
+    }
+    return {
+      session: agent.sessionMeta(updated),
+      messages: agent.getDisplayMessages(updated.id),
+      contextRef: updated.contextRef ?? null,
+    }
+  },
+)
+
+app.patch<{ Params: { id: string }; Body: { contextRef: SessionContextRef | null } }>(
+  '/api/sessions/:id/context',
+  async (req, reply) => {
+    if (!('contextRef' in (req.body ?? {}))) {
+      return reply.code(400).send({ error: 'contextRef required' })
+    }
+    const updated = agent.setSessionContextRef(req.params.id, req.body?.contextRef ?? null)
+    if (!updated) return reply.code(404).send({ error: 'session not found' })
+    return {
+      session: agent.sessionMeta(updated),
+      contextRef: updated.contextRef ?? null,
+    }
+  },
+)
+
+app.delete<{ Params: { id: string } }>('/api/sessions/:id/context', async (req, reply) => {
+  const updated = agent.clearSessionContextRef(req.params.id)
+  if (!updated) return reply.code(404).send({ error: 'session not found' })
+  return {
+    session: agent.sessionMeta(updated),
+    contextRef: null,
+  }
+})
+
+app.post<{ Params: { id: string }; Body: { message: string; selected_text: string; model?: string; history?: Array<{ role: 'user' | 'assistant'; content: string }> } }>(
+  '/api/sessions/:id/ephemeral-ask',
+  async (req, reply) => {
+    if (!req.body?.message?.trim()) return reply.code(400).send({ error: 'message required' })
+    const result = await agent.ephemeralAsk(
+      req.params.id,
+      req.body.message,
+      req.body.selected_text ?? '',
+      req.body.model,
+      req.body.history,
+    )
+    return { reply: result.reply }
+  },
+)
+
+app.post<{ Params: { id: string } }>('/api/sessions/:id/chat/cancel', async (req, reply) => {
+  // Stop：无论是否有活跃 chat，都取消挂起 wake / waits / watches；并取消 background 协作任务
+  clearSessionTurnWakes(req.params.id)
+  clearSessionJobWaitsAndWatches(req.params.id)
+  const cancelledChildren = agent.cancelRunningSubagents(req.params.id)
+  const cancelled = cancelSessionChat(req.params.id)
+  agent.userPromptBridge.cancelSession(req.params.id)
+  agent.steerBridge.clear(req.params.id)
+  if (!cancelled && cancelledChildren === 0) {
+    return { cancelled: true, chat_active: false, children_cancelled: 0 }
+  }
+  return {
+    cancelled: true,
+    chat_active: Boolean(cancelled),
+    children_cancelled: cancelledChildren,
+  }
+})
+
+app.post<{ Params: { id: string }; Body: { message?: string } }>(
+  '/api/sessions/:id/chat/steer',
+  async (req, reply) => {
+    if (isReadonlyCollaborationSession(req.params.id)) {
+      return reply.code(403).send({ error: COLLAB_SESSION_READONLY_ERROR })
+    }
+    const message = typeof req.body?.message === 'string' ? req.body.message.trim() : ''
+    if (!message) {
+      return reply.code(200).send({ ok: false, reason: 'empty' })
+    }
+    if (!hasActiveSessionChat(req.params.id)) {
+      return reply.code(200).send({ ok: false, reason: 'no_active_chat' })
+    }
+    const result = agent.enqueueSteer(req.params.id, message)
+    if (!result.ok) {
+      if (result.reason === 'readonly') {
+        return reply.code(403).send({ error: COLLAB_SESSION_READONLY_ERROR })
+      }
+      return reply.code(200).send({ ok: false, reason: result.reason })
+    }
+    return { ok: true }
+  },
+)
+
+app.post<{
+  Params: { id: string }
+  Body: {
+    prompt_id: string
+    kind: 'option' | 'custom' | 'secret'
+    selected_ids?: string[]
+    selected_labels?: string[]
+    custom_text?: string
+    name?: string
+    secret_value?: string
+    inject_hosts?: string[]
+  }
+}>(
+  '/api/sessions/:id/chat/user-prompt',
+  async (req, reply) => {
+    if (isReadonlyCollaborationSession(req.params.id)) {
+      return reply.code(403).send({ error: COLLAB_SESSION_READONLY_ERROR })
+    }
+    const promptId = req.body?.prompt_id?.trim()
+    if (!promptId) return reply.code(400).send({ error: 'prompt_id required' })
+
+    const kind = req.body?.kind
+    if (kind !== 'option' && kind !== 'custom' && kind !== 'secret') {
+      return reply.code(400).send({ error: 'kind must be option, custom, or secret' })
+    }
+
+    if (kind === 'secret') {
+      const name = String(req.body?.name ?? '').trim()
+      if (!name) return reply.code(400).send({ error: 'name required for kind=secret' })
+
+      const cancelled = Array.isArray(req.body.selected_ids)
+        && req.body.selected_ids.map(id => String(id)).includes('cancel')
+      const secretValue = typeof req.body.secret_value === 'string' ? req.body.secret_value : ''
+
+      if (cancelled || !secretValue) {
+        const ok = agent.resolveUserPrompt(req.params.id, promptId, {
+          kind: 'secret',
+          selected_ids: ['cancel'],
+          selected_labels: ['取消'],
+          name,
+          cancelled: true,
+          saved: false,
+          session_granted: false,
+        })
+        if (!ok) return { ok: true, stale: true }
+        return { ok: true }
+      }
+
+      const injectHosts = Array.isArray(req.body.inject_hosts)
+        ? req.body.inject_hosts.map(h => String(h ?? '').trim()).filter(Boolean)
+        : undefined
+
+      try {
+        getUserDataStore().agentVault.put(name, secretValue, {
+          overwrite: true,
+          injectHosts,
+        })
+        getSessionSecretAccessStore().grant(req.params.id, name)
+      } catch (err) {
+        const message = err instanceof Error ? err.message : '保存密钥失败'
+        return reply.code(500).send({ error: message })
+      }
+
+      // 回传给 Agent 的答案永不含 secret_value
+      const ok = agent.resolveUserPrompt(req.params.id, promptId, {
+        kind: 'secret',
+        selected_ids: [],
+        selected_labels: [],
+        name,
+        saved: true,
+        session_granted: true,
+      })
+      if (!ok) return { ok: true, stale: true }
+      return { ok: true }
+    }
+
+    const selectedIds = Array.isArray(req.body.selected_ids)
+      ? req.body.selected_ids.map(id => String(id).trim()).filter(Boolean)
+      : []
+    const selectedLabels = Array.isArray(req.body.selected_labels)
+      ? req.body.selected_labels.map(label => String(label).trim()).filter(Boolean)
+      : []
+    const customText = typeof req.body.custom_text === 'string'
+      ? req.body.custom_text.trim()
+      : ''
+
+    if (kind === 'custom') {
+      if (!customText) return reply.code(400).send({ error: 'custom_text required for kind=custom' })
+    } else if (!selectedIds.length || !selectedLabels.length) {
+      return reply.code(400).send({ error: 'selected_ids and selected_labels required for kind=option' })
+    }
+
+    const ok = agent.resolveUserPrompt(req.params.id, promptId, {
+      kind,
+      selected_ids: selectedIds,
+      selected_labels: selectedLabels,
+      custom_text: kind === 'custom' ? customText : undefined,
+    })
+    if (!ok) return { ok: true, stale: true }
+    return { ok: true }
+  },
+)
+
+app.post<{ Params: { id: string }; Body: { message: string; model?: string; attachments?: string[]; research_canvas?: unknown } }>(
+  '/api/sessions/:id/chat/stream',
+  async (req, reply) => {
+    if (isReadonlyCollaborationSession(req.params.id)) {
+      return reply.code(403).send({ error: COLLAB_SESSION_READONLY_ERROR })
+    }
+    const hasAttachments = Array.isArray(req.body?.attachments) && req.body.attachments.length > 0
+    if (!req.body?.message?.trim() && !hasAttachments) {
+      return reply.code(400).send({ error: 'message required' })
+    }
+
+    // Best-effort Ingress admit (observability only; never gates chat).
+    admitChatBestEffort(platform, {
+      text: req.body.message ?? '',
+      sessionId: req.params.id,
+      origin: 'web.chat',
+    })
+
+    reply.hijack()
+    reply.raw.writeHead(200, {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    })
+
+    const write = (event: ChatProgressEvent) => {
+      reply.raw.write(`data: ${JSON.stringify(event)}\n\n`)
+    }
+
+    const ac = registerSessionChat(req.params.id)
+    req.raw.on('aborted', () => {
+      if (!reply.raw.writableEnded) ac.abort()
+    })
+    reply.raw.on('close', () => {
+      if (!reply.raw.writableEnded) ac.abort()
+    })
+
+    try {
+      await agent.chat(
+        req.params.id,
+        req.body.message ?? '',
+        req.body.model,
+        {
+          onProgress: write,
+          signal: ac.signal,
+          researchCanvasSnapshot: req.body.research_canvas,
+        },
+        req.body.attachments,
+      )
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e)
+      if (message !== '已取消' && !ac.signal.aborted) {
+        write({ type: 'error', message })
+        write({
+          type: 'done',
+          reply: message,
+          tools_used: [],
+          session_id: req.params.id,
+          tool_steps: [],
+        })
+      }
+    } finally {
+      clearSessionChat(req.params.id, ac)
+      reply.raw.end()
+    }
+  },
+)
+
+app.post<{ Params: { id: string }; Body: { message: string; model?: string; attachments?: string[]; research_canvas?: unknown } }>(
+  '/api/sessions/:id/chat',
+  async (req, reply) => {
+    if (isReadonlyCollaborationSession(req.params.id)) {
+      return reply.code(403).send({ error: COLLAB_SESSION_READONLY_ERROR })
+    }
+    const hasAttachments = Array.isArray(req.body?.attachments) && req.body.attachments.length > 0
+    if (!req.body?.message?.trim() && !hasAttachments) {
+      return reply.code(400).send({ error: 'message required' })
+    }
+    // Best-effort Ingress admit (observability only; never gates chat).
+    admitChatBestEffort(platform, {
+      text: req.body.message ?? '',
+      sessionId: req.params.id,
+      origin: 'web.chat',
+    })
+    const result = await agent.chat(
+      req.params.id,
+      req.body.message ?? '',
+      req.body.model,
+      { researchCanvasSnapshot: req.body.research_canvas },
+      req.body.attachments,
+    )
+    return {
+      reply: result.reply,
+      tools_used: result.toolsUsed,
+      session_id: result.sessionId,
+      title: result.title,
+    }
+  },
+)
+
+/** @deprecated use POST /api/sessions/:id/chat */
+app.post<{ Body: { message: string } }>('/api/chat', async (req) => {
+  const sessions = agent.listSessions()
+  const id = sessions[0]?.id ?? (await agent.createSession()).id
+  const result = await agent.chat(id, req.body?.message ?? '')
+  return { reply: result.reply, tools_used: result.toolsUsed, session_id: result.sessionId }
+})
+
+// REST endpoints aligned with research-hub features
+app.post<{ Body: { code: string; scorecard?: string } }>('/api/evaluate', async (req, reply) => {
+  const r = await hub.dispatch('stock_diagnosis', { code: req.body.code, scorecard: req.body.scorecard })
+  if (!r.success) return reply.code(400).send({ error: r.message })
+  return r.data
+})
+
+app.post<{ Body: { conditions: unknown[]; scorecard?: string; top_n?: number } }>('/api/screen', async (_req, reply) => {
+  return reply.code(410).send({ error: '本地筛选已移除，请使用 instrument_search、instrument_evaluation 等在线能力' })
+})
+
+app.post<{ Body: { holdings: [string, number][]; scorecard?: string } }>('/api/portfolio', async (req, reply) => {
+  const r = await hub.dispatch('portfolio_analysis', req.body)
+  if (!r.success) return reply.code(400).send({ error: r.message })
+  return r.data
+})
+
+app.post<{ Body: { keyword: string } }>('/api/search', async (req) => {
+  const r = await hub.dispatch('search_stocks', { keyword: req.body.keyword })
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.post<{ Body: { code: string } }>('/api/signal', async (req) => {
+  const r = await hub.dispatch('strategy_signal', { code: req.body.code })
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.post<{ Body: { code: string } }>('/api/strategy/report', async (req, reply) => {
+  const { code } = req.body ?? {}
+  if (!code) return reply.code(400).send({ error: 'code required' })
+  const r = await hub.dispatch('strategy_report', { code })
+  if (!r.success) return reply.code(400).send({ error: r.message })
+  return r.data
+})
+
+// Portfolio trade ledger (buy/sell records)
+app.get('/api/portfolio/trades', async (req) => {
+  const q = req.query as { code?: string; market?: string }
+  const code = q.code ?? ''
+  const market = q.market?.trim() || undefined
+  const r = await hub.dispatch('portfolio_trades', { code, market })
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.get('/api/portfolio/summary', async () => {
+  const r = await hub.dispatch('portfolio_summary', {})
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.get('/api/market/fx-rates', async (_req, reply) => {
+  try {
+    const { getFxRatesToCny } = await import('./fx-rates-service.js')
+    const data = await getFxRatesToCny()
+    return { success: true, data }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '汇率暂时无法获取'
+    return reply.code(503).send({ success: false, message })
+  }
+})
+
+app.get('/api/portfolio/fees/global', async () => {
+  const r = await hub.dispatch('portfolio_fee_global', {})
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.put<{ Body: { globalFees?: unknown } }>('/api/portfolio/fees/global', async (req, reply) => {
+  const r = await hub.dispatch('portfolio_fee_global_save', { globalFees: req.body?.globalFees })
+  if (!r.success) return reply.code(400).send({ error: r.message })
+  return { success: true, data: r.data, message: r.message }
+})
+
+app.get<{ Querystring: { code?: string; market?: string } }>('/api/portfolio/fees/instrument', async (req, reply) => {
+  const code = String(req.query?.code ?? '').trim()
+  if (!code) return reply.code(400).send({ error: 'code required' })
+  const market = req.query?.market?.trim() || undefined
+  const r = await hub.dispatch('portfolio_fee_instrument', { code, market })
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.put<{ Body: { code?: string; market?: string; overrides?: unknown } }>(
+  '/api/portfolio/fees/instrument',
+  async (req, reply) => {
+    const code = String(req.body?.code ?? '').trim()
+    if (!code) return reply.code(400).send({ error: 'code required' })
+    const r = await hub.dispatch('portfolio_fee_instrument_save', {
+      code,
+      market: req.body?.market,
+      overrides: req.body?.overrides,
+    })
+    if (!r.success) return reply.code(400).send({ error: r.message })
+    return { success: true, data: r.data, message: r.message }
+  },
+)
+
+app.get('/api/watchlist', async () => {
+  const r = await hub.dispatch('watchlist_list', {})
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.put<{ Body: { items: Array<{ code: string; name: string; industry?: string; note?: string; addedAt?: string; addedPrice?: number | null }> } }>(
+  '/api/watchlist',
+  async (req, reply) => {
+    const items = req.body?.items
+    if (!Array.isArray(items)) return reply.code(400).send({ error: 'items array required' })
+    const r = await hub.dispatch('watchlist_save', { items })
+    if (!r.success) return reply.code(400).send({ error: r.message })
+    return { success: true, data: r.data, message: r.message }
+  },
+)
+
+app.get('/api/watchlist/groups', async () => {
+  const r = await hub.dispatch('watchlist_groups_get', {})
+  return { success: r.success, data: r.data, message: r.message }
+})
+
+app.put<{ Body: { groups?: Array<{ id: string; title: string; sortOrder: number; createdAt?: string }>; membership?: Record<string, string[]> } }>(
+  '/api/watchlist/groups',
+  async (req, reply) => {
+    const { groups, membership } = req.body ?? {}
+    if (groups != null && !Array.isArray(groups)) {
+      return reply.code(400).send({ error: 'groups must be an array when provided' })
+    }
+    if (membership != null && (typeof membership !== 'object' || Array.isArray(membership))) {
+      return reply.code(400).send({ error: 'membership must be an object when provided' })
+    }
+    const r = await hub.dispatch('watchlist_groups_save', { groups: groups ?? [], membership: membership ?? {} })
+    if (!r.success) return reply.code(400).send({ error: r.message })
+    return { success: true, data: r.data, message: r.message }
+  },
+)
+
+app.post<{ Body: {
+  code: string
+  shares: number
+  price: number
+  side?: string
+  date?: string
+  name?: string
+  market?: string
+  assetClass?: string
+  instrument?: { market: string; assetClass: string; symbol: string; exchange?: string }
+} }>(
+  '/api/portfolio/trade',
+  async (req, reply) => {
+    const { code, shares, price, side = 'buy', date, market, assetClass, instrument, name } = req.body ?? {}
+    if (!code || !shares || !price) return reply.code(400).send({ error: 'code, shares, price required' })
+    const pm = hub.de.portfolio
+    const m = market?.trim() || undefined
+    const ac = assetClass?.trim() || undefined
+    // 裸码 / Opptrix / 命名空间均接受；recordTrade 内部升格为 Opptrix 再落库
+    const inst = instrument && typeof instrument === 'object'
+      ? instrument as import('@opptrix/shared').InstrumentRef
+      : undefined
+    const result = await pm.recordTrade(
+      side === 'sell' ? 'sell' : 'buy',
+      code,
+      shares,
+      price,
+      {
+        date,
+        name: typeof name === 'string' ? name.trim() : '',
+        market: m as import('@opptrix/shared').Market | undefined,
+        assetClass: ac as import('@opptrix/shared').AssetClass | undefined,
+        instrument: inst,
+      },
+    )
+    return { success: true, trade: result }
+  },
+)
+
+app.delete<{ Params: { id: string } }>('/api/portfolio/trade/:id', async (req, reply) => {
+  const id = Number(req.params.id)
+  if (!Number.isFinite(id) || id <= 0) return reply.code(400).send({ error: 'invalid trade id' })
+  const ok = hub.de.portfolio.removeTrade(id)
+  if (!ok) return reply.code(404).send({ error: 'trade not found' })
+  return { success: true }
+})
+
+app.delete<{ Querystring: { code?: string; market?: string; assetClass?: string } }>('/api/portfolio/instrument', async (req, reply) => {
+  const code = String(req.query?.code ?? '').trim()
+  if (!code) return reply.code(400).send({ error: 'code required' })
+  const market = req.query?.market?.trim() || undefined
+  const assetClassRaw = req.query?.assetClass?.trim() || undefined
+  const assetClass = assetClassRaw as import('@opptrix/shared').AssetClass | undefined
+  const { removed } = hub.de.portfolio.clearInstrument(
+    code,
+    market as import('@opptrix/shared').Market | undefined,
+    assetClass,
+  )
+  return { success: true, removed }
+})
+
+let serveUi = false
+let httpsServer: HttpsServer | null = null
+
+async function listenHttpIfEnabled(): Promise<void> {
+  if (HTTP_PORT == null) {
+    await app.ready()
+    return
+  }
+  try {
+    await app.listen({ port: HTTP_PORT, host: HOST })
+  } catch (err) {
+    const code = err && typeof err === 'object' && 'code' in err ? String(err.code) : ''
+    if (code !== 'EADDRINUSE') throw err
+    console.warn(`[server] 端口 ${HTTP_PORT} 被占用，尝试清理残留 Opptrix sidecar…`)
+    await cleanupStaleApiListeners(HTTP_PORT, { aggressive: true })
+    try {
+      await app.listen({ port: HTTP_PORT, host: HOST })
+      console.warn(`[server] 已清理残留进程并成功绑定 :${HTTP_PORT}`)
+    } catch (retryErr) {
+      console.error(
+        `\n  无法绑定 http://${HOST}:${HTTP_PORT}/ — 端口仍被占用。\n`
+          + `  手动清理：lsof -ti :${HTTP_PORT} -sTCP:LISTEN | xargs kill -9\n`
+          + `  或设置环境变量 STOCK_RESEARCH_PORT 使用其他端口。\n`,
+      )
+      throw retryErr
+    }
+  }
+}
+
+async function listenHttpsIfEnabled(): Promise<void> {
+  if (HTTPS_PORT == null) {
+    if (process.env.OPPTRIX_DOCKER === '1') {
+      throw new Error('Docker 生产环境必须启用 HTTPS（OPPTRIX_HTTPS_PORT，默认 8712）')
+    }
+    return
+  }
+  try {
+    const tls = ensureSelfSignedTlsMaterials()
+    if (tls.created) {
+      console.log(`  TLS → 已生成自签名证书 (${tls.dir})`)
+    }
+    httpsServer = await listenHttpsAlongsideHttp({
+      httpServer: app.server,
+      host: HOST,
+      port: HTTPS_PORT,
+      key: tls.key,
+      cert: tls.cert,
+    })
+  } catch (err) {
+    const code = err && typeof err === 'object' && 'code' in err ? String(err.code) : ''
+    if (code === 'EADDRINUSE') {
+      console.warn(`[server] HTTPS 端口 ${HTTPS_PORT} 被占用，尝试清理残留 Opptrix sidecar…`)
+      await cleanupStaleApiListeners(HTTPS_PORT, { aggressive: true })
+      const tls = ensureSelfSignedTlsMaterials()
+      httpsServer = await listenHttpsAlongsideHttp({
+        httpServer: app.server,
+        host: HOST,
+        port: HTTPS_PORT,
+        key: tls.key,
+        cert: tls.cert,
+      })
+      return
+    }
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error(`[server] HTTPS :${HTTPS_PORT} 启动失败: ${msg}`)
+    throw err
+  }
+}
+
+async function listenWithStaleCleanup(): Promise<void> {
+  if (HTTP_PORT == null && HTTPS_PORT == null) {
+    throw new Error('HTTP 与 HTTPS 均已关闭，无法监听')
+  }
+  await listenHttpIfEnabled()
+  await listenHttpsIfEnabled()
+}
+
+async function bootstrap() {
+  // ── phaseA：listen 前只做网络 + 路由/静态/404，使 /api/health 与 GET / 尽早可通
+  await initOutboundNetwork()
+  console.log('  Outbound network → IPv4-first, v6 fallback on connect failure')
+
+  // 后台预热 models.dev，避免首屏聊天下拉被富化请求拖死
+  void getModelsDevCatalog().catch(() => {})
+
+  await registerNewsSettingsRoutes(app)
+  registerSandboxSettingsRoutes(app)
+  registerPythonSettingsRoutes(app)
+  registerHarnessSettingsRoutes(app)
+  await registerEnrichmentRoutes(app)
+  await registerMcpServerRoutes(app)
+  await registerAgentSkillRoutes(app)
+  registerSearchRoutes(app, hub, agent)
+  registerSessionAttachmentRoutes(app, agent)
+  registerOpptrixVendorRoutes(app)
+  ensureMediaTranscriptBridge()
+  await registerSpeechRoutes(app)
+
+  serveUi = shouldServeUi()
+  if (serveUi) {
+    serveUi = await registerStaticUi(app)
+  }
+
+  app.setNotFoundHandler(async (req, reply) => {
+    if (serveUi && !isApiPath(req.url)) {
+      return reply.sendFile('index.html', resolveUiDist())
+    }
+    return reply.code(404).send({ error: 'not found' })
+  })
+
+  await listenWithStaleCleanup()
+  platform.events.emit(
+    SystemEvents.app.startup,
+    {
+      httpPort: HTTP_PORT,
+      httpsPort: HTTPS_PORT,
+      at: new Date().toISOString(),
+    },
+    { kind: 'system', id: 'sidecar' },
+  )
+  const bindNote = HOST !== CONNECT_HOST ? ` (bind ${HOST})` : ''
+  if (HTTP_PORT != null) {
+    console.log(`\n  Opptrix API → http://${CONNECT_HOST}:${HTTP_PORT}/api/health${bindNote}`)
+  }
+  if (HTTPS_PORT != null) {
+    console.log(`\n  Opptrix HTTPS → https://${CONNECT_HOST}:${HTTPS_PORT}/api/health${bindNote} （自签名）`)
+  }
+  if (serveUi) {
+    if (HTTPS_PORT != null) {
+      console.log(`  Web UI → https://<公网IP或本机>:${HTTPS_PORT}/\n`)
+    } else if (HTTP_PORT != null) {
+      console.log(`  Desktop UI → http://${CONNECT_HOST}:${HTTP_PORT}\n`)
+    }
+  } else {
+    console.log(`  Web UI → npm run dev → https://127.0.0.1:5173（自签名；设 WEB_HTTPS=0 可回退 HTTP）\n`)
+  }
+
+  // System hot-update: first-boot hooks + silent check (after listen so status API works)
+  startSystemUpdateAfterListen()
+
+  // R0 Phase 1+2: load persisted extensions + re-activate previously-active ones.
+  // Fire-and-forget — must NOT block startup (R0-1).
+  void platform.extensions.ready().catch(() => {
+    // R0: extension startup failure must not block bootstrap
+  })
+
+  // 1GB VPS memory profile: lightweight sampler (60s, unref'd). Logs RSS/heap
+  // and emits a bus event when heap pressure crosses 80% of the configured
+  // cap. Disable with OPPTRIX_MEM_SAMPLE=0.
+  if (process.env.OPPTRIX_MEM_SAMPLE !== '0') {
+    const heapCapMiB =
+      Number(/--max-old-space-size=(\d+)/.exec(process.env.NODE_OPTIONS ?? '')?.[1] ?? 512) || 512
+    let lastPressureAt = 0
+    const sampler = setInterval(() => {
+      try {
+        const mu = process.memoryUsage()
+        const rssMiB = Math.round(mu.rss / 1048576)
+        const heapMiB = Math.round(mu.heapUsed / 1048576)
+        if (heapMiB > (heapCapMiB * 4) / 5 && Date.now() - lastPressureAt > 5 * 60_000) {
+          lastPressureAt = Date.now()
+          platform.events.emit(
+            'system.memory.pressure',
+            { rssMiB, heapMiB, heapCapMiB },
+            { kind: 'system', id: 'sidecar' },
+          )
+          app.log.warn({ rssMiB, heapMiB, heapCapMiB }, 'memory pressure: heap above 80% cap')
+        } else {
+          app.log.info({ rssMiB, heapMiB }, 'mem')
+        }
+      } catch {
+        // sampling must never throw
+      }
+    }, 60_000)
+    sampler.unref?.()
+  }
+
+  // ── phaseB：listen 之后再跑调度/预热等非路由重活。
+  // Fastify 5：listen 后路由树锁定，禁止再 app.register / app.get|post|… 注册新路由。
+  startNewsFeedScheduler()
+  startEnrichmentScheduler(90_000, resolveProjectRoot())
+  startRetentionMaintenance({
+    hub,
+    listKnownSessionIds: () => agent.listAllSessions().map(s => s.id),
+    log: {
+      info: (obj, msg) => app.log.info(obj, msg),
+      warn: (obj, msg) => app.log.warn(obj, msg),
+    },
+  })
+  // 语义模型按需加载：boot 不 tryEnable / 不 embedPending；首次检索或入库 embed 时再加载并限速回填
+  scheduleService.start()
+  void maybeBootstrapTranslationModel(getNewsSettings().translation).catch(() => {})
+  // 后台清理已删会话遗留的 chat-attachments / session-state 目录（best-effort，不阻塞启动）
+  setImmediate(() => {
+    try {
+      const known = agent.listAllSessions().map(s => s.id)
+      const removedAttachments = pruneOrphanChatAttachments(known)
+      if (removedAttachments > 0) {
+        console.log(`  Pruned ${removedAttachments} orphan chat-attachment session dir(s)`)
+      }
+      const removedState = pruneOrphanSessionState(known)
+      if (removedState > 0) {
+        console.log(`  Pruned ${removedState} orphan session-state dir(s)`)
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.warn(`[boot] prune orphan chat-attachments / session-state failed: ${msg}`)
+    }
+  })
+
+  // 桌面/有内置资源时后台探测磁盘 runtime（不载入 E5）；OCR 尽量就绪（失败不崩）
+  void import('@opptrix/doc-library')
+    .then(async (mod) => {
+      const r = await mod.ensureBundledRagRuntime()
+      console.log(
+        `  RAG runtime: embedding=${r.embedding ? 'installed' : 'skip'} layout=${r.layout ? 'ready' : 'skip'} deep=${r.deep ? 'ready' : 'skip'}`,
+      )
+    })
+    .catch(() => {
+      console.log('  RAG runtime: skip (prepare deferred)')
+    })
+}
+
+let shuttingDown = false
+
+const browserSessionManager = createBrowserSessionManager()
+registerBrowserShutdownHooks(browserSessionManager)
+
+async function shutdown(signal: string) {
+  if (shuttingDown) return
+  shuttingDown = true
+  app.log.info(`received ${signal}, shutting down`)
+  await runSidecarShutdown({
+    log: {
+      info: (msg) => app.log.info(msg),
+      warn: (obj, msg) => {
+        if (msg) app.log.warn(obj, msg)
+        else app.log.warn(obj)
+      },
+      error: (obj, msg) => {
+        if (msg) app.log.error(obj, msg)
+        else app.log.error(obj)
+      },
+    },
+    forceExitMs: resolveSidecarForceExitMs(),
+    exitCode: signal === 'uncaughtException' ? 1 : 0,
+    onShuttingDown: () => {
+      platform.events.emit(
+        SystemEvents.app.shuttingDown,
+        { signal, at: new Date().toISOString() },
+        { kind: 'system', id: 'sidecar' },
+      )
+    },
+    onShutdown: () => {
+      platform.events.emit(
+        SystemEvents.app.shutdown,
+        { signal, at: new Date().toISOString() },
+        { kind: 'system', id: 'sidecar' },
+      )
+    },
+    stopSchedulers: () => {
+      scheduleService.stop()
+      stopRetentionMaintenance()
+      stopNewsFeedScheduler()
+      stopEnrichmentScheduler()
+    },
+    shutdownExtensions: async () => {
+      // R1: ordered extension shutdown — bounded best-effort, never throws.
+      try {
+        await platform.extensions.shutdown()
+      } catch {
+        // R1: best-effort; forceExit timer handles the hard bound
+      }
+      // R1: stop the market data plane poll timer.
+      getMarketPlane().stop()
+    },
+    closeBrowsers: () => browserSessionManager.closeAll(),
+    closeHttpApp: async () => {
+      await closeHttpsServer(httpsServer)
+      httpsServer = null
+      await app.close()
+    },
+    unloadLlama: async () => {
+      try {
+        await llamaRuntime.unload()
+      } catch {
+        /* swallow — unload must not block teardown */
+      }
+    },
+    closeDocLibrary: async () => {
+      const docLib = await import('@opptrix/doc-library')
+      // closeDocLibraryService 已含 Lance / embedding / OCR / doc sqlite；勿重复 close*
+      await docLib.closeDocLibraryService()
+    },
+    closeUserStore: () => {
+      getUserDataStore().close()
+    },
+  })
+}
+
+process.on('SIGTERM', () => { void shutdown('SIGTERM') })
+process.on('SIGINT', () => { void shutdown('SIGINT') })
+process.on('unhandledRejection', err => {
+  app.log.error({ err }, 'unhandledRejection')
+})
+process.on('uncaughtException', err => {
+  app.log.error({ err }, 'uncaughtException')
+  void shutdown('uncaughtException')
+})
+
+bootstrap().catch(err => {
+  console.error(err)
+  process.exit(1)
+})

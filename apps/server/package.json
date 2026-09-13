@@ -1,0 +1,52 @@
+{
+  "name": "@opptrix/server",
+  "version": "0.4.0",
+  "private": true,
+  "description": "Research Canvas 本地 API 服务（Fastify + Agent 投研引擎）",
+  "homepage": "https://github.com/Travisun/Opptrix",
+  "license": "Apache-2.0",
+  "author": "Research Canvas",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Travisun/Opptrix.git",
+    "directory": "apps/server"
+  },
+  "bugs": {
+    "url": "https://github.com/Travisun/Opptrix/issues"
+  },
+  "type": "module",
+  "scripts": {
+    "predev": "node ../../scripts/ensure-native-bindings.mjs",
+    "dev": "npm run build && concurrently -k -n tsc,api \"tsc -p tsconfig.json --watch --preserveWatchOutput\" \"node scripts/dev.mjs\"",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "mcp": "npm run build -w @opptrix/agent && node ../../packages/agent/dist/mcp/stdio-entry.js"
+  },
+  "dependencies": {
+    "@fastify/multipart": "^9.4.0",
+    "@fastify/static": "^10.1.3",
+    "@opptrix/agent": "*",
+    "@opptrix/agent-browser": "*",
+    "@opptrix/agent-skills": "*",
+    "@opptrix/agent-workspace": "*",
+    "@opptrix/article-enrichment": "*",
+    "@opptrix/doc-library": "*",
+    "@opptrix/event-bus": "*",
+    "@opptrix/local-inference": "*",
+    "@opptrix/news-feed": "*",
+    "@opptrix/plugin-storage": "*",
+    "@opptrix/research-hub": "*",
+    "@opptrix/schedule": "*",
+    "@opptrix/search-hub": "*",
+    "@opptrix/shared": "*",
+    "@opptrix/system-update": "*",
+    "@opptrix/user-store": "*",
+    "fastify": "^5.11.3",
+    "node-llama-cpp": "^3.19.0",
+    "nodejs-whisper": "^0.3.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.12",
+    "typescript": "^5.7.2"
+  }
+}

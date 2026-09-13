@@ -1,0 +1,201 @@
+import assert from 'node:assert/strict'
+import { test } from 'node:test'
+
+import {
+  normalizeInstrumentChart,
+  normalizeInstrumentSnapshot,
+  klinesToChartBars,
+  quoteFromProviderRow,
+  resolveInstrumentQuoteChangePct,
+} from '../packages/shared/dist/instrument-response.js'
+import { resolveCnInstrumentIdentity } from '../packages/shared/dist/instrument-symbol.js'
+
+test('resolveInstrumentQuoteChangePct recovers from absurd upstream change_pct', () => {
+  const pct = resolveInstrumentQuoteChangePct(
+    { change_pct: 94196, price: 190, preClose: 188 },
+    190,
+    188,
+  )
+  assert.equal(pct, 1.06)
+})
+
+test('resolveInstrumentQuoteChangePct converts decimal ratio to percent', () => {
+  // 指数源偶发返回 -0.00076677（比率）而非 -0.08（百分数）
+  const pct = resolveInstrumentQuoteChangePct(
+    { change_pct: -0.00076677, price: 3912.49, preClose: 3915.49 },
+    3912.49,
+    3915.49,
+  )
+  assert.ok(pct != null && Math.abs(pct + 0.08) < 0.02)
+  // 已是百分数时不得再 ×100
+  assert.equal(
+    resolveInstrumentQuoteChangePct({ change_pct: -0.73, price: 6.78, preClose: 6.83 }, 6.78, 6.83),
+    -0.73,
+  )
+})
+
+test('quoteFromProviderRow normalizes camelCase provider row', () => {
+  const q = quoteFromProviderRow(
+    { market: 'US', assetClass: 'EQUITY', symbol: 'AAPL' },
+    { name: 'Apple', price: 190, changePct: 1.2, volume: 1000 },
+  )
+  assert.equal(q.code, 'US:STOCK:AAPL.US')
+  assert.equal(q.change_pct, 1.2)
+  assert.equal(q.market, 'US')
+})
+
+test('resolveCnInstrumentIdentity maps listed ETF codes to CN ETF not PF fund', () => {
+  const ref = resolveCnInstrumentIdentity({
+    market: 'CN',
+    assetClass: 'FUND',
+    symbol: '510300',
+    exchange: 'PF',
+  })
+  assert.equal(ref.assetClass, 'ETF')
+  assert.equal(ref.symbol, '510300')
+  assert.equal(ref.exchange, 'SH')
+})
+
+test('quoteFromProviderRow ignores stale prevNav when price tracks unitNav', () => {
+  const q = quoteFromProviderRow(
+    { market: 'CN', assetClass: 'ETF', symbol: '510300', exchange: 'SH' },
+    {
+      price: 4.0,
+      unitNav: 4.05,
+      prevNav: 9.76,
+      preClose: 4.02,
+      changePct: -0.5,
+    },
+  )
+  assert.equal(q.price, 4.0)
+  assert.equal(q.pre_close, 4.02)
+  assert.ok(q.change_pct != null && Math.abs(q.change_pct) < 10)
+})
+
+test('quoteFromProviderRow maps fund unitNav to price', () => {
+  const q = quoteFromProviderRow(
+    { market: 'CN', assetClass: 'FUND', symbol: '000001', exchange: 'PF' },
+    { name: '华夏成长', unitNav: 1.2345, prevNav: 1.22, changePct: 1.02 },
+  )
+  assert.equal(q.code, 'CN:OTC:000001.OF')
+  assert.equal(q.price, 1.2345)
+  assert.equal(q.pre_close, 1.22)
+  assert.equal(q.change_pct, 1.02)
+  assert.equal(q.asset_class, 'FUND')
+})
+
+test('quoteFromProviderRow derives 0% change when price equals pre_close', () => {
+  const q = quoteFromProviderRow(
+    { market: 'CN', assetClass: 'FUND', symbol: '000001', exchange: 'PF' },
+    { name: '华夏成长', unitNav: 1.22, prevNav: 1.22 },
+  )
+  assert.equal(q.change_pct, 0)
+})
+
+test('quoteFromProviderRow preserves extended CN quote fields', () => {
+  const q = quoteFromProviderRow(
+    { market: 'CN', assetClass: 'EQUITY', symbol: '600519' },
+    {
+      name: '贵州茅台',
+      price: 1700,
+      changePct: 0.5,
+      open: 1690,
+      high: 1710,
+      low: 1688,
+      preClose: 1691,
+      turnoverRate: 0.32,
+      pe: 28.5,
+      pb: 8.2,
+      volume: 12000,
+      amount: 2e9,
+    },
+  )
+  assert.equal(q.code, 'CN:STOCK:600519.SH')
+  assert.equal(q.open, 1690)
+  assert.equal(q.pre_close, 1691)
+  assert.equal(q.turnover_rate, 0.32)
+  assert.equal(q.pe, 28.5)
+})
+
+test('klinesToChartBars maps StockKline shape', () => {
+  const bars = klinesToChartBars([
+    { code: '600519', date: '2024-01-02', open: 1, high: 2, low: 0.5, close: 1.5, volume: 100, amount: 200, changePct: 1, turnoverRate: 0.5 },
+  ])
+  assert.equal(bars[0]?.time, '2024-01-02')
+  assert.equal(bars[0]?.close, 1.5)
+})
+
+test('normalizeInstrumentChart wraps cross-market kline items', () => {
+  const chart = normalizeInstrumentChart(
+    { market: 'US', assetClass: 'EQUITY', symbol: 'AAPL' },
+    'daily',
+    {
+      symbol: 'AAPL',
+      items: [{ code: 'AAPL', date: '2024-01-02', open: 1, high: 2, low: 0.5, close: 1.5, volume: 100, amount: 200, changePct: 1, turnoverRate: null }],
+      count: 1,
+    },
+  )
+  assert.equal(chart.code, 'US:STOCK:AAPL.US')
+  assert.equal(chart.bars.length, 1)
+  assert.equal(chart.bars[0]?.close, 1.5)
+})
+
+test('normalizeInstrumentChart passes cross-market has_more', () => {
+  const chart = normalizeInstrumentChart(
+    { market: 'US', assetClass: 'EQUITY', symbol: 'AAPL' },
+    'daily',
+    {
+      symbol: 'AAPL',
+      items: [{ code: 'AAPL', date: '2024-01-02', open: 1, high: 1, low: 1, close: 1, volume: 1, amount: 1, changePct: 0, turnoverRate: null }],
+      indicators: [],
+      count: 1,
+      hasMore: true,
+    },
+  )
+  assert.equal(chart.has_more, true)
+})
+
+test('normalizeInstrumentChart passes cross-market indicators', () => {
+  const chart = normalizeInstrumentChart(
+    { market: 'HK', assetClass: 'EQUITY', symbol: '00700' },
+    'daily',
+    {
+      symbol: '00700',
+      items: [{ code: '00700', date: '2024-01-02', open: 300, high: 310, low: 295, close: 305, volume: 1000, amount: 305000, changePct: 1.2, turnoverRate: null }],
+      indicators: [{ time: '2024-01-02', ma5: 302, ma10: 298, ma20: 290, ma60: 280, macd: 1.2, macdSignal: 0.8, macdHist: 0.4 }],
+      count: 1,
+    },
+  )
+  assert.equal(chart.code, 'HK:STOCK:00700.HK')
+  assert.equal(chart.indicators?.length, 1)
+  assert.equal(chart.indicators?.[0]?.ma5, 302)
+  assert.equal(chart.indicators?.[0]?.macdHist, 0.4)
+})
+
+test('normalizeInstrumentSnapshot attaches local_insights in extras', () => {
+  const snap = normalizeInstrumentSnapshot(
+    { market: 'CN', assetClass: 'EQUITY', symbol: '600519' },
+    {
+      code: '600519',
+      name: '贵州茅台',
+      quote: { code: '600519', name: '贵州茅台', price: 1700, changePct: 0.5 },
+      profile: { code: '600519', industry: '白酒' },
+      financial: null,
+    },
+    {
+      localInsights: {
+        trade_date: '2024-06-01',
+        total_score: 72,
+        scorecard: '综合评估',
+        pe: 30,
+        pb: 8,
+        pe_percentile: 65,
+        pb_percentile: 70,
+      },
+      source: 'mixed',
+    },
+  )
+  assert.equal(snap.instrument.symbol, '600519')
+  assert.equal(snap.extras?.local_insights?.total_score, 72)
+  assert.equal(snap.source, 'mixed')
+})

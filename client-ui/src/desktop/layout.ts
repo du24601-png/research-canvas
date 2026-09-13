@@ -1,0 +1,115 @@
+import { electronPlatform } from '../platform/detect'
+import {
+  DESKTOP_CHROME_TOP_OFFSET,
+  DESKTOP_CHROME_TOP_OFFSET_WIN,
+  DESKTOP_FRAME_TITLEBAR_HEIGHT,
+  DESKTOP_SETTINGS_SIDEBAR_WIDTH,
+  DESKTOP_TITLE_BAR_ACTIONS_WIDTH,
+  DESKTOP_TITLE_GAP,
+  DESKTOP_TITLEBAR_HEIGHT,
+  DESKTOP_TOOL_GAP,
+  DESKTOP_TOOL_SIZE,
+  DESKTOP_TOOLBAR_TOOL_COUNT,
+  DESKTOP_TRAFFIC_LIGHT_WIDTH,
+  DESKTOP_TRAFFIC_LIGHT_WIDTH_FULLSCREEN,
+  SIDEBAR_DEFAULT_WIDTH,
+} from './constants'
+
+/** Dedicated window-frame titlebar height (non-mac Electron only). */
+export function desktopFrameTitlebarHeight(): number {
+  const platform = electronPlatform()
+  if (platform === 'darwin' || platform == null) return 0
+  return DESKTOP_FRAME_TITLEBAR_HEIGHT
+}
+
+/** Platform chrome inset inside the content title band */
+export function desktopChromeTopOffset(): number {
+  return electronPlatform() === 'win32' ? DESKTOP_CHROME_TOP_OFFSET_WIN : DESKTOP_CHROME_TOP_OFFSET
+}
+
+export function desktopChromeBandHeight(): number {
+  return DESKTOP_TITLEBAR_HEIGHT - desktopChromeTopOffset()
+}
+
+/** Right inset for chat/panel toggles — window controls live in the frame titlebar on non-mac */
+export function desktopTitleBarActionsRight(): number {
+  return 12
+}
+
+export function desktopToolbarLeft(fullscreen = false): number {
+  if (electronPlatform() !== 'darwin') return 12
+  return fullscreen ? DESKTOP_TRAFFIC_LIGHT_WIDTH_FULLSCREEN : DESKTOP_TRAFFIC_LIGHT_WIDTH
+}
+
+export function desktopToolbarWidth(): number {
+  return DESKTOP_TOOLBAR_TOOL_COUNT * DESKTOP_TOOL_SIZE
+    + (DESKTOP_TOOLBAR_TOOL_COUNT - 1) * DESKTOP_TOOL_GAP
+}
+
+export type DesktopViewMode = 'chat' | 'settings'
+
+export function desktopTitleLeft(
+  sidebarInline: boolean,
+  view: DesktopViewMode = 'chat',
+  fullscreen = false,
+  sidebarWidth = SIDEBAR_DEFAULT_WIDTH,
+): number {
+  const afterToolbar = desktopToolbarLeft(fullscreen) + desktopToolbarWidth() + DESKTOP_TITLE_GAP
+  if (view === 'settings') {
+    if (sidebarInline) {
+      return DESKTOP_SETTINGS_SIDEBAR_WIDTH + DESKTOP_TITLE_GAP
+    }
+    return afterToolbar
+  }
+  if (sidebarInline) {
+    return sidebarWidth + DESKTOP_TITLE_GAP
+  }
+  return afterToolbar
+}
+
+export function desktopTitleMaxWidth(opts: {
+  titleLeft: number
+  viewportWidth: number
+  rightPanelOpen?: boolean
+  rightPanelWidth?: number
+  chatColumnVisible?: boolean
+  reserveTitleBarActions?: boolean
+  titleBarActionsRight?: number
+  titleBarActionsWidth?: number
+  /** Measured chat column width — refines ellipsis when split layout is active */
+  chatColumnWidth?: number
+  /** Left edge of chat column in viewport (inline sidebar width, else 0) */
+  chatAreaLeft?: number
+}): number {
+  const trailingPad = DESKTOP_TITLE_GAP
+  let rightEdge = opts.viewportWidth - trailingPad
+
+  if (opts.rightPanelOpen && opts.chatColumnVisible !== false && (opts.rightPanelWidth ?? 0) > 0) {
+    rightEdge = opts.viewportWidth - (opts.rightPanelWidth ?? 0) - trailingPad
+  } else if (opts.reserveTitleBarActions) {
+    const actionsRight = opts.titleBarActionsRight ?? 12
+    const actionsWidth = opts.titleBarActionsWidth ?? DESKTOP_TITLE_BAR_ACTIONS_WIDTH
+    rightEdge = opts.viewportWidth - actionsRight - actionsWidth - trailingPad
+  }
+
+  let available = rightEdge - opts.titleLeft
+
+  if (opts.chatColumnWidth != null && opts.chatColumnWidth > 0) {
+    const chatAreaLeft = opts.chatAreaLeft ?? 0
+    const offsetInChat = Math.max(0, opts.titleLeft - chatAreaLeft)
+    available = Math.min(available, opts.chatColumnWidth - offsetInChat - trailingPad)
+  }
+
+  return Math.max(96, Math.min(480, available))
+}
+
+/** 可点击标题区右缘 — 用于在全局 drag 层上留出“洞” */
+export function desktopTitleZoneRight(titleLeft: number, titleMaxWidth: number): number {
+  return titleLeft + titleMaxWidth
+}
+
+export function desktopChromeToolbarReserve(fullscreen = false): number {
+  return desktopToolbarLeft(fullscreen) + desktopToolbarWidth() + DESKTOP_TITLE_GAP
+}
+
+export { DESKTOP_TITLEBAR_HEIGHT }

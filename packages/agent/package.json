@@ -1,0 +1,37 @@
+{
+  "name": "@opptrix/agent",
+  "version": "0.5.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "opptrix-mcp": "./dist/mcp/stdio-entry.js",
+    "opptrix-mcp-iwencai": "./dist/mcp/builtin/iwencai/stdio-entry.js",
+    "opptrix-mcp-websearch": "./dist/mcp/builtin/websearch/stdio-entry.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node -e \"import('node:fs').then(({cpSync,mkdirSync})=>{mkdirSync('dist/rsshub',{recursive:true});cpSync('src/rsshub/rsshub_routes_schema.json','dist/rsshub/rsshub_routes_schema.json')})\"",
+    "mcp": "node dist/mcp/stdio-entry.js",
+    "mcp:iwencai": "node dist/mcp/builtin/iwencai/stdio-entry.js",
+    "mcp:websearch": "node dist/mcp/builtin/websearch/stdio-entry.js"
+  },
+  "dependencies": {
+    "@opptrix/agent-browser": "*",
+    "@opptrix/agent-skills": "*",
+    "@opptrix/agent-workspace": "*",
+    "@opptrix/doc-library": "*",
+    "@opptrix/research-hub": "*",
+    "@opptrix/schedule": "*",
+    "@opptrix/shared": "*",
+    "@opptrix/user-store": "*",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "pdf-parse": "^1.1.1"
+  }
+}

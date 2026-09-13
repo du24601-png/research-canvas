@@ -1,0 +1,100 @@
+# Research Canvas — recommended single-user self-host (Docker Compose)
+#
+# Users: pull-only via `research-canvas up` (prebuilt GHCR image). Do not rely on local build.
+#   CLI sets OPPTRIX_IMAGE=ghcr.io/travisun/opptrix:opptrix-selfhost-vX.Y.Z then pull + up.
+#   Override registry/tag anytime: OPPTRIX_IMAGE=... docker compose up -d
+#
+# Developer local build (OPPTRIX_DEV_ALLOW_BUILD=1 only):
+#   cp compose.env.example compose.env   # optional runtime overrides
+#   OPPTRIX_DEV_ALLOW_BUILD=1 research-canvas up --build
+#   # or: docker compose up -d --build
+#   open https://<公网IP或本机>:8712   （自签名 HTTPS，默认唯一入口）
+#   HTTP 默认关闭。反代需要明文 upstream 时设 OPPTRIX_ENABLE_HTTP=1 并自行映射 8711。
+#
+# Persistence: single named volume `opptrix-home` → `/opptrix`
+#   private/   user DB, auth, vault, sessions… (service-only)
+#   workspace/ Agent 工作区（opptrix-agent 可写）
+#   mounts/    额外挂载约定
+#   models/    本地模型
+#   system/    热更新槽位
+#
+# Agent isolation: service as root; opptrix_run drops to uid 10001 (opptrix-agent).
+# Legacy 3-volume layout: see docker-compose.legacy-volumes.yml
+#
+# Extra host folders (override):
+#   - ./host-research:/opptrix/mounts/research:ro
+
+services:
+  opptrix:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NODE_VERSION: "${OPPTRIX_NODE_VERSION:-24}"
+        NODE_IMAGE_PREFIX: "${OPPTRIX_DOCKER_IMAGE_PREFIX:-}"
+        NPM_REGISTRY: "${OPPTRIX_NPM_REGISTRY:-}"
+        APT_MIRROR: "${OPPTRIX_APT_MIRROR:-}"
+        MIRROR_AUTO: "${OPPTRIX_MIRROR_AUTO_BUILD:-}"
+        OPPTRIX_BASE_VERSION: "${OPPTRIX_BASE_VERSION:-}"
+        OPPTRIX_RELEASE_TAG: "${OPPTRIX_RELEASE_TAG:-}"
+    image: ${OPPTRIX_IMAGE:-opptrix:local}
+    container_name: opptrix
+    env_file:
+      - path: compose.env
+        required: false
+    ports:
+      # 默认只发布 HTTPS；可用 compose.env 覆盖宿主机端口
+      - "${OPPTRIX_HOST_HTTPS_PORT:-8712}:8712"
+      # HTTP 默认不映射。需要时设 OPPTRIX_ENABLE_HTTP=1 并增加：
+      # - "${OPPTRIX_HOST_HTTP_PORT:-8711}:8711"
+    environment:
+      STOCK_RESEARCH_HOST: "0.0.0.0"
+      OPPTRIX_ENABLE_HTTP: "${OPPTRIX_ENABLE_HTTP:-0}"
+      STOCK_RESEARCH_PORT: "${STOCK_RESEARCH_PORT:-8711}"
+      OPPTRIX_HTTPS_PORT: "${OPPTRIX_HTTPS_PORT:-8712}"
+      # 浏览器走 HTTPS 自签时 Cookie Secure（反代终结 TLS 时可改）
+      OPPTRIX_AUTH_COOKIE_SECURE: "${OPPTRIX_AUTH_COOKIE_SECURE:-1}"
+      SERVE_UI: "1"
+      OPPTRIX_HOME: "/opptrix"
+      OPPTRIX_DATA_DIR: "/opptrix/private"
+      OPPTRIX_AGENT_WORKSPACE_DIR: "/opptrix/workspace"
+      OPPTRIX_MOUNTS_DIR: "/opptrix/mounts"
+      OPPTRIX_SYSTEM_DIR: "/opptrix/system"
+      OPPTRIX_DOCKER: "1"
+      OPPTRIX_AGENT_SANDBOX: "${OPPTRIX_AGENT_SANDBOX:-off}"
+      OPPTRIX_AGENT_USER: "opptrix-agent"
+      OPPTRIX_AGENT_UID: "10001"
+      OPPTRIX_AGENT_GID: "10001"
+      OPPTRIX_SEED_ROOT: "/app"
+      OPPTRIX_MODELS_DIR: "/opptrix/models"
+      OPPTRIX_LLM_DIR: "/opptrix/models/llms"
+      OPPTRIX_E5_BUNDLED_DIR: "/opptrix/models/llms/multilingual-e5-small"
+      OPPTRIX_RAPIDOCR_MODEL_DIR: "/opptrix/models/llms/rapidocr-ppocrv4-mobile"
+      OPPTRIX_RAPIDOCR_BUNDLED_DIR: "/opptrix/models/llms/rapidocr-ppocrv4-mobile"
+      OPPTRIX_SENSEVOICE_BUNDLED_DIR: "/opptrix/models/sensevoice"
+      UI_DIST_PATH: "/app/client-ui/dist"
+      OPPTRIX_WITH_MODELS: "${OPPTRIX_WITH_MODELS:-1}"
+      OPPTRIX_FETCH_MODELS_ON_START: "${OPPTRIX_FETCH_MODELS_ON_START:-0}"
+      OPPTRIX_SKIP_MODEL_FETCH: "${OPPTRIX_SKIP_MODEL_FETCH:-0}"
+      OPPTRIX_MIRROR_AUTO: "${OPPTRIX_MIRROR_AUTO:-1}"
+      OPPTRIX_FORCE_MODEL_FETCH: "${OPPTRIX_FORCE_MODEL_FETCH:-0}"
+      OPPTRIX_MODEL_SOURCE_ORDER: "${OPPTRIX_MODEL_SOURCE_ORDER:-modelscope,hf-mirror,huggingface}"
+      OPPTRIX_APP_VERSION: "${OPPTRIX_APP_VERSION:-}"
+      OPPTRIX_RELEASE_CHANNEL: "${OPPTRIX_RELEASE_CHANNEL:-}"
+      OPPTRIX_RELEASE_TAG: "${OPPTRIX_RELEASE_TAG:-}"
+      OPPTRIX_BASE_VERSION: "${OPPTRIX_BASE_VERSION:-}"
+    volumes:
+      - opptrix-home:/opptrix
+      # Extra research / docs folders:
+      # - ./host-research:/opptrix/mounts/research:ro
+    restart: unless-stopped
+    stop_grace_period: 20s
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsk https://127.0.0.1:${OPPTRIX_HTTPS_PORT:-8712}/api/health"]
+      interval: 30s
+      timeout: 8s
+      retries: 8
+      start_period: 180s
+
+volumes:
+  opptrix-home:

@@ -1,0 +1,433 @@
+import type { ChatLiveTrace, ChatProgressEvent, ChatToolStep, ChatUserPromptPayload } from '../types/chatProgress'
+import { morphPhaseLabelForInvestor } from './tracePresentation.ts'
+import {
+  joinReasoningSegments,
+  normalizeReasoningSegments,
+  resolveReasoningSegments,
+  type ReasoningSegment,
+} from './reasoningTimeline.ts'
+
+export type SessionStreamSnapshot = {
+  liveTrace: ChatLiveTrace | null
+  /** 按协作 run_id 索引的子任务实时 trace（subagent_child_progress） */
+  collaborationTraces?: Record<string, ChatLiveTrace>
+  pendingUserPrompt: ChatUserPromptPayload | null
+  userPromptSubmitting: boolean
+  /** 会话内上下文整理轻提示 */
+  contextHint: string | null
+}
+
+/** 去掉尾部省略号，得到纯净 phaseLabel */
+export function stripPhaseEllipsis(label: string): string {
+  return label.replace(/[…]+$/u, '').replace(/\.{2,}$/u, '').trim()
+}
+
+/** 投资者向单行 status（不含 token / 步数） */
+export function formatLiveThinkingStatus(phaseLabel: string | undefined): string | undefined {
+  if (!phaseLabel?.trim()) return undefined
+  return `${morphPhaseLabelForInvestor(stripPhaseEllipsis(phaseLabel))}…`
+}
+
+/** 从已有 trace 解析 phaseLabel（兼容仅有 thinkingLabel 的旧快照） */
+function resolvePhaseLabel(trace: ChatLiveTrace | null | undefined, fallback: string): string {
+  if (trace?.phaseLabel) return trace.phaseLabel
+  const raw = trace?.thinkingLabel
+  if (!raw) return fallback
+  const base = stripPhaseEllipsis(raw).split(' · ')[0]?.trim()
+  return base || fallback
+}
+
+function rebuildLiveTrace(
+  prev: ChatLiveTrace | null | undefined,
+  patch: {
+    steps?: ChatToolStep[]
+    phaseLabel?: string
+    /** 显式传入（含 undefined）表示覆盖；不传则保留上一轮 */
+    estimatedTokens?: number | undefined
+    clearEstimatedTokens?: boolean
+    thinkingSnippet?: string | undefined
+    thinkingSegments?: ReasoningSegment[] | undefined
+    replyDraft?: string | undefined
+    clearReplyDraft?: boolean
+  },
+): ChatLiveTrace {
+  const steps = patch.steps ?? prev?.steps ?? []
+  const phaseLabel = patch.phaseLabel ?? resolvePhaseLabel(prev, '')
+  const estimatedTokens = patch.clearEstimatedTokens
+    ? undefined
+    : ('estimatedTokens' in patch ? patch.estimatedTokens : prev?.estimatedTokens)
+  const thinkingSegments = 'thinkingSegments' in patch
+    ? patch.thinkingSegments
+    : prev?.thinkingSegments
+  const thinkingSnippet = 'thinkingSnippet' in patch
+    ? patch.thinkingSnippet
+    : (thinkingSegments?.length
+      ? joinReasoningSegments(thinkingSegments)
+      : prev?.thinkingSnippet)
+  const replyDraft = patch.clearReplyDraft
+    ? undefined
+    : ('replyDraft' in patch ? patch.replyDraft : prev?.replyDraft)
+  return {
+    steps,
+    phaseLabel: phaseLabel || undefined,
+    estimatedTokens,
+    thinkingSnippet,
+    thinkingSegments,
+    replyDraft,
+    thinkingLabel: formatLiveThinkingStatus(phaseLabel || undefined),
+  }
+}
+
+export function createEmptyStreamSnapshot(): SessionStreamSnapshot {
+  return {
+    liveTrace: null,
+    pendingUserPrompt: null,
+    userPromptSubmitting: false,
+    contextHint: null,
+  }
+}
+
+export function createThinkingStreamSnapshot(label = '模型正在思考…'): SessionStreamSnapshot {
+  const phaseLabel = stripPhaseEllipsis(label)
+  return {
+    liveTrace: {
+      steps: [],
+      phaseLabel,
+      thinkingLabel: formatLiveThinkingStatus(phaseLabel),
+    },
+    pendingUserPrompt: null,
+    userPromptSubmitting: false,
+    contextHint: null,
+  }
+}
+
+export function applyChatProgressEvent(
+  snapshot: SessionStreamSnapshot,
+  event: ChatProgressEvent,
+): SessionStreamSnapshot {
+  switch (event.type) {
+    case 'thinking': {
+      const incoming = normalizeReasoningSegments(event.segments)
+      let thinkingSegments: ReasoningSegment[] | undefined
+      if (incoming?.length) {
+        thinkingSegments = incoming
+      } else if (event.snippet != null && event.snippet !== '') {
+        // 旧服务端仅推 snippet：按 SEP 降级分段
+        thinkingSegments = resolveReasoningSegments(undefined, event.snippet)
+      } else {
+        thinkingSegments = snapshot.liveTrace?.thinkingSegments
+      }
+      const segmentsOrUndef = thinkingSegments?.length ? thinkingSegments : undefined
+      const phaseLabel = stripPhaseEllipsis(event.label)
+      // 新一轮思考（非「正在整理消息」）清空回复草稿预览
+      const clearReplyDraft = phaseLabel !== '正在整理消息'
+      return {
+        ...snapshot,
+        liveTrace: rebuildLiveTrace(snapshot.liveTrace, {
+          phaseLabel,
+          clearEstimatedTokens: true,
+          clearReplyDraft,
+          thinkingSegments: segmentsOrUndef,
+          thinkingSnippet: event.snippet
+            ?? (segmentsOrUndef ? joinReasoningSegments(segmentsOrUndef) : undefined)
+            ?? snapshot.liveTrace?.thinkingSnippet,
+        }),
+      }
+    }
+    case 'context_compact':
+      return {
+        ...snapshot,
+        contextHint: event.message,
+        liveTrace: rebuildLiveTrace(snapshot.liveTrace, {
+          phaseLabel: '正在整理对话要点',
+          thinkingSnippet: snapshot.liveTrace?.thinkingSnippet,
+          thinkingSegments: snapshot.liveTrace?.thinkingSegments,
+        }),
+      }
+    case 'user_prompt':
+      return {
+        ...snapshot,
+        pendingUserPrompt: event.prompt,
+        liveTrace: rebuildLiveTrace(snapshot.liveTrace, {
+          phaseLabel: '等待你的确认',
+          thinkingSnippet: snapshot.liveTrace?.thinkingSnippet,
+          thinkingSegments: snapshot.liveTrace?.thinkingSegments,
+        }),
+      }
+    case 'tool_start':
+      return {
+        ...snapshot,
+        liveTrace: rebuildLiveTrace(snapshot.liveTrace, {
+          steps: [...(snapshot.liveTrace?.steps ?? []), event.step],
+          clearReplyDraft: true,
+        }),
+      }
+    case 'tool_done':
+      return {
+        ...snapshot,
+        pendingUserPrompt: null,
+        liveTrace: rebuildLiveTrace(snapshot.liveTrace, {
+          phaseLabel: '模型正在整理结果',
+          steps: (snapshot.liveTrace?.steps ?? []).map(step =>
+            step.id === event.step.id ? event.step : step,
+          ),
+        }),
+      }
+    case 'research_canvas':
+      return snapshot
+    case 'reply': {
+      // 终答有 content →「正在整理消息」；仅 estimatedTokens 流式进度则保持思考/工具后整理态
+      const hasContent = typeof event.content === 'string' && event.content.length > 0
+      let phaseLabel: string
+      if (hasContent) {
+        phaseLabel = '正在整理消息'
+      } else {
+        const prevPhase = resolvePhaseLabel(snapshot.liveTrace, '')
+        const consolidating = prevPhase.includes('整理')
+        phaseLabel = prevPhase || (consolidating ? '模型正在整理结果' : '模型正在思考')
+      }
+      return {
+        ...snapshot,
+        liveTrace: rebuildLiveTrace(snapshot.liveTrace, {
+          phaseLabel,
+          // reply 无估算时清空，与旧行为一致（不残留假数字）
+          estimatedTokens: event.estimatedTokens,
+          clearEstimatedTokens: event.estimatedTokens == null,
+          ...(hasContent
+            ? { replyDraft: event.content }
+            : {}),
+        }),
+      }
+    }
+    case 'steer_applied':
+      // 生成中补充说明：轻量提示，避免完全不可见（不打断工具/思考时间线）
+      return {
+        ...snapshot,
+        liveTrace: rebuildLiveTrace(snapshot.liveTrace, {
+          phaseLabel: '已收到补充说明',
+          thinkingSnippet: snapshot.liveTrace?.thinkingSnippet,
+          thinkingSegments: snapshot.liveTrace?.thinkingSegments,
+        }),
+      }
+    case 'job_watch': {
+      if (event.action === 'deduped' || event.action === 'cleared') {
+        return snapshot
+      }
+      const label = event.label?.trim() || '后台任务进行中'
+      const pct = typeof event.percent === 'number' ? event.percent : undefined
+      const phaseLabel = pct != null && pct > 0 && pct < 100
+        ? `${label}（${Math.floor(pct)}%）`
+        : label
+      return {
+        ...snapshot,
+        liveTrace: rebuildLiveTrace(snapshot.liveTrace, {
+          phaseLabel,
+          thinkingSnippet: snapshot.liveTrace?.thinkingSnippet,
+          thinkingSegments: snapshot.liveTrace?.thinkingSegments,
+        }),
+      }
+    }
+    case 'job_progress': {
+      const label = event.label?.trim() || '后台任务进行中'
+      const pct = typeof event.percent === 'number' ? event.percent : undefined
+      const phaseLabel = pct != null && pct > 0 && pct < 100
+        ? `${label}（${Math.floor(pct)}%）`
+        : label
+      return {
+        ...snapshot,
+        liveTrace: rebuildLiveTrace(snapshot.liveTrace, {
+          phaseLabel,
+          thinkingSnippet: snapshot.liveTrace?.thinkingSnippet,
+          thinkingSegments: snapshot.liveTrace?.thinkingSegments,
+        }),
+      }
+    }
+    case 'subagent_child_progress': {
+      const runId = event.run_id?.trim() || ''
+      if (!runId) return snapshot
+      const inner = event.child
+        ?? event.event
+        ?? event.progress
+        ?? event.child_progress
+      if (!inner || typeof inner !== 'object' || !('type' in inner)) return snapshot
+      const prevTraces = snapshot.collaborationTraces ?? {}
+      const prevChildTrace = prevTraces[runId] ?? null
+      const childSnap = applyChatProgressEvent(
+        {
+          liveTrace: prevChildTrace,
+          pendingUserPrompt: null,
+          userPromptSubmitting: false,
+          contextHint: null,
+        },
+        inner,
+      )
+      const collaborationTraces = {
+        ...prevTraces,
+        [runId]: childSnap.liveTrace ?? { steps: [] },
+      }
+      const label = event.label?.trim() || '协作任务'
+      const stepId = `collab:${runId}`
+      const prevSteps = snapshot.liveTrace?.steps ?? []
+      const hasStep = prevSteps.some(st => st.id === stepId)
+      const steps = hasStep
+        ? prevSteps.map(st =>
+          st.id === stepId
+            ? { ...st, label: `协作任务：${label}`, status: 'running' as const }
+            : st,
+        )
+        : [
+          ...prevSteps,
+          {
+            id: stepId,
+            tool: 'collaboration_task',
+            label: `协作任务：${label}`,
+            status: 'running' as const,
+            startedAt: new Date().toISOString(),
+          },
+        ]
+      return {
+        ...snapshot,
+        collaborationTraces,
+        liveTrace: rebuildLiveTrace(snapshot.liveTrace, {
+          phaseLabel: `协作任务进行中：${label}`,
+          steps,
+          thinkingSnippet: snapshot.liveTrace?.thinkingSnippet,
+          thinkingSegments: snapshot.liveTrace?.thinkingSegments,
+        }),
+      }
+    }
+    case 'subagent_started':
+    case 'subagent_progress':
+    case 'subagent_done': {
+      const label = event.label?.trim() || '协作任务'
+      const runId = event.run_id?.trim() || ''
+      const stepId = runId ? `collab:${runId}` : `collab:${label}`
+      const prevSteps = snapshot.liveTrace?.steps ?? []
+      const nowIso = new Date().toISOString()
+      let steps = prevSteps
+
+      if (event.type === 'subagent_started') {
+        const existing = prevSteps.find(st => st.id === stepId)
+        if (!existing) {
+          steps = [
+            ...prevSteps,
+            {
+              id: stepId,
+              tool: 'collaboration_task',
+              label: `协作任务：${label}`,
+              status: 'running' as const,
+              startedAt: nowIso,
+            },
+          ]
+        } else {
+          steps = prevSteps.map(st =>
+            st.id === stepId
+              ? { ...st, label: `协作任务：${label}`, status: 'running' as const }
+              : st,
+          )
+        }
+      } else if (event.type === 'subagent_progress') {
+        const summary = event.summary?.trim()
+        steps = prevSteps.map(st =>
+          st.id === stepId
+            ? {
+                ...st,
+                label: `协作任务：${label}`,
+                status: 'running' as const,
+                resultPreview: summary || st.resultPreview,
+              }
+            : st,
+        )
+        if (!prevSteps.some(st => st.id === stepId)) {
+          steps = [
+            ...prevSteps,
+            {
+              id: stepId,
+              tool: 'collaboration_task',
+              label: `协作任务：${label}`,
+              status: 'running' as const,
+              startedAt: nowIso,
+              resultPreview: summary,
+            },
+          ]
+        }
+      } else {
+        // subagent_done
+        const stLower = (event.status || '').trim().toLowerCase()
+        const failed = stLower === 'failed' || stLower === 'cancelled'
+        const summary = event.summary?.trim()
+        steps = prevSteps.map(st =>
+          st.id === stepId
+            ? {
+                ...st,
+                label: `协作任务：${label}`,
+                status: failed ? ('error' as const) : ('done' as const),
+                finishedAt: nowIso,
+                resultPreview: summary
+                  || (stLower === 'cancelled' ? '已结束' : failed ? '未完成' : '已完成'),
+              }
+            : st,
+        )
+        if (!prevSteps.some(st => st.id === stepId)) {
+          steps = [
+            ...prevSteps,
+            {
+              id: stepId,
+              tool: 'collaboration_task',
+              label: `协作任务：${label}`,
+              status: failed ? ('error' as const) : ('done' as const),
+              startedAt: nowIso,
+              finishedAt: nowIso,
+              resultPreview: summary
+                || (stLower === 'cancelled' ? '已结束' : failed ? '未完成' : '已完成'),
+            },
+          ]
+        }
+      }
+
+      const phaseLabel = event.type === 'subagent_started'
+        ? `协作任务进行中：${label}`
+        : event.type === 'subagent_done'
+          ? (
+            (event.status || '').trim().toLowerCase() === 'failed'
+              ? `协作任务未完成：${label}`
+              : (event.status || '').trim().toLowerCase() === 'cancelled'
+                ? `协作任务已结束：${label}`
+                : `协作任务已完成：${label}`
+          )
+          : (event.summary?.trim() || `协作任务进行中：${label}`)
+
+      return {
+        ...snapshot,
+        liveTrace: rebuildLiveTrace(snapshot.liveTrace, {
+          phaseLabel,
+          steps,
+          thinkingSnippet: snapshot.liveTrace?.thinkingSnippet,
+          thinkingSegments: snapshot.liveTrace?.thinkingSegments,
+        }),
+      }
+    }
+    case 'done':
+    case 'error':
+      return {
+        ...snapshot,
+        pendingUserPrompt: null,
+      }
+    default:
+      return snapshot
+  }
+}
+
+export function syncStreamSnapshotToUi(
+  snapshot: SessionStreamSnapshot,
+  ui: {
+    setLiveTrace: (value: ChatLiveTrace | null) => void
+    setPendingUserPrompt: (value: ChatUserPromptPayload | null) => void
+    setUserPromptSubmitting: (value: boolean) => void
+  } | null | undefined,
+) {
+  if (!ui) return
+  ui.setLiveTrace(snapshot.liveTrace)
+  ui.setPendingUserPrompt(snapshot.pendingUserPrompt)
+  ui.setUserPromptSubmitting(snapshot.userPromptSubmitting)
+}

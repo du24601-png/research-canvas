@@ -1,0 +1,26 @@
+{
+  "name": "@opptrix/system-update",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Research Canvas unified hot-update: system slots, activate, rollback, extract/verify (Docker + bare Node)",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./vendor-fuse": {
+      "types": "./dist/vendor-fuse.d.ts",
+      "import": "./dist/vendor-fuse.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

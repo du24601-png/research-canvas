@@ -1,0 +1,1008 @@
+/** 数据层 / 分析工具元数据：用途说明与调用规范（OpenAI tools + MCP 共用） */
+import {
+  discoverMiningToolNamesForProfile,
+  INSTRUMENT_HUB_FEATURE,
+  isDiscoverStrategyProfile,
+  packIdForTool,
+  type ToolPackId,
+} from '@opptrix/shared'
+
+/**
+ * 工具元数据 — 每个 Agent 工具的使用指南和调用规范。
+ *
+ * 用途：
+ *   1. 注入 LLM 工具描述（formatToolDescription 拼接 usageGuide + compliance）
+ *   2. 控制工具在挖掘/聊天场景下的可见性
+ *   3. 映射到 ResearchHub.dispatch feature 名称
+ *   4. packId：聊天 Tool Pack 路由归属（见 @opptrix/shared TOOL_PACK_MEMBERSHIP）
+ */
+export interface ToolMeta {
+  /** 何时使用此工具的指导说明（如"初选后批量获取候选截面"） */
+  usageGuide: string
+  /** 调用规范与约束（如"codes ≤80、禁止重复调用"） */
+  compliance: string
+  /** 选股挖掘阶段是否开放给 Agent，默认 false 隐藏 */
+  miningEligible?: boolean
+  /** 对应 ResearchHub.dispatch feature 名称，用于 hub 层路由 */
+  hubFeature?: string
+  /**
+   * 所属工具包（单一主 pack）。
+   * 未显式填写时由 TOOL_PACK_MEMBERSHIP 补全。
+   */
+  packId?: ToolPackId
+}
+
+const MCP_FIRST_LOCAL_FALLBACK =
+  'tools 中若有对应 [MCP:…] / namespaced（server__tool）工具，必须先调外部（含快照/行情/财务/概况等同能力）；本工具仅 MCP 未启用/失败或需精确事实表核验时用。'
+
+const LOCAL_ONLY_ANALYTICS =
+  '本机评分/策略/风格共识，勿用问财代替。'
+
+const INSTRUMENT_REF_USAGE = [
+  '标的标识（Stock-index 命名空间）：',
+  '有 MCP 搜码/问数能力时先用远程（如 iwencai__query2data 等）；search_instruments 仅标的代码歧义或外部 MCP 未启用/失败时才允许，',
+  '快照/行情同样先 namespaced MCP，本地 get_instrument_snapshot / get_instrument_quotes 为补充；',
+  '使用其返回的 instrument 对象（market + symbol + exchange）或 code/ref_label（如 CN:SZ.000009）',
+  'A 股 CN 须带 exchange 消歧：{market:"CN", symbol:"000009", exchange:"SZ"} 或 code:"CN:SZ.000009"',
+  '美股 US:AAPL / 港股 HK:00700 / Crypto CRYPTO:BINANCE.BTC/USDT',
+  'instrument.symbol 为裸代码，勿写入 CN:SZ.xxx 命名空间。',
+].join(' ')
+
+export const TOOL_META: Record<string, ToolMeta> = {
+  get_market_regime: {
+    hubFeature: 'market_regime',
+    miningEligible: true,
+    usageGuide: '判断 A 股/美股宏观环境（牛熊、风险偏好）；挖掘或组合分析前先了解大盘背景。'
+      + ` ${MCP_FIRST_LOCAL_FALLBACK}`,
+    compliance: '只读；profile_scope 默认 cn；us 需 TickFlow/在线 K 线可用；勿重复调用。',
+  },
+  get_market_dynamics: {
+    hubFeature: 'market_dynamics',
+    miningEligible: true,
+    usageGuide: '需要市场全景（指数、全球市场、涨跌榜、龙虎榜）时使用；适合开盘/收盘复盘或解释板块异动背景。'
+      + ` ${MCP_FIRST_LOCAL_FALLBACK}`,
+    compliance: '只读；无参数；响应较大，同一轮对话调用一次即可。',
+  },
+  batch_instrument_snapshots: {
+    hubFeature: 'instrument_batch_snapshots',
+    miningEligible: true,
+    usageGuide: `对已有候选代码批量拉取在线聚合快照（行情/概况等）。${MCP_FIRST_LOCAL_FALLBACK} ${INSTRUMENT_REF_USAGE}`,
+    compliance: 'instruments 或 codes 一次传入，硬上限 200；允许部分失败（看 failed[] / attempted_count）；禁止对同一列表重复调用。',
+  },
+  get_watchlist: {
+    hubFeature: 'watchlist_list',
+    miningEligible: true,
+    usageGuide: '需要知道用户已关注哪些股票时调用；再对重点标的用 get_instrument_quotes / get_instrument_snapshot 深入分析。',
+    compliance: '只读；无参数；关注列表由客户端同步至服务端。',
+  },
+  get_etf_list: {
+    hubFeature: 'etf_list',
+    miningEligible: true,
+    usageGuide: '获取 A 股 ETF 全量列表或按 code 验证；定位标的优先 MCP 搜码/问数，不足再用 search_instruments（markets=["CN"]）或直接用代码。'
+      + ` ${MCP_FIRST_LOCAL_FALLBACK}`,
+    compliance: '只读；可选 code 过滤；列表结果用 code 调用 get_instrument_snapshot / get_etf_nav / get_etf_holdings。',
+  },
+  get_etf_nav: {
+    hubFeature: 'etf_nav',
+    miningEligible: true,
+    usageGuide: 'ETF 历史净值与溢价率序列；判断折溢价、净值趋势时使用。'
+      + ` ${MCP_FIRST_LOCAL_FALLBACK}`,
+    compliance: '单只 code；在线拉取。',
+  },
+  get_etf_holdings: {
+    hubFeature: 'etf_holdings',
+    miningEligible: true,
+    usageGuide: 'ETF 最新披露持仓与权重；了解底层资产或行业暴露时使用。'
+      + ` ${MCP_FIRST_LOCAL_FALLBACK}`,
+    compliance: '单只 code；持仓按季报更新，勿臆造成分股。',
+  },
+  get_etf_profile: {
+    hubFeature: 'etf_profile',
+    miningEligible: true,
+    usageGuide: 'ETF 档案（跟踪指数、费率、规模等）；与净值/持仓区分。'
+      + ` ${MCP_FIRST_LOCAL_FALLBACK}`,
+    compliance: '单只 InstrumentRef/code；经标准 etf_profile；无数据时声明缺口。',
+  },
+  get_fund_list: {
+    hubFeature: 'fund_list',
+    miningEligible: true,
+    usageGuide: '公募基金列表或关键词检索；返回须带 assetClass=FUND。',
+    compliance: '关键词可选；勿与 ETF 列表混用。',
+  },
+  get_fund_profile: {
+    hubFeature: 'fund_profile',
+    miningEligible: true,
+    usageGuide: '公募基金档案（类型、经理、规模、费率）；净值用 get_fund_nav。',
+    compliance: '须 FUND / CN:PF 命名空间；勿用 get_instrument_profile 代替。',
+  },
+  get_fund_nav: {
+    hubFeature: 'fund_nav',
+    miningEligible: true,
+    usageGuide: '公募基金历史净值；勿用实时价或 ETF 净值工具代替。',
+    compliance: '单只基金 code；按交易日更新。',
+  },
+  get_fund_holdings: {
+    hubFeature: 'fund_holdings',
+    miningEligible: true,
+    usageGuide: '公募基金季报重仓；按披露期更新。',
+    compliance: '单只基金 code；勿与用户持仓混淆。',
+  },
+  get_sector_constituents: {
+    hubFeature: 'sector_constituents',
+    miningEligible: true,
+    usageGuide: '板块或行业成分股；须先有 board_key 或 industry_code（先 MCP 问数获取）。'
+      + ` ${MCP_FIRST_LOCAL_FALLBACK}`,
+    compliance: 'board_key 与 industry_code 二选一；分页 page/page_size；勿编造成分。',
+  },
+  get_trade_calendar: {
+    hubFeature: 'trade_calendar',
+    miningEligible: true,
+    usageGuide: 'A 股交易日历（按年）；问休市日/下一交易日时首选；勿用 get_market_session 代替。'
+      + ` ${MCP_FIRST_LOCAL_FALLBACK}`,
+    compliance: 'year 可选，默认当年；只读。',
+  },
+  get_index_constituents: {
+    hubFeature: 'index_constituents',
+    miningEligible: true,
+    usageGuide: '指数成分（如沪深300）或同花顺概念/板块成分；index_code 必填。'
+      + ` ${MCP_FIRST_LOCAL_FALLBACK}`,
+    compliance: '主要 CN；无数据时声明；勿与 get_sector_constituents 混用拉成分。',
+  },
+  get_market_session: {
+    hubFeature: 'market_session',
+    miningEligible: true,
+    usageGuide: '问是否开盘/交易时段时使用；精确交易日/休市用 get_trade_calendar。'
+      + ` ${MCP_FIRST_LOCAL_FALLBACK}`,
+    compliance: '只读；market 默认 CN；勿当作完整 calendar。',
+  },
+  search_instruments: {
+    hubFeature: 'instrument_search',
+    miningEligible: true,
+    usageGuide:
+      '禁止用于名称搜索/选股/问数。仅当标的代码歧义（同码多市场/多交易所需消歧），或外部 MCP 未启用、连接失败、调用报错时才允许。'
+      + ' tools 中若有 [MCP:]/namespaced（server__tool）搜码/问数工具须先调远程。',
+    compliance:
+      'keyword 必填 ≥1 字符；可用 markets 数组过滤（CN/US/HK/CRYPTO）。'
+      + ' 禁止名称搜索/选股主路径；仅代码歧义或外部 MCP 未启用/失败。命中后用返回的 instrument 或 code 调用 get_instrument_*。',
+  },
+  get_instrument_capabilities: {
+    hubFeature: 'instrument_capabilities',
+    miningEligible: true,
+    usageGuide: `查询标的可用数据能力（快照、行情、K 线、评估等）；跨市场分析未知代码或新市场时的第一步。${INSTRUMENT_REF_USAGE}`,
+    compliance: '只读；须传 instrument 或 market+symbol；按返回 capabilities 选择后续工具。',
+  },
+  get_instrument_snapshot: {
+    hubFeature: 'instrument_snapshot',
+    miningEligible: true,
+    usageGuide: `单只标的聚合快照（概况、行情、关键序列）；有问数/行情 MCP 须先远程，本工具为本地聚合快照补充。需要可核验财务/股东事实表时再用 get_instrument_financials / get_instrument_profile。${MCP_FIRST_LOCAL_FALLBACK} ${INSTRUMENT_REF_USAGE}`,
+    compliance: '单只 InstrumentRef；capabilities 不含 snapshot 时勿调用；勿对 20+ 只批量 snapshot。',
+  },
+  get_instrument_profile: {
+    hubFeature: 'instrument_profile',
+    miningEligible: true,
+    usageGuide: `公司/标的概况事实表（主业、行业、概念、上市信息）；问「做什么的/所属概念」时可用。${MCP_FIRST_LOCAL_FALLBACK} ${INSTRUMENT_REF_USAGE}`,
+    compliance: '单只；经标准 profile capability；勿用 query_market_capability 替代；无数据时声明缺口。',
+  },
+  get_instrument_financials: {
+    hubFeature: 'instrument_financials',
+    miningEligible: true,
+    usageGuide: `财务摘要多期事实表（营收/利润/ROE/同比）；问增速、盈利质量、财报数字时可用；资产负债/现金流明细改用 get_instrument_balance_sheet / get_instrument_cash_flow。${MCP_FIRST_LOCAL_FALLBACK} ${INSTRUMENT_REF_USAGE}`,
+    compliance: '单只；report_type 默认 all；引用具体 reportDate；无数据时声明缺口，禁止编造。',
+  },
+  get_instrument_balance_sheet: {
+    hubFeature: 'instrument_balance_sheet',
+    miningEligible: true,
+    usageGuide: `资产负债表多期事实表；问总资产/负债/权益、资产负债率明细时可用。${MCP_FIRST_LOCAL_FALLBACK} ${INSTRUMENT_REF_USAGE}`,
+    compliance: '单只；经标准 balance_sheet；勿用 evaluate 或自定义方法替代；无数据时声明缺口。',
+  },
+  get_instrument_cash_flow: {
+    hubFeature: 'instrument_cash_flow',
+    miningEligible: true,
+    usageGuide: `现金流量表多期事实表；问经营/投资/筹资现金流时可用。${MCP_FIRST_LOCAL_FALLBACK} ${INSTRUMENT_REF_USAGE}`,
+    compliance: '单只；经标准 cash_flow；勿用财务摘要的 operatingCashFlow 单字段敷衍完整表。',
+  },
+  get_instrument_income_statement: {
+    hubFeature: 'instrument_income_statement',
+    miningEligible: true,
+    usageGuide: `利润表多期事实表；问营收/成本/费用明细时可用，勿仅用财务摘要代替。${MCP_FIRST_LOCAL_FALLBACK} ${INSTRUMENT_REF_USAGE}`,
+    compliance: '单只；经标准 income_statement；勿用 evaluate 替代。',
+  },
+  get_instrument_financial_indicators: {
+    hubFeature: 'instrument_financial_indicators',
+    miningEligible: true,
+    usageGuide: `同花顺财务指标树；须 report=2024Q3 等。三表明细用 income/balance/cash 专用工具。${MCP_FIRST_LOCAL_FALLBACK} ${INSTRUMENT_REF_USAGE}`,
+    compliance: '须启用 tonghuashun；report 必填；无 Key 时声明缺口。',
+  },
+  get_instrument_shareholders: {
+    hubFeature: 'instrument_shareholders',
+    miningEligible: true,
+    usageGuide: `股东结构事实表；问十大股东、股权集中度时使用。季报机构持仓（基金/QFII Tab）用 get_instrument_institution_holdings。${MCP_FIRST_LOCAL_FALLBACK} ${INSTRUMENT_REF_USAGE}`,
+    compliance: '单只；部分市场可能无数据；勿编造股东名单。',
+  },
+  get_instrument_institution_holdings: {
+    hubFeature: 'instrument_institution_holdings',
+    miningEligible: true,
+    usageGuide:
+      'A 股季报机构持仓：scope=overview 一览；scope=detail+org_type 明细 Tab；scope=dates 报告期。'
+      + `勿与十大股东混淆。${MCP_FIRST_LOCAL_FALLBACK} ${INSTRUMENT_REF_USAGE}`,
+    compliance: '仅 CN；经标准 institution_holdings capability；空类型声明缺口（一/三季报可能无 QFII 等）；勿编造持仓。',
+  },
+  get_instrument_dividend: {
+    hubFeature: 'instrument_dividend',
+    miningEligible: true,
+    usageGuide: `分红派息历史事实表；问分红政策、历史派息时使用。${MCP_FIRST_LOCAL_FALLBACK} ${INSTRUMENT_REF_USAGE}`,
+    compliance: '单只；港股可带 page；无记录时声明，勿臆造股息率时间序列。',
+  },
+  get_instrument_quotes: {
+    hubFeature: 'instrument_quotes',
+    miningEligible: true,
+    usageGuide:
+      `批量最新价、涨跌幅、量比等；初选后快速更新多只候选行情。`
+      + ` ${MCP_FIRST_LOCAL_FALLBACK} ${INSTRUMENT_REF_USAGE}`,
+    compliance: 'instruments 数组一次传入，建议 ≤ 30；禁止逐只循环调用。',
+  },
+  get_instrument_institution_rating: {
+    hubFeature: INSTRUMENT_HUB_FEATURE.institution_rating,
+    miningEligible: true,
+    usageGuide: `28 家机构风格共识；基本面/估值研究需外部观点时使用；仅 A 股。${LOCAL_ONLY_ANALYTICS} 网上卖方研报优先 MCP report_search。 ${INSTRUMENT_REF_USAGE}`,
+    compliance: '单只 InstrumentRef；market 须为 CN；可选 groups 过滤；勿编造机构观点。',
+  },
+  get_instrument_institution_report: {
+    hubFeature: INSTRUMENT_HUB_FEATURE.institution_report,
+    miningEligible: false,
+    usageGuide: `机构评级完整文本报告；仅 A 股。${LOCAL_ONLY_ANALYTICS} ${INSTRUMENT_REF_USAGE}`,
+    compliance: '长文本；仅用户明确要求深度报告时调用；market 须为 CN。',
+  },
+  analyze_portfolio: {
+    hubFeature: 'portfolio_analysis',
+    miningEligible: true,
+    usageGuide: '按自定义权重分析组合因子暴露；无本地持仓记录或需假设权重时使用。',
+    compliance: '需 holdings 权重数组；有实盘持仓时优先 get_portfolio_holdings / portfolio_summary。',
+  },
+  get_portfolio_holdings: {
+    hubFeature: 'portfolio_holdings',
+    miningEligible: true,
+    usageGuide: '读取用户实盘持仓（股数、成本、市值、浮盈）；含 A 股/港股/美股；分析持仓、对比策略候选或排除已持仓时使用。',
+    compliance: '只读；无参数；返回每条含 market 字段；数据来自本地交易账本。',
+  },
+  portfolio_trades: {
+    hubFeature: 'portfolio_trades',
+    miningEligible: true,
+    usageGuide: '查询买卖流水；核实成本、交易历史或复盘时使用。过滤单只时港/美须带 market（如 market=HK, code=00700）。',
+    compliance: '只读；可选 code/market 过滤；勿编造交易记录。',
+  },
+  portfolio_summary: {
+    hubFeature: 'portfolio_summary',
+    miningEligible: true,
+    usageGuide: '持仓盈亏汇总 + 明细（含 market）；需要组合层面 PnL 时使用。',
+    compliance: '只读；比 get_portfolio_holdings 更重；二选一即可，勿重复调用。',
+  },
+  get_news_center_status: {
+    hubFeature: 'news_center_status',
+    miningEligible: false,
+    usageGuide: '用户询问订阅资讯、RSS 要闻或新闻中心内容前调用；确认数据是否已刷新、订阅规模与文章总量。',
+    compliance: '只读；无参数；stale=true 时告知用户列表可能不是最新，勿编造文章。',
+  },
+  list_news_groups: {
+    hubFeature: 'news_groups_list',
+    miningEligible: false,
+    usageGuide: '按标的类型选资讯分组：阅读返回的 market_hints 与 relevance，优先与标的 market 一致的分组。',
+    compliance: '只读；分组 id 须原样传入 list_news_articles；未分组订阅用 group_id=__ungrouped__；同一任务最多调用 1 次。',
+  },
+  list_news_sources: {
+    hubFeature: 'news_sources_list',
+    miningEligible: false,
+    usageGuide: '在已选分组内按 market_hints / title 关键词筛选 enabled 来源。',
+    compliance: '只读；subscription_id 须来自本工具返回；同一任务最多调用 1 次。',
+  },
+  list_news_articles: {
+    hubFeature: 'news_articles_list',
+    miningEligible: false,
+    usageGuide:
+      '标的相关资讯：优先 view=group + 最匹配 group_id；信息不足时交叉调阅 MACRO/GLOBAL 分组或 view=timeline 兜底。'
+      + ' tools 中若有对应 [MCP:…] / namespaced 新闻工具，必须先调外部；本工具为本机 RSS 订阅补充。',
+    compliance: '只读；limit ≤50；view=group 须 group_id，view=source 须 subscription_id；列表无正文，禁止臆造 article_id。',
+  },
+  get_news_article: {
+    hubFeature: 'news_article_detail',
+    miningEligible: false,
+    usageGuide: '仅对 list 筛出的最相关 1–3 篇拉正文做深度解读；用户点名某条资讯时使用。'
+      + ` ${MCP_FIRST_LOCAL_FALLBACK}`,
+    compliance: 'article_id 必填且须来自 list_news_articles；只读；正文已压缩空白。',
+  },
+  add_news_source: {
+    hubFeature: 'news_source_add',
+    miningEligible: false,
+    usageGuide: '用户要添加 RSS/Atom 订阅时直接使用；内部已验证，无需先 validate。',
+    compliance: 'url 必填；写入前内部验证；可选 group_id/title；禁止同一 URL 先 validate_news_source 再本工具（双重探测）；写操作可直接执行。',
+  },
+  delete_news_source: {
+    hubFeature: 'news_source_delete',
+    miningEligible: false,
+    usageGuide: '删除资讯订阅；必须先 ask_user 确认，再 confirmed=true 删除。',
+    compliance: 'subscription_id 必填；未 confirmed 只返回摘要；删除不可恢复。',
+  },
+  import_news_sources: {
+    hubFeature: 'news_sources_import',
+    miningEligible: false,
+    usageGuide: '批量导入订阅列表；须 ask_user 后 confirmed=true。',
+    compliance: '入参 schema_version=1 + subscriptions，或仅 subscriptions 数组；已存在 url 会跳过。',
+  },
+  create_news_group: {
+    hubFeature: 'news_group_create',
+    miningEligible: false,
+    usageGuide: '用户要新建资讯分组时使用。',
+    compliance: 'title 必填；写操作可直接执行；随后可用 move_news_source 归类。',
+  },
+  update_news_group: {
+    hubFeature: 'news_group_update',
+    miningEligible: false,
+    usageGuide: '重命名资讯分组或调整排序。',
+    compliance: 'group_id 必填；title/sort_order 至少其一；写操作可直接执行。',
+  },
+  delete_news_group: {
+    hubFeature: 'news_group_delete',
+    miningEligible: false,
+    usageGuide: '删除资讯分组；须 ask_user 后 confirmed=true。组内订阅改为未分组，不删订阅。',
+    compliance: 'group_id 必填；未 confirmed 只返回摘要。',
+  },
+  move_news_source: {
+    hubFeature: 'news_source_move_group',
+    miningEligible: false,
+    usageGuide: '把订阅移入某分组，或移出为未分组。',
+    compliance: 'subscription_id 必填；group_id 空表示未分组；写操作可直接执行。',
+  },
+  validate_news_source: {
+    hubFeature: 'news_source_validate',
+    miningEligible: false,
+    usageGuide: '仅当用户只要「测通」订阅地址、不写入时使用；添加订阅请直接 add_news_source（内部已验证）。',
+    compliance: 'url 必填；只读验证、不写入；禁止与 add_news_source 对同一 URL 串联双重探测。',
+  },
+  list_rsshub_categories: {
+    miningEligible: false,
+    usageGuide:
+      '添加 RSS 订阅三级漏斗第 1 步：列出内置分类后 ask_user 单选分类（option.id 用分类 id，label 可用 description）；再 list_rsshub_domains。',
+    compliance: '只读；无参数；返回分类摘要 + hint，不含全量路由。',
+  },
+  list_rsshub_domains: {
+    miningEligible: false,
+    usageGuide:
+      '三级漏斗第 2 步：按分类列出该分类全部域名（含 feed_count）后 ask_user 单选网站（域名一般 ≤15，应尽量全量展示，勿只给 3–6 候选）。优先传选中项的 category id；若只有中文分类名也可直接传（工具可解析）。',
+    compliance:
+      'category 必填（英文 id 或中文名/别名，大小写不敏感）；limit 默认 50、上限 50；只读；解析失败时返回可用 categories 提示。',
+  },
+  search_rsshub_routes: {
+    miningEligible: false,
+    usageGuide:
+      '用户已点名具体媒体时的捷径：按关键词搜可订阅叶子（含频道名/path）；模糊主题勿用本工具代替 list_rsshub_domains 全站选择。',
+    compliance: 'q 必填；可选 category（id 或中文名）；limit≤20；只返回短名单，禁止当作全站 radar 或 GitHub docs。',
+  },
+  get_rsshub_domain_routes: {
+    miningEligible: false,
+    usageGuide:
+      '三级漏斗第 3 步：返回该站拉平可订阅叶子（路由与频道已展开，如「电报 · 看盘」），供 ask_user(allow_multiple=true) 多选；禁止再先选路由再选频道。叶子过多用 q 缩小。再拼短名单基址 + add_news_source。',
+    compliance:
+      'domain 必填；可选 category（id 或中文名）、q；默认最多 50 条 + has_more（上限 100）；勿 dump 全量 schema。',
+  },
+  get_notice_content: {
+    hubFeature: 'notice_content',
+    miningEligible: false,
+    usageGuide: '用户要读某条上市公司公告/年报全文时使用；url 来自 announcement_search 等公告检索结果、get_instrument_snapshot 公告列表或用户提供的链接。',
+    compliance: 'url 必填；支持 HTML 与 PDF；正文已压缩；truncated=true 时可增大 max_chars；只读。',
+  },
+  get_current_time: {
+    miningEligible: true,
+    usageGuide: '仅当用户明确问「现在几点/星期几」或需二次核对时间时调用；日常「截至」时效请用 system【会话时钟】，勿每轮必调。',
+    compliance: '只读；与会话时钟重复时优先会话时钟。',
+  },
+  schedule_turn_wake: {
+    miningEligible: false,
+    usageGuide:
+      '无后台任务事件时的纯延时续跑；有 preparing/accepted/installing+job_id 时系统自动挂起并终态续跑，禁止对本工具传 job_id，禁止 poll/sleep 查进度。',
+    compliance:
+      'seconds∈[5,1800]；prompt 必填；禁止 job_id；可多次挂（每会话上限 8）；到期注入续跑消息并同会话 chat；用户新消息会取消 pending。',
+  },
+  cancel_job: {
+    miningEligible: false,
+    usageGuide:
+      '仅当任务明确可取消时调用；多数安装/下载不支持取消，只需结束等待请发新消息或 Stop。',
+    compliance:
+      'job_id 必填；cancelable=false 时返回明确错误；不自动 cancel 全局任务。',
+  },
+  list_jobs: {
+    miningEligible: false,
+    usageGuide:
+      '查看本对话后台任务列表（标题、进度、是否可取消）；取消用 cancel_job，勿 tight-poll。',
+    compliance:
+      '默认本会话；可选 states/kind/limit；只读。',
+  },
+  get_system_info: {
+    miningEligible: false,
+    usageGuide: '运行 opptrix_run 前先调用，确认 platform 与沙盒 node/python/npm 是否就绪；桌面端 node 由应用内嵌运行时提供，勿因 PATH 无 node 声称无法执行。',
+    compliance:
+      '只读；看 python_priority / python_source / sandbox_python_version 与 python_argv_hint；opptrix_run 的 command 用「python」「pip」字面量，禁止手写系统/托管绝对路径；不含密钥与内部绝对路径。',
+  },
+  get_app_settings: {
+    miningEligible: false,
+    usageGuide: '需要默认评分卡、TopN、可用 LLM 模型列表或确认 LLM 是否已配置时调用。',
+    compliance: '只读；不返回 API Key。',
+  },
+  get_project_info: {
+    miningEligible: false,
+    usageGuide: '需要确认应用版本、运行时或数据是否已配置时调用；不是可访问目录清单。',
+    compliance: '只读；不返回 ~/.opptrix 内部路径；询问可访问目录请用 list_workspace_grants，勿将本工具结果当作授权目录。',
+  },
+  get_integration_status: {
+    miningEligible: false,
+    usageGuide: '需要确认 Tushare 等外部集成是否已配置时调用。',
+    compliance: '只读；不返回 Token/Secret。',
+  },
+  list_session_documents: {
+    miningEligible: false,
+    usageGuide: '用户拖入研报 PDF 或要对比/分析附件研报时，先列出本对话已整理文档（attachment_id、页数、状态）。',
+    compliance: '只读；仅当前会话附件；未整理完成的 PDF status≠ready。',
+  },
+  search_library: {
+    miningEligible: false,
+    usageGuide:
+      '跨会话检索本机研报库/资讯。研报走文档库（可混合关键词与语义）；资讯走本机资讯全文检索（与统一搜索同源、无向量）——查资讯时用股票代码、公司简称、主题、事件等具体词，可一次多词组合，避免空泛「相关报道」。'
+      + ' 网上研报若 tools 有 namespaced MCP（如 iwencai__report_search）须先调远程；本工具仅跨会话已入库文档补充。'
+      + ' 用户问「哪些研报提到某标的」「跨研报找主题」或「本机库里某公司资讯」时可用；研报命中后 read_document(document_id) 精读；资讯命中以摘录为准。',
+    compliance:
+      '只读；query 必填；可选 source_type=report|news、limit≤20；source_type=news 时勿依赖语义/向量，勿对资讯 document_id 调用 read_document；研报引用须带文档名与页码；勿编造未读内容。',
+  },
+  search_document: {
+    miningEligible: false,
+    usageGuide:
+      '在本会话已链文档中按关键词检索；可省略 attachment_id 搜全部附件；单篇已知时用 attachment_id 限定；再 read_document 精读。',
+    compliance: '只读；query 必填；引用答复时带文件名与页码。',
+  },
+  read_document: {
+    miningEligible: false,
+    usageGuide:
+      '按 document_id（跨库命中）或 attachment_id（本会话）+ 页范围/chunk_id 精读片段；search_library 多跳后的第二步。',
+    compliance: '只读；控制 max_chars；引用时标注文档名与页码。',
+  },
+  create_canvas: {
+    miningEligible: false,
+    usageGuide:
+      '用户明确点名可视化报告/投研画布，或本轮已自感应决定交付完整多章节图文报告时创建（禁止先 ask_user 问是否出报告）；日常「画个图」用消息 ```chart 围栏，勿误用本工具。图表勿全宽拉满。默认机构调研报告版式（H1→导语→H2 分章→正文与 Chart/Table/Stat 穿插）；定量对比/变化/构成/强弱矩阵优先 Chart（bar/line/pie/heatmap）+ 主题配色，多折线/分组柱须 data[].series；Table/Stat 作明细与 KPI；Chart 随内容宽自适应（稀疏≈紧凑 320/230/380，密集可增至父容器上限；勿写 width:100% 强制拉满 Surface / 超大 height）；图注用 Chart caption（与图居中对齐），勿全宽左对齐旁白；Chart 已含轴/网格/数值标注，勿手写假坐标；避免 Divider；章节靠标题与 Stack；仅用户明确要求时例外；勿用 Card 墙做面板分割；须含介绍与说明文字；仅用户明确要面板/仪表盘时才用密面板布局；语义配色：文字层级用 Text tone（primary/secondary/tertiary）；涨跌默认红涨绿跌（danger/success）；tips/风险用 Callout（tone+可选 variant）；原文/口径摘录用 Quote（cite 来源），勿用 Callout 冒充引用；行内 Pill/Code/Link；可见文案禁止 emoji；返回 attachment 供消息内预览。',
+    compliance:
+      'title+source 必填；source 为 TSX：仅可 import react 与 @opptrix/canvas 公开导出；禁止其它 npm（含 echarts）；≤200000 字符；mode 默认 fluid；默认报告型（禁 Card 墙分章；避免 Divider，仅用户明确要求时例外）；定量对比/变化/强弱矩阵优先 Chart type=bar|line|pie|heatmap（heatmap data 含 row/col/value；多折线须 series）；Chart 勿拉满 Surface（随内容宽自适应；稀疏紧凑、密集可至容器宽；勿写 width:100%）；图注用 Chart caption 与图居中；禁止渐变/大阴影；任意可见文案（标题/Stat/表格/Callout/Quote/Pill 等）禁止 emoji/表情符号/装饰性符号图标，用 Pill/Text tone 表达状态；语义配色：正文/副题/脚注分层 Text tone；涨跌红涨绿跌用 danger/success；警示 Callout（最多 0–2）、摘录 Quote；颜色用 useCanvasTheme（含 chart1–5 / success/danger；heatmap 主题连续色阶）或组件默认，勿硬编码花哨 hex；勿用 workspace_write 代替。',
+  },
+  update_canvas: {
+    miningEligible: false,
+    usageGuide:
+      '修改已创建画布；仍默认报告型版式（勿改成 Card 墙面板分割；避免 Divider；章节靠标题与 Stack；仅用户明确要求时例外；定量对比/变化/强弱矩阵优先 Chart bar/line/pie/heatmap + 主题配色；保留介绍与说明文字；语义配色同 create_canvas：Text 层级 tone、涨跌红涨绿跌 danger/success、警示 Callout、摘录 Quote）；仅 react/@opptrix/canvas；可见文案禁止 emoji；attachment_id 来自 create_canvas / read_canvas。',
+    compliance:
+      'attachment_id+source 必填；仅更新本会话 canvas 附件；source 约束同 create_canvas（禁其它 npm；默认报告型；定量对比优先 Chart bar|line|pie|heatmap；语义配色：Text tone 层级、涨跌 danger/success、警示 Callout、摘录 Quote；禁止 emoji）。',
+  },
+  read_canvas: {
+    miningEligible: false,
+    usageGuide: '读取已有画布源码与元数据后再 update_canvas。',
+    compliance: '只读；attachment_id 必填。',
+  },
+  create_mindmap: {
+    miningEligible: false,
+    usageGuide:
+      '用户要脑图、思维导图、结构化主题树，或产业链/股东/主题等关系梳理、流程示意、关系图谱式结构时创建（对齐 create_mindmap，禁止虚构 knowledge-graph 等独立工具名）；nodes 含 id/parentId/label；节点 label/note 禁止 emoji；返回 attachment 供预览。',
+    compliance:
+      'title+rootId+nodes 必填；rootId 须在 nodes 中；节点 label/note 禁止 emoji/表情符号/装饰性符号图标；勿用 workspace_write 代替；勿捏造未注册的图谱工具。',
+  },
+  update_mindmap: {
+    miningEligible: false,
+    usageGuide: '更新已有脑图的完整节点树；节点 label/note 禁止 emoji。',
+    compliance:
+      'attachment_id+rootId+nodes 必填；仅更新本会话 mindmap 附件；节点 label/note 禁止 emoji/表情符号/装饰性符号图标。',
+  },
+  read_mindmap: {
+    miningEligible: false,
+    usageGuide: '读取已有脑图树后再 update_mindmap。',
+    compliance: '只读；attachment_id 必填。',
+  },
+  create_web: {
+    miningEligible: false,
+    usageGuide:
+      '用户要可交互 HTML 网页、仪表盘页、离线图表页、或明确「网页/HTML 制品」时创建；与 create_canvas（TSX 画布报告）并存——报告型多章节图文优先 canvas，需要浏览器 HTML+本地库（Chart.js/ECharts 等）时用本工具。单文件 index.html + 可选同目录相对 css/js；脚本/样式只许引用 /opptrix-vendor/...，禁止 CDN/外网脚本。可用 list_web_vendor 查看已钉版本库。返回 attachment 供消息内预览。',
+    compliance:
+      'title+html 必填；html≤200000 字符；可选 files=[{path,content}] 写相对路径资源；禁止外网 CDN（cdnjs/unpkg/jsdelivr 等）；库路径形如 /opptrix-vendor/chart.js/chart.umd.min.js；勿用 workspace_write 代替；与 canvas/mindmap 不互斥。',
+  },
+  update_web: {
+    miningEligible: false,
+    usageGuide: '修改已创建网页制品的 HTML/相对资源；约束同 create_web（仅 /opptrix-vendor，禁 CDN）。',
+    compliance:
+      'attachment_id+html 必填；仅更新本会话 web 附件；可选 files 覆盖/新增相对路径文件。',
+  },
+  read_web: {
+    miningEligible: false,
+    usageGuide: '读取已有网页 index.html 与元数据后再 update_web。',
+    compliance: '只读；attachment_id 必填。',
+  },
+  list_web_vendor: {
+    miningEligible: false,
+    usageGuide: '创建网页前查看本机离线库清单与引用路径前缀 /opptrix-vendor/<id>/。',
+    compliance: '只读；无参数；返回 manifest 摘要。',
+  },
+  ask_user: {
+    miningEligible: false,
+    usageGuide:
+      '需用户确认/选择/填空且上下文无法推断时调用。confirm=授权或是否继续；choice=有限选项 2–50；text=开放填空（mode:"text" 或空 options+allow_custom=true）。禁止用 confirm 收集开放答案。',
+    compliance:
+      'prompt 必填、面向投资者且勿用 emoji；mode（或别名 interaction）为 confirm|choice|text；空 options 默认 confirm（兼容），空 options+allow_custom=true 或 mode=text 为开放输入；choice 须 2–50 项且 id 唯一；confirm 回传 reject|confirm；同一轮最多 1 次；禁止索要密钥。',
+  },
+  run_subagent: {
+    miningEligible: false,
+    usageGuide:
+      '将可独立取证/多角色并行的子任务委派出去。必填 role{name,instructions}、task、result_schema（可校验 object，建议含 summary:string + required）。创建前可 list_subagents 一次；同 label/role 进行中自动 dedupe。失败优先 restart_run_id 复用同卡。mode=background 独立并行；foreground 强依赖上一步。终态自动续跑，禁止 list/get 忙等 poll。',
+    compliance:
+      '仅父会话。role.name/instructions、task、result_schema 必填；result_schema.type 须为 "object"，须有 properties+required，建议强制 summary。restart_run_id 仅用于 failed/cancelled/needs_parent_action，复用 run_id+child_session_id。role.model 仅当为已启用的 providerId:model 时才传。子不可再委派、无 ask_user/request_secret/LAN/grant；缺权经 needs_parent_action。成功后 reclaim_subagent。',
+  },
+  list_subagents: {
+    miningEligible: false,
+    usageGuide:
+      '创建协作任务前可调用一次核对是否已有同 label/role 进行中；或需要一览本父会话协作任务时调用。禁止 sleep/忙等轮询；后台终态会自动续跑汇报。',
+    compliance:
+      '只读；无参数；仅父会话。禁止为等进度反复忙等调用。需要读完整结果时对目标 run 调用一次 get_subagent。失败优先 run_subagent(restart_run_id=…)；亦可 reclaim 后再开。',
+  },
+  cancel_subagent: {
+    miningEligible: false,
+    usageGuide: '取消仍在运行的子任务（run_id）。',
+    compliance: 'run_id 必填；终态幂等返回。',
+  },
+  get_subagent: {
+    miningEligible: false,
+    usageGuide:
+      '需要读某协作任务完整结果或当前状态时调用一次。后台终态会自动续跑汇报；禁止 sleep/忙等轮询。',
+    compliance:
+      'run_id 必填；只读。禁止为等进度反复忙等调用。失败/未成功后优先 run_subagent(restart_run_id=…)；亦可 reclaim 后再开。',
+  },
+  reclaim_subagent: {
+    miningEligible: false,
+    usageGuide: '回收已结束的子任务记录（运行中须先 cancel）；失败后重开前可先 reclaim。',
+    compliance: 'run_id 必填；running/queued 拒绝。',
+  },
+  list_enabled_providers: {
+    hubFeature: 'provider_list',
+    miningEligible: false,
+    usageGuide: '调用自定义方法前确认数据源已启用；返回 provider_id、优先级与支持能力摘要。',
+    compliance: '只读；无参数；自定义方法调用前建议先调用一次。',
+  },
+  query_market_capabilities: {
+    hubFeature: 'market_capabilities',
+    miningEligible: false,
+    usageGuide:
+      '探查系统能力目录（market 市场级 42 项 / instrument 标的级 35 项 / app 应用计算服务 12 项三界），每项含 name/scope/markets/params 参数定义/providers 可用数据源。'
+      + 'query_market_capability 的 capability 名与 args 顺序以本目录 params 定义为准。',
+    compliance: '只读；无参数；返回 {name, scope, markets, assetClasses, params, providers, description} 条目，不执行查询。',
+  },
+  query_market_capability: {
+    hubFeature: 'market_capability_query',
+    miningEligible: false,
+    usageGuide: '执行系统能力目录（query_market_capabilities 返回三界：market/instrument/app）中登记的能力；capability 名与 args 参数顺序以目录该项 params 定义为准；标准 get_instrument_* 能覆盖的需求勿调用。',
+    compliance: 'capability + args 必填；args 为 JSON 数组，顺序与 query_market_capabilities 目录一致；同一 capability 每任务最多 1 次。',
+  },
+  list_tool_packs: {
+    packId: 'meta',
+    usageGuide: '查看可用工具包目录与当前已加载状态；需要未暴露的能力时先 list 再 activate。',
+    compliance: '只读；无参数；返回 id/title/description/tool_count/loaded，不含完整 schema。',
+  },
+  activate_tool_pack: {
+    packId: 'meta',
+    usageGuide: '记录需强调的业务域；artifacts 须用户在输入框加号中打开，本工具无法加载。其余 pack 通常已加载，选型卡已给出首选工具。',
+    compliance: 'pack_ids 为字符串数组；opt-in pack（artifacts）即使用户请求也不会加载；同会话 tools schema 仅在用户勾选报告与脑图时重建。',
+  },
+  list_agent_skills: {
+    packId: 'meta',
+    usageGuide: '查看可用工作流技能目录（名称与说明）；需要固定投研流程（早报、财报速读、个股深度分析等）时先 list 再 activate。',
+    compliance: '只读；返回 skills 元数据与 active_skills；不含完整步骤正文。',
+  },
+  activate_agent_skill: {
+    packId: 'meta',
+    usageGuide: '激活工作流技能，完整步骤注入本轮尾注；技能 required-packs 中的 artifacts 不会自动挂上，须用户已打开「报告与脑图」。',
+    compliance: 'skill_names 为字符串数组；同会话最多 3 个；无效名或超额进入 skipped；循环依赖会被检测并跳过；返回 activated_packs。',
+  },
+  update_research_checklist: {
+    packId: 'meta',
+    usageGuide: '维护本轮研究步骤清单（待办/完成/跳过）；多步投研或已激活技能时用来对照进度，避免漏步。',
+    compliance: 'mode=replace|merge；items 为 { id?, title, status: pending|done|skipped }[]；merge 按 id 合并。',
+  },
+  get_agent_skill: {
+    packId: 'meta',
+    usageGuide: '预览单个工作流技能的完整说明；确认后再 activate_agent_skill。',
+    compliance: 'skill_name 必填；只读。',
+  },
+  get_agent_skill_file: {
+    packId: 'meta',
+    usageGuide: '按需读取技能目录内的附加文件（参考资料/脚本说明等）。',
+    compliance: 'skill_name + path 必填；路径须在技能根内，禁止 ..。',
+  },
+  create_agent_skill: {
+    packId: 'meta',
+    usageGuide: '为用户创建新的工作流技能；必须先 ask_user 确认，再 confirmed=true；可附 references/files。',
+    compliance: 'name/description/body 必填；files.path 须在 references|scripts|assets 下；未 confirmed 只返回摘要。',
+  },
+  import_agent_skill: {
+    packId: 'meta',
+    usageGuide: '从 Markdown 文本导入工作流技能；须 ask_user 后 confirmed=true。',
+    compliance: 'markdown 必填；未 confirmed 只返回摘要。',
+  },
+  delete_agent_skill: {
+    packId: 'meta',
+    usageGuide: '删除用户导入或创建的工作流技能；不可删内置；须 ask_user 后 confirmed=true。',
+    compliance: 'skill_name 必填；未 confirmed 只返回摘要。',
+  },
+  list_mcp_servers: {
+    packId: 'meta',
+    usageGuide: '查看用户已配置的外部 MCP Server 状态（健康、优先级、工具数）；需要外部数据源或排查不可用时使用。',
+    compliance: '只读；无密钥；返回 servers 列表。',
+  },
+  enable_mcp_server: {
+    packId: 'meta',
+    usageGuide: '启用并取消暂停某外部 MCP；启用后本轮工具目录会刷新，绑定工具优先走外部源。',
+    compliance: 'server_id 必填；不可改 command/url/env。',
+  },
+  disable_mcp_server: {
+    packId: 'meta',
+    usageGuide: '禁用外部 MCP（配额耗尽或异常时）；配置保留，本地工具仍兜底。',
+    compliance: 'server_id 必填。',
+  },
+  edit_mcp_server: {
+    packId: 'meta',
+    usageGuide: '编辑已安装 MCP 的配置。可改 title/transport/url/command/args/cwd/env/headers/secrets/capability_bindings，未传字段保持不变。',
+    compliance: 'server_id 必填（不可改）；transport 变更需附带 url 或 command；secrets 和 capability_bindings 为合并写入，空字符串可清除单条。',
+  },
+  install_mcp_server: {
+    packId: 'meta',
+    usageGuide: '登记新的外部 MCP。必须先 ask_user 确认，再 confirmed=true 安装。支持 stdio / http / streamable-http / sse 四种传输，可在安装时一并传入 headers/secrets/env。',
+    compliance: 'transport=stdio|http|streamable-http|sse；stdio 需 command；http/sse 需 url；密钥通过 secrets 参数在安装时写入（http 自动注入为 Header / stdio 注入为环境变量）；勿在未确认时重复安装。',
+  },
+  uninstall_mcp_server: {
+    packId: 'meta',
+    usageGuide: '卸载外部 MCP；须 ask_user 后 confirmed=true。',
+    compliance: 'server_id 必填；确认后删除配置并断开。',
+  },
+  reorder_mcp_servers: {
+    packId: 'meta',
+    usageGuide: '调整外部 MCP 故障转移优先级（列表越前越优先；本地始终最后兜底）。',
+    compliance: 'server_ids 为完整顺序列表。',
+  },
+  browser_navigate: {
+    packId: 'browser',
+    usageGuide: '用户给出外部 http(s) URL 或要打开网页时首选；打开后用 browser_snapshot 读取页面。',
+    compliance: '仅 http/https；禁止 file/javascript/data 等协议；导航后 ref 清空，须重新 snapshot。',
+  },
+  browser_snapshot: {
+    packId: 'browser',
+    usageGuide: '读取当前浏览器页面的无障碍快照（含 [ref=eN]）；点击/输入前必须先 snapshot。',
+    compliance: '返回精简 a11y 树；勿向用户朗读完整快照或文件路径；同一页面交互后可重复调用刷新 ref。',
+  },
+  browser_click: {
+    packId: 'browser',
+    usageGuide: '对 snapshot 中的 ref 执行点击；表单提交或导航后应重新 snapshot。',
+    compliance: 'ref 须来自最近一次 browser_snapshot；无效 ref 时先 snapshot 再试。',
+  },
+  browser_type: {
+    packId: 'browser',
+    usageGuide: '向 snapshot 中的输入框键入文本；搜索框可 submit=true 提交。',
+    compliance: 'ref 须来自最近一次 browser_snapshot；clear=true 可先清空；勿输入敏感凭证除非用户明确要求。',
+  },
+  browser_screenshot: {
+    packId: 'browser',
+    usageGuide: '保存当前页面 PNG 截图供内部分析；需要视觉确认页面布局时使用。',
+    compliance: '返回本地 path 供模型参考；勿对用户朗读路径；非 base64 inline。',
+  },
+  browser_close: {
+    packId: 'browser',
+    usageGuide: '外部网页任务结束或切换站点前关闭浏览器，释放资源。',
+    compliance: '无参数；关闭后再次浏览须 browser_navigate 重新打开。',
+  },
+  workspace_glob: {
+    packId: 'workspace',
+    usageGuide:
+      '找文件/看树首选（优先于 shell ls/find）：不知 root 时先 list_workspace_grants（至多一次）；已知 root 后按文件名模式递归查找（如 **/*.py、src/**/*.ts）；再 workspace_read(numbered) / workspace_replace_lines；opptrix_run(ls/find) 仅管道/复杂场景后备且 cwd 相对 root；勿虚构已移除的列目录工具；勿先 ensure_python。',
+    compliance:
+      '只读；glob_pattern 必填；path 相对 root_id（禁绝对/~ /file:// /abs_path）；可选 max_results（默认 200，上限 500）；禁止越权与 .. 穿越；优先于 opptrix_run(ls/find)；探树勿把 abs_path 抄进 path。',
+  },
+  workspace_grep: {
+    packId: 'workspace',
+    usageGuide:
+      '搜文本首选（优先于 shell rg/grep）：keywords 空格分词 + match_mode=and|or（默认 and），或 pattern 正则；返回 path/line/content，再 read(numbered) 定点改；shell 仅管道/复杂场景后备；勿虚构已移除的列目录工具；勿先 ensure_python。',
+    compliance:
+      '只读；keywords 与 pattern 二选一；path 相对 root_id（禁绝对/~ /file:// /abs_path）；可选 glob 限文件、max_hits≤100、context_lines 0–2；跳过二进制与过大文件；禁止越权；优先于 opptrix_run(rg/grep)。',
+  },
+  workspace_read: {
+    packId: 'workspace',
+    usageGuide:
+      '读工作区文本首选（优先于 shell cat/head/tail）；改脚本前必读；大文本必须 start_line/end_line 分段，numbered=true 带行号前缀，便于对接 workspace_replace_lines；勿先 ensure_python。',
+    compliance:
+      '只读；root_id + 相对 path（禁绝对/~ /file:// /abs_path）；勿把 grants.abs_path 抄进 path；勿读二进制/超大文件进上下文；大文本用行区间分块，禁止整文件灌对话；UTF-8 无 BOM；默认不传区间则整文件无前缀；禁止用 opptrix_run 读文件内容。',
+  },
+  workspace_write: {
+    packId: 'workspace',
+    usageGuide:
+      '新建或整文件覆盖首选（优先于 shell 重定向/heredoc）；小改动（修几行）请用 workspace_replace_lines，禁止为省事整文件 rewrite；禁止用 echo>/tee 写文件。勿先 ensure_python。',
+    compliance:
+      '须 rw 授权；path 相对 root_id（禁绝对/~ /file:// /abs_path）；授权根内覆盖免确认；工作区总配额 20GB；写完再 code_preflight / opptrix_run。',
+  },
+  workspace_replace_lines: {
+    packId: 'workspace',
+    usageGuide:
+      '改已有脚本的首选（优先于 shell sed/awk）：① edits 按 code_preflight L 行号批量定点替换；② old_string/new_string/replace_all 精确字符串替换。勿用行情工具或 opptrix_run 改文件；勿先 ensure_python。多文件结构化改动可用 workspace_apply_patch。',
+    compliance:
+      '文件须已存在；path 相对 root_id（禁绝对/~ /file:// /abs_path）；edits 与 old_string 二选一；≤40 条 edits；精确替换默认要求唯一匹配；局部替换不走 overwrite 确认；任一条失败则文件不变；修完再 code_preflight。',
+  },
+  workspace_apply_patch: {
+    packId: 'workspace',
+    usageGuide:
+      '多文件或结构化补丁首选（优先于 shell 批量改文件）：传入 OpenCode *** Begin Patch 文本（Add/Update/Delete）；路径相对授权 root；Update 靠上下文 hunk 匹配。单处小改优先 workspace_replace_lines。',
+    compliance:
+      '须 rw 授权；补丁内路径相对 root（禁绝对/~ /file:// /abs_path）；越权/穿越失败；Add 不可覆盖已存在文件；授权根内 Delete 免确认；勿用行情工具或 shell 代替补丁。',
+  },
+  workspace_delete: {
+    packId: 'workspace',
+    usageGuide: '删除工作区内文件或目录；授权根内直接删除。',
+    compliance: '须 rw 授权；path 相对 root_id（禁绝对/~ /file:// /abs_path）；删除不可恢复。',
+  },
+  download_file: {
+    packId: 'workspace',
+    usageGuide: '从 http(s) URL 流式下载大文件到工作区（公告 PDF、数据集等）。',
+    compliance: '禁止内网/本地 URL；保存 path 相对 root_id（禁绝对/~ /file:// /abs_path）；授权根内覆盖免确认；更新工作区配额。',
+  },
+  http_fetch: {
+    packId: 'workspace',
+    usageGuide: '调用开放 HTTP API 获取 JSON/文本；响应自动截断以节约 token。',
+    compliance: '仅 http/https；禁止 SSRF；请求体 ≤32MB；响应用于模型上下文时截断。',
+  },
+  request_folder_access: {
+    packId: 'workspace',
+    usageGuide: '需要访问工作区外的文件夹时，提示用户在界面授权（ro/rw）。',
+    compliance: '工具本身不弹窗；用户授权后 list_workspace_grants 获取 root_id（成功后勿反复 list）。',
+  },
+  list_workspace_grants: {
+    packId: 'workspace',
+    usageGuide:
+      '仅当不知 root_id、或用户问可访问哪些目录/本对话授权工作区时调用（至多一次）；已知 root 直接 workspace_glob / workspace_grep / opptrix_run。',
+    compliance:
+      '只读；返回 root_id/label/mode；若含 abs_path 则 do_not_use_as_tool_path=true，禁止抄进 path/cwd；同一授权集至多一次，成功后勿反复 list；勿用 get_project_info 代替；额外目录需 request_folder_access 或界面授权。',
+  },
+  resolve_workspace_path_uri: {
+    packId: 'workspace',
+    usageGuide:
+      '消息内要引用工作区图片/视频/音频/文件时，生成 opptrix-ws:// URI；也可在写出文件后校验 exists。',
+    compliance:
+      'root_id + 相对 path（禁绝对/~ /file:// /abs_path）；仅授权 root；返回 uri/exists/kind_hint，禁止返回本机绝对路径；消息引用须用 uri，禁止 file://。',
+  },
+  shell_platform_status: {
+    packId: 'workspace',
+    usageGuide: '运行代码或安装依赖前，确认系统隔离环境是否就绪；不可用时向用户说明缺少组件。',
+    compliance: '只读；返回平台与就绪状态；用户文案勿暴露内部实现细节。',
+  },
+  opptrix_run: {
+    packId: 'workspace',
+    usageGuide:
+      '命令主路径的真 Shell：跑脚本/本地命令/pip·npm 安装首选；找搜优先 workspace_glob/grep，本工具 ls/find/rg 仅管道/复杂场景后备（cwd 相对 root）。主参数 command；短命令前台同步；预计较长（下载/安装/重计算/大数据处理）必须 background:true（job_id + 自动挂起，依赖终态续跑；禁止 poll/sleep）。大数据优先脚本内分块/流式，结果写工作区再 workspace_read 区间；勿把巨量 stdout 当上下文。包源默认已放行；其它域名运行时确认或 suggested_escalate；出隔离 escalate=unsandboxed（每次确认）。python/pip 直接写进 command（运行时解析）；勿先 ensure_python。硬禁：勿用 cat/head/tail/sed/awk/echo>/heredoc 读或改文件内容（改用 workspace_read/write/replace_lines/apply_patch）；勿代替行情工具。',
+    compliance:
+      '可先 get_system_info 确认 platform/就绪；cwd 与 command/脚本内路径相对 root_id（禁绝对/~ /file:// /abs_path）；'
+      + '子进程 HOME=grant 根（非 cwd；~ ≠ cwd，勿用 ~/ 当相对 cwd）；workspace_* 与 shell 对照：读改写走 workspace_*，跑命令走本工具；'
+      + '传 command（勿用已移除工具）；python/node/npm/pip 字面量会改写到当前运行时（含真 shell 管道/&&）；依赖直接 opptrix_run("pip/npm install …")；'
+      + '硬禁勿用 shell 创建/覆盖/就地改文本文件内容（cat/head/tail/sed/awk/echo>/heredoc）；找树/搜内容优先 workspace_glob/grep；'
+      + '编程前估内存，大数据分块处理；预计较长必须 background:true，依赖终态自动续跑，禁止 poll/sleep/反复等进度；'
+      + 'secret_refs 须已授权；行情/财务勿用本工具爬取；ensure_python 仅失败兜底；连续同类失败须改策略或向用户说明，勿同模式空转。',
+  },
+  code_preflight: {
+    packId: 'workspace',
+    usageGuide:
+      '写自定义 python/js/ts 脚本后、opptrix_run 前：一次返回全部 findings（diagnostics，尽量带 line；errors/warnings 含 L 前缀），按行号用 workspace_replace_lines 一轮修完再 preflight。软门禁，不硬拦 opptrix_run。',
+    compliance:
+      'path 必填且相对 root_id（禁绝对/~ /file:// /abs_path）；levels 默认 ["l0","l1"]；language 默认 auto；不执行业务代码；L1 无 ruff/biome 时 skip 不报错；优先读带 line 的 diagnostics，禁止小改动却整文件 workspace_write。',
+  },
+  python_env_status: {
+    packId: 'workspace',
+    usageGuide:
+      '用户问 Python 环境、版本、是否可用时首选；只看当前优先解释器（priority / active_source），勿把两套路径都当可执行选项。编程主路径勿先调本工具再写代码。',
+    compliance:
+      '只读；返回 ready/active_source/priority 与诊断布尔；不含 system_path/opptrix_path；opptrix_run 的 command 用 python/pip 字面量。',
+  },
+  ensure_python: {
+    packId: 'workspace',
+    usageGuide:
+      '失败兜底：仅当用户明确要检查/修复 Python，或 opptrix_run(python/pip) 因未就绪失败时再调用；禁止作为编程第一步。只读探测，不会下载安装；未就绪返回 failed 与说明（本机装 Python 3 / 桌面内置 / Docker 装 python3）。',
+    compliance:
+      '同步返回 ready|failed；勿期望 preparing/installing/job_id；failed 勿假装已安装；编程默认直接 opptrix_run。',
+  },
+  list_local_data_apis: {
+    packId: 'workspace',
+    usageGuide: '编程或取本地大数据前，先列本地/标准 API 索引；详情再 get_local_data_catalog。',
+    compliance: '只读索引；勿臆造未列出的 API；分类含 instrument_standard / workspace_fs 等。',
+  },
+  get_local_data_catalog: {
+    packId: 'workspace',
+    usageGuide: '按 api_id 获取调用方式、参数与示例；system 仅有索引句时必须用本工具补详情。',
+    compliance: 'api_id 来自 list_local_data_apis；include_examples 默认 true。',
+  },
+  request_session_lan_access: {
+    packId: 'workspace',
+    usageGuide: '沙盒需访问局域网（NAS/内网 API）且全局未开局域网时，先申请本对话授权。',
+    compliance: '内部 ask_user；选项 allow_lan_session|deny；授权不写回全局设置；clearSession 清除。',
+  },
+  request_secret: {
+    packId: 'workspace',
+    usageGuide: '需要第三方数据密钥/口令时安全录入保险箱；禁止 ask_user 或聊天粘贴收集密钥。',
+    compliance: 'name+reason 必填；同名存在且未 overwrite 返回 need_overwrite；工具结果仅 ok/name/saved，永不含明文。',
+  },
+  list_vault_secrets: {
+    packId: 'workspace',
+    usageGuide: '编程前查看保险箱已有哪些密钥名称与末位提示；无明文。',
+    compliance: '只读；返回 name/hint/updated_at；禁止声称能读出密钥内容。',
+  },
+  grant_session_secret: {
+    packId: 'workspace',
+    usageGuide: '保险箱已有条目时，为本对话授权使用（用户确认）；再 opptrix_run.secret_refs。',
+    compliance: 'name 必填且须已存在；内部 ask_user；clearSession 清除授权。',
+  },
+  revoke_session_secret: {
+    packId: 'workspace',
+    usageGuide: '撤销本对话对某保险箱密钥的使用授权（不删除条目）。',
+    compliance: '仅清会话 allowlist；不删 vault。',
+  },
+  delete_vault_secret: {
+    packId: 'workspace',
+    usageGuide: '用户明确要求删除保险箱中某密钥时使用；须确认。',
+    compliance: '内部 ask_user 确认；删除不可恢复；同步撤销本会话授权。',
+  },
+  list_scheduled_jobs: {
+    packId: 'automation',
+    usageGuide: '用户询问已有计划任务、定时分析或自动执行安排时，先列出任务。',
+    compliance: '只读；返回 id/标题/下次时间/最近状态；同一轮最多调用 1 次。',
+  },
+  get_scheduled_job: {
+    packId: 'automation',
+    usageGuide: '需要单个计划任务详情（调度规则、载荷）时使用。',
+    compliance: 'job_id 必填且来自 list_scheduled_jobs；只读。',
+  },
+  create_scheduled_job: {
+    packId: 'automation',
+    usageGuide: '用户要新建定时智能体任务或受控脚本时使用。',
+    compliance: 'shell_script 须在设置中允许；schedule 须合法；写操作可直接执行。',
+  },
+  update_scheduled_job: {
+    packId: 'automation',
+    usageGuide: '修改已有计划任务的标题、调度或载荷。',
+    compliance: 'job_id 必填；至少提供一个变更字段；脚本任务受 allow_shell_scripts 约束。',
+  },
+  enable_scheduled_job: {
+    packId: 'automation',
+    usageGuide: '恢复已暂停的计划任务。',
+    compliance: 'job_id 必填；写操作可直接执行。',
+  },
+  disable_scheduled_job: {
+    packId: 'automation',
+    usageGuide: '暂停计划任务，不再自动执行。',
+    compliance: 'job_id 必填；写操作可直接执行。',
+  },
+  delete_scheduled_job: {
+    packId: 'automation',
+    usageGuide: '删除计划任务；须 ask_user 后 confirmed=true。',
+    compliance: 'job_id 必填；未 confirmed 只返回摘要；删除不可恢复。',
+  },
+  run_scheduled_job_now: {
+    packId: 'automation',
+    usageGuide: '用户要求立刻跑一次计划任务时使用。',
+    compliance: 'job_id 必填；会写入执行记录；同一任务勿连续多次触发。',
+  },
+  list_scheduled_job_runs: {
+    packId: 'automation',
+    usageGuide: '查看计划任务历史执行结果与错误信息。',
+    compliance: 'job_id 必填；limit ≤50；只读。',
+  },
+  query_data: {
+    packId: 'research_canvas',
+    miningEligible: false,
+    usageGuide:
+      '比较或查询多家公司的毛利率、营收、净利润、ROE 等标准财务指标，或查询日K时，先用本工具生成数据集。只传公司名/代码、指标与年份。禁止编造数字，禁止把明细行写进回复。改看另一个指标时重新调用本工具，不要 refine_dataset。K 线用 metric=kline，最多两只标的。行业或板块对比须先 resolve_industry_universe 并经用户确认，禁止凭印象填公司。',
+    compliance:
+      'entities 为公司简称/全称/代码，最多 20 家；metric 仅 gross_margin / revenue / revenue_growth / net_income / net_margin / roe / kline；start/end 为四位年份。成功后只用返回的 datasetId 调用 propose_widget；图种默认取 view.recommended，意图取 intent，标题取 view.suggestedTitle。同一数据集禁止再次 query_data。',
+  },
+  resolve_industry_universe: {
+    packId: 'research_canvas',
+    miningEligible: false,
+    usageGuide:
+      '用户要某行业/板块/主题的指标排名或横向对比，但还没有确认公司名单时，先用本工具解析候选。返回后必须 ask_user 确认，默认勾选 8 家，用户要更全时最多 20 家，再 query_data。禁止口播名单，禁止把候选当作完整行业。',
+    compliance:
+      'industry 必填；有 board_key 或 industry_code 时优先按成分股。不取财务数字。确认前不得 query_data。',
+  },
+  refine_dataset: {
+    packId: 'research_canvas',
+    miningEligible: false,
+    usageGuide:
+      '已有数据集上去掉/加上公司、收窄年份，或按组做算术平均（如电池链条 vs 整车链条）时使用。生成新的派生数据集，不要覆盖旧数据集。成功后默认 propose_widget，不要 update_widget。改图种不要用本工具；改指标用 query_data。',
+    compliance:
+      'datasetId 必填且须为本轮已有真实数据集；operation.type 为 remove_entities / add_entities / change_period / aggregate_groups。aggregate_groups 仅 arithmetic_mean；groups[].members 为公司名/代码。禁止传入 data / layout / formula。成功后用新 datasetId 调用 propose_widget；禁止 update_widget，除非用户明确要求改右侧已有图。',
+  },
+  propose_widget: {
+    packId: 'research_canvas',
+    miningEligible: false,
+    usageGuide:
+      '比较/看看/分析后，用本工具在对话中提出一张研究视图预览。不要写入右侧画布。优先传 intent；type/title 可省略。2–8 家多年对照用 grouped_bar；>8 家多年用 heatmap_table。预览已出后改颜色/图例/轴标题用 update_proposal，勿 update_widget。禁止正文 ```chart 代替预览，禁止 create_canvas。',
+    compliance:
+      'intent 为 trend / rank / compare / composition / price；type 可省略，取值含 heatmap_table；title 可省略（用 suggestedTitle）；datasetId 须为本轮真实数据集。params.period / params.topN 可选；style 可选初始样式。默认只提出一张主图。禁止布局字段。返回 warning 时用白话转述。',
+  },
+  update_proposal: {
+    packId: 'research_canvas',
+    miningEligible: false,
+    usageGuide:
+      '对话预览尚未 Adopt 时，改图例/颜色/轴标题/系列显示名/预览标题用本工具。用户说「宁德蓝、比亚迪橙」时 series 键用公司名即可，color 可用蓝/橙。已加入右侧画布则用 update_widget。改图种仍用 propose_widget。',
+    compliance:
+      'proposalId 可省略（本轮仅一个 ready 预览时）；至少提供 title / style / view 之一；style 仅 legend/xAxis/yAxis/series/marks；series 键可用公司名、代码或 entityId；color 可用蓝/橙/绿或 #hex。禁止布局字段。',
+  },
+  create_widget: {
+    packId: 'research_canvas',
+    miningEligible: false,
+    usageGuide:
+      '仅当用户明确要求直接加入右侧研究画布、放进画布时使用。比较/看看/分析应走 propose_widget。禁止 create_canvas，禁止正文 ```chart 代替右侧组件，禁止传入 id 或 x/y/w/h。',
+    compliance:
+      'type 仅 line_chart / bar_chart / grouped_bar / stacked_bar / stacked_bar_percent / combo_bar_line / pie_chart / donut_chart / candlestick / heatmap_table / table / sources；title ≤80 字；datasetId 须为本轮已有真实数据集或用户明确沿用的旧演示集；禁止布局字段；id 由系统生成。',
+  },
+  update_widget: {
+    packId: 'research_canvas',
+    miningEligible: false,
+    usageGuide:
+      '按 id 修改右侧研究画布已有组件的类型、标题、数据集或图表样式（图例/颜色/轴标题/系列显示名）。对话预览改图种请用 propose_widget；改颜色/图例/标签用 style。不得改布局，不得用 create_canvas。',
+    compliance:
+      'id 必填且须为本轮画布已有组件；至少提供 type / title / datasetId / style 之一；style 仅 legend/xAxis/yAxis/series/marks；series 键可用公司名、代码或 entityId；color 可用蓝/橙/绿或 #hex；datasetId 须为本轮已有真实数据集；禁止 x/y/w/h。',
+  },
+  delete_widget: {
+    packId: 'research_canvas',
+    miningEligible: false,
+    usageGuide: '按 id 从右侧研究画布移除组件。先对照本轮画布清单确认 id。',
+    compliance: 'id 必填且须存在；禁止布局字段；删除后不要再对该 id 调用 update_widget。',
+  },
+}
+
+/** 为 TOOL_META 条目补全 packId（单一事实源仍是 TOOL_PACK_MEMBERSHIP） */
+export function resolveToolPackId(toolName: string, meta?: ToolMeta): ToolPackId | null {
+  return meta?.packId ?? packIdForTool(toolName)
+}
+
+export const DATA_LAYER_MINING_TOOL_NAMES = Object.entries(TOOL_META)
+  .filter(([, m]) => m.miningEligible)
+  .map(([name]) => name) as readonly string[]
+
+export function discoverMiningToolNames(profile: string): readonly string[] {
+  if (isDiscoverStrategyProfile(profile)) {
+    const names = discoverMiningToolNamesForProfile(profile)
+    if (names.length) return names
+    return []
+  }
+  return DATA_LAYER_MINING_TOOL_NAMES
+}
+
+export function formatToolDescription(
+  description: string,
+  meta?: ToolMeta,
+): string {
+  if (!meta) return description
+  return [
+    description,
+    `【何时使用】${meta.usageGuide}`,
+    `【调用规范】${meta.compliance}`,
+  ].join('\n')
+}
+
+export function mcpToolCatalog(registry: { list: () => Array<{ name: string; description: string; category: string; parameters: unknown }> }) {
+  return registry.list().map(t => {
+    const meta = TOOL_META[t.name]
+    return {
+      name: t.name,
+      category: t.category,
+      pack_id: resolveToolPackId(t.name, meta),
+      hub_feature: meta?.hubFeature ?? null,
+      mining_eligible: Boolean(meta?.miningEligible),
+      description: t.description,
+      usage_guide: meta?.usageGuide ?? '',
+      compliance: meta?.compliance ?? '',
+      parameters: t.parameters,
+      full_description: formatToolDescription(t.description, meta),
+    }
+  })
+}

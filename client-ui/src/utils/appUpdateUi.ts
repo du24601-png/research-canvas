@@ -1,0 +1,153 @@
+import type { AppUpdateStatus } from '../platform/detect'
+
+export type AppUpdatePanelModel = {
+  visible: boolean
+  title: string
+  desc: string
+  showProgress: boolean
+  /** 0–100；undefined 表示不确定进度 */
+  percent?: number
+  showInstall: boolean
+  /** 关自动下载时，available 态展示「下载更新」 */
+  showDownload: boolean
+}
+
+export function buildAppUpdatePanel(
+  status: AppUpdateStatus,
+  opts: { checkedOnce: boolean; autoDownload?: boolean },
+): AppUpdatePanelModel | null {
+  const { checkedOnce, autoDownload = false } = opts
+
+  switch (status.state) {
+    case 'checking':
+      return {
+        visible: true,
+        title: '正在检查更新',
+        desc: status.message ?? '正在连接更新服务器，请稍候…',
+        showProgress: false,
+        showInstall: false,
+        showDownload: false,
+      }
+    case 'available':
+      if (!autoDownload) {
+        return {
+          visible: true,
+          title: status.version ? `发现新版本 v${status.version}` : '发现新版本',
+          desc: status.message ?? '确认后即可下载；下载完成后可重启安装。',
+          showProgress: false,
+          showInstall: false,
+          showDownload: true,
+        }
+      }
+      return {
+        visible: true,
+        title: status.version ? `发现新版本 v${status.version}` : '发现新版本',
+        desc: status.message ?? '正在准备下载，请稍候…',
+        showProgress: true,
+        percent: 0,
+        showInstall: false,
+        showDownload: false,
+      }
+    case 'downloading':
+      return {
+        visible: true,
+        title: status.version ? `正在下载 v${status.version}` : '正在下载更新',
+        desc: status.message ?? '下载完成后可重启安装',
+        showProgress: true,
+        percent: status.percent ?? 0,
+        showInstall: false,
+        showDownload: false,
+      }
+    case 'ready':
+      return {
+        visible: true,
+        title: status.manual_install_help
+          ? (status.version ? `v${status.version} 需手动安装` : '更新需手动安装')
+          : (status.version ? `新版本 v${status.version} 已就绪` : '新版本已就绪'),
+        desc: status.message ?? (status.manual_install_help
+          ? '自动更新多次未成功。可到官网下载最新安装包覆盖安装。'
+          : '点击下方按钮重启并完成安装，对话与本地数据不会丢失。'),
+        showProgress: false,
+        percent: 100,
+        showInstall: !status.manual_install_help,
+        showDownload: false,
+      }
+    case 'installing':
+      return {
+        visible: true,
+        title: status.version ? `正在安装 v${status.version}` : '正在安装更新',
+        desc: status.message ?? '应用即将退出并自动重启，请勿强制结束进程。',
+        showProgress: true,
+        showInstall: false,
+        showDownload: false,
+      }
+    case 'error':
+      return {
+        visible: true,
+        title: '暂时无法完成更新',
+        desc: status.message ?? '请检查网络后重试，或稍后再试。',
+        showProgress: false,
+        showInstall: false,
+        showDownload: false,
+      }
+    case 'not-available':
+      if (!checkedOnce) return null
+      return {
+        visible: true,
+        title: '当前已是最新版本',
+        desc: status.message ?? '暂无可用更新。你可以稍后再检查，或到项目主页查看发布说明。',
+        showProgress: false,
+        showInstall: false,
+        showDownload: false,
+      }
+    default:
+      return null
+  }
+}
+
+export function isAppUpdateCheckBusy(status: AppUpdateStatus): boolean {
+  return status.state === 'checking'
+}
+
+/** Title-bar hint when sidebar footer notice is hidden (overlay collapsed, etc.). */
+export function shouldShowAppUpdateChromeHint(status: AppUpdateStatus): boolean {
+  return (
+    status.state === 'downloading'
+    || status.state === 'available'
+    || status.state === 'ready'
+    || status.state === 'installing'
+    || status.state === 'error'
+  )
+}
+
+export function getAppUpdateChromeHintLabel(
+  status: AppUpdateStatus,
+  opts?: { autoDownload?: boolean },
+): string {
+  const autoDownload = opts?.autoDownload ?? false
+  switch (status.state) {
+    case 'available':
+      if (!autoDownload) {
+        return status.version ? `发现 v${status.version}` : '发现新版本'
+      }
+      return status.version ? `下载 v${status.version}` : '正在下载更新'
+    case 'downloading':
+      if (status.percent != null && status.percent > 0) {
+        return status.version
+          ? `下载 v${status.version} ${status.percent}%`
+          : `下载更新 ${status.percent}%`
+      }
+      return status.version ? `下载 v${status.version}` : '正在下载更新'
+    case 'ready':
+      if (status.manual_install_help) {
+        return status.version ? `v${status.version} 需手动安装` : '需手动安装'
+      }
+      return status.version ? `v${status.version} 可更新` : '新版本可更新'
+    case 'installing':
+      return '正在安装…'
+    case 'error':
+      return '更新失败'
+    default:
+      return ''
+  }
+}

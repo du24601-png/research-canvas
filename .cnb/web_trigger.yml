@@ -1,0 +1,42 @@
+# CNB 仓库页面手动触发按钮配置（事件流水线见根目录 .cnb.yml 同名 web_trigger_* 事件）。
+# 制品以 GitHub 为准：这里只提供「同步镜像」与「应急构建」两个人工通道，
+# 不存在任何自动构建入口。
+branch:
+  - reg: ^main$
+    buttons:
+      - name: 同步镜像到制品库
+        description: 将 GitHub 已发布的多架构镜像（digest 不变）复制到本仓制品库 docker.cnb.cool/travisun/opptrix
+        event: web_trigger_sync_image
+        inputs:
+          IMAGE_TAG:
+            name: 镜像标签
+            description: 支持 opptrix-selfhost-vX.Y.Z、X.Y.Z 或浮动标签 selfhost
+            placeholder: 例如 opptrix-selfhost-v1.3.6 / 1.3.6 / selfhost
+            required: false
+            type: input
+            default: selfhost
+      - name: 应急构建镜像
+        description: GitHub 不可用时的应急通道，在 CNB 单平台构建并推送本仓制品库（多架构镜像仍以 GitHub 发布为准）
+        event: web_trigger_build_image
+        env:
+          # 国内源默认值（可在触发时覆盖；置空回退官方源，Dockerfile 对空值已兼容）
+          NODE_IMAGE_PREFIX: docker.1ms.run/library/
+          NPM_REGISTRY: https://registry.npmmirror.com
+          APT_MIRROR: mirrors.aliyun.com
+        inputs:
+          IMAGE_TAG:
+            name: 镜像标签
+            description: 支持 opptrix-selfhost-vX.Y.Z、X.Y.Z 或浮动标签 selfhost
+            placeholder: 例如 opptrix-selfhost-v1.3.6 / 1.3.6 / selfhost
+            required: false
+            type: input
+            default: selfhost
+          PLATFORM:
+            name: 目标平台
+            description: 应急构建为单平台；多架构镜像以 GitHub 发布为准
+            required: false
+            type: select
+            options:
+              - linux/amd64
+              - linux/arm64
+            default: linux/amd64

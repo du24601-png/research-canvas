@@ -1,0 +1,75 @@
+import { makeStyles, mergeClasses } from '@fluentui/react-components'
+import OpptrixButton from '../components/opptrix/OpptrixButton'
+import { useAppUpdate } from '../hooks/useAppUpdate'
+import { isElectron } from '../platform/detect'
+import { opptrixTokens, opptrixCssVars } from '../theme/tokens'
+import {
+  getAppUpdateChromeHintLabel,
+  shouldShowAppUpdateChromeHint,
+} from '../utils/appUpdateUi'
+
+const useStyles = makeStyles({
+  hint: {
+    fontSize: 'var(--opptrix-font-sm)',
+    padding: '2px 8px',
+    fontWeight: 500,
+    lineHeight: 1,
+    color: opptrixCssVars.accent,
+    backgroundColor: opptrixCssVars.accentSoft,
+    whiteSpace: 'nowrap',
+    WebkitAppRegion: 'no-drag',
+    flexShrink: 0,
+    ':hover': {
+      opacity: 0.88,
+    },
+  },
+  hintError: {
+    color: opptrixCssVars.error,
+    backgroundColor: opptrixCssVars.errorSoft,
+  },
+})
+
+interface AppUpdateChromeHintProps {
+  sidebarOpen: boolean
+  sidebarHoverReveal?: boolean
+  onRevealSidebar?: () => void
+  onToggleSidebar?: () => void
+}
+
+export default function AppUpdateChromeHint({
+  sidebarOpen,
+  sidebarHoverReveal = false,
+  onRevealSidebar,
+  onToggleSidebar,
+}: AppUpdateChromeHintProps) {
+  const s = useStyles()
+  const { status, autoDownload } = useAppUpdate()
+
+  if (!isElectron() || sidebarOpen || !shouldShowAppUpdateChromeHint(status)) {
+    return null
+  }
+
+  const label = getAppUpdateChromeHintLabel(status, { autoDownload })
+  if (!label) return null
+
+  const handleClick = () => {
+    if (sidebarHoverReveal) onRevealSidebar?.()
+    else onToggleSidebar?.()
+  }
+
+  const canClick = Boolean(onRevealSidebar || onToggleSidebar)
+
+  return (
+    <OpptrixButton
+      className={mergeClasses(s.hint, status.state === 'error' && s.hintError)}
+      variant="ghost"
+      size="small"
+      aria-label={label}
+      title={status.message ?? label}
+      onClick={canClick ? handleClick : undefined}
+      disabled={!canClick}
+    >
+      {label}
+    </OpptrixButton>
+  )
+}

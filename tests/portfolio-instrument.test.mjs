@@ -1,0 +1,174 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import {
+  portfolioDisplayCode,
+  portfolioLedgerKey,
+  portfolioCodesMatch,
+  portfolioInstrumentRef,
+  portfolioCodeAliases,
+} from '../packages/a-stock-layer/dist/portfolio/instrument.js'
+import { buildOpptrixInstrumentId } from '../packages/shared/dist/instrument-symbol.js'
+
+test('portfolioInstrumentRef — CN six-digit, HK five-digit, US ticker', () => {
+  const cn = portfolioInstrumentRef('600519', 'CN')
+  assert.equal(cn.market, 'CN')
+  assert.equal(cn.symbol, '600519')
+  assert.equal(cn.assetClass, 'EQUITY')
+
+  const cnEtf = portfolioInstrumentRef('510300', 'CN')
+  assert.equal(cnEtf.market, 'CN')
+  assert.equal(cnEtf.symbol, '510300')
+  assert.equal(cnEtf.assetClass, 'ETF')
+
+  const hk = portfolioInstrumentRef('700', 'HK')
+  assert.equal(hk.market, 'HK')
+  assert.equal(hk.symbol, '00700')
+
+  const us = portfolioInstrumentRef('aapl', 'US')
+  assert.equal(us.market, 'US')
+  assert.equal(us.symbol, 'AAPL')
+})
+
+test('portfolioDisplayCode — Opptrix ID for CN/US/HK', () => {
+  assert.equal(portfolioDisplayCode('00700', 'HK'), 'HK:STOCK:00700.HK')
+  assert.equal(portfolioDisplayCode('700', 'HK'), 'HK:STOCK:00700.HK')
+  assert.equal(portfolioDisplayCode('AAPL', 'US'), 'US:STOCK:AAPL.US')
+  assert.equal(portfolioDisplayCode('600519', 'CN'), 'CN:STOCK:600519.SH')
+  assert.equal(portfolioDisplayCode('519', 'CN'), 'CN:STOCK:000519.SZ')
+  assert.equal(
+    portfolioDisplayCode('600519', 'CN'),
+    buildOpptrixInstrumentId(portfolioInstrumentRef('600519', 'CN')),
+  )
+})
+
+test('portfolioInstrumentRef — OTC fund namespace and .OF suffix', () => {
+  const pf = portfolioInstrumentRef('CN:PF.009049')
+  assert.equal(pf.market, 'CN')
+  assert.equal(pf.assetClass, 'FUND')
+  assert.equal(pf.exchange, 'PF')
+  assert.equal(pf.symbol, '009049')
+
+  const ofSuffix = portfolioInstrumentRef('009049.OF')
+  assert.equal(ofSuffix.assetClass, 'FUND')
+  assert.equal(ofSuffix.exchange, 'PF')
+  assert.equal(ofSuffix.symbol, '009049')
+})
+
+test('portfolioDisplayCode — fund is Opptrix OTC; equity distinct', () => {
+  assert.equal(portfolioDisplayCode('CN:PF.009049'), 'CN:OTC:009049.OF')
+  assert.equal(portfolioDisplayCode('009049.OF'), 'CN:OTC:009049.OF')
+  assert.equal(portfolioDisplayCode('009049', 'CN', 'FUND'), 'CN:OTC:009049.OF')
+  assert.equal(portfolioDisplayCode('600519', 'CN'), 'CN:STOCK:600519.SH')
+  assert.notEqual(
+    portfolioDisplayCode('009049', 'CN', 'FUND'),
+    portfolioDisplayCode('009049', 'CN', 'EQUITY'),
+  )
+})
+
+test('portfolioLedgerKey — distinct keys per market', () => {
+  const cnKey = portfolioLedgerKey('600519', 'CN')
+  const hkKey = portfolioLedgerKey('00700', 'HK')
+  const usKey = portfolioLedgerKey('AAPL', 'US')
+  assert.notEqual(cnKey, hkKey)
+  assert.notEqual(cnKey, usKey)
+  assert.notEqual(hkKey, usKey)
+  assert.equal(portfolioLedgerKey('CN:PF.009049'), 'CN:PF.009049')
+  assert.equal(portfolioLedgerKey('CN:OF.009049'), 'CN:PF.009049')
+})
+
+test('portfolioCodesMatch — aliases and legacy rows', () => {
+  assert.ok(portfolioCodesMatch('00700', 'HK', '700', 'HK'))
+  assert.ok(portfolioCodesMatch('600519', 'CN', '600519', 'CN'))
+  assert.ok(portfolioCodesMatch('600519', undefined, '600519', 'CN'))
+  assert.ok(!portfolioCodesMatch('00700', 'HK', 'AAPL', 'US'))
+  assert.ok(!portfolioCodesMatch('00700', 'HK', '600519', 'CN'))
+  assert.ok(portfolioCodesMatch('CN:STOCK:600519.SH', 'CN', '600519', 'CN'))
+  assert.ok(portfolioCodesMatch('US:STOCK:AAPL.US', 'US', 'AAPL', 'US'))
+})
+
+test('portfolioCodesMatch — FUND vs bare six-digit legacy ledger', () => {
+  assert.ok(portfolioCodesMatch('CN:PF.009049', undefined, '009049', 'CN'))
+  assert.ok(portfolioCodesMatch('009049', 'CN', 'CN:OF.009049', undefined))
+  assert.ok(portfolioCodesMatch('009049.OF', undefined, '009049', 'CN'))
+  assert.ok(portfolioCodesMatch('CN:OTC:009049.OF', undefined, '009049', 'CN', 'FUND'))
+  // 显式交易所命名空间与场外基金不混配
+  assert.ok(!portfolioCodesMatch('CN:PF.000001', undefined, 'CN:SZ.000001', undefined))
+  assert.ok(!portfolioCodesMatch('CN:PF.009049', undefined, '600519', 'CN'))
+})
+
+test('portfolioInstrumentRef — explicit assetClass FUND/ETF not defaulted to EQUITY', () => {
+  const fund = portfolioInstrumentRef('009049', 'CN', 'FUND')
+  assert.equal(fund.assetClass, 'FUND')
+  assert.equal(fund.exchange, 'PF')
+  assert.equal(portfolioDisplayCode('009049', 'CN', 'FUND'), 'CN:OTC:009049.OF')
+  assert.equal(portfolioLedgerKey('009049', 'CN', 'FUND'), 'CN:PF.009049')
+
+  const etf = portfolioInstrumentRef('510300', 'CN', 'ETF')
+  assert.equal(etf.assetClass, 'ETF')
+  assert.notEqual(etf.assetClass, 'EQUITY')
+  assert.equal(portfolioDisplayCode('510300', 'CN', 'ETF'), 'CN:ETF:510300.SH')
+
+  const fromRef = portfolioInstrumentRef({
+    market: 'CN',
+    assetClass: 'FUND',
+    symbol: '110022',
+    exchange: 'PF',
+  })
+  assert.equal(fromRef.assetClass, 'FUND')
+  assert.equal(portfolioLedgerKey('110022', 'CN', 'FUND'), portfolioLedgerKey(fromRef.symbol, fromRef.market, fromRef.assetClass))
+})
+
+test('portfolioLedgerKey — US / HK equity refs', () => {
+  const us = portfolioInstrumentRef('MSFT', 'US')
+  assert.equal(us.market, 'US')
+  assert.equal(us.assetClass, 'EQUITY')
+  assert.ok(portfolioLedgerKey('MSFT', 'US').includes('US') || portfolioLedgerKey('MSFT', 'US') === 'US:MSFT' || portfolioLedgerKey('MSFT', 'US').startsWith('US'))
+
+  const hk = portfolioInstrumentRef('00700', 'HK')
+  assert.equal(hk.market, 'HK')
+  assert.ok(portfolioLedgerKey('00700', 'HK'))
+  assert.notEqual(portfolioLedgerKey('MSFT', 'US'), portfolioLedgerKey('00700', 'HK'))
+})
+
+test('portfolioCodesMatch — same fund with explicit assetClass on both sides', () => {
+  assert.ok(portfolioCodesMatch('CN:PF.009049', 'CN', '009049', 'CN', 'FUND', 'FUND'))
+  assert.ok(portfolioCodesMatch('CN:PF.009049', 'CN', 'CN:PF.009049', 'CN', 'FUND', 'FUND'))
+  assert.ok(portfolioCodesMatch('CN:OTC:009049.OF', 'CN', 'CN:PF.009049', 'CN', 'FUND', 'FUND'))
+})
+
+test('portfolioCodesMatch — equity must not match fund bare code without fund side', () => {
+  assert.ok(!portfolioCodesMatch('CN:PF.009049', 'CN', '600519', 'CN', 'FUND', 'EQUITY'))
+  assert.ok(portfolioCodesMatch('CN:PF.009049', 'CN', '009049', 'CN', 'FUND', 'FUND'))
+})
+
+test('holdingMatchesRef semantics — FUND namespace must not match EQUITY same digits', async () => {
+  const { instrumentRefKey } = await import('../packages/shared/dist/instrument-ref.js')
+  const fund = portfolioInstrumentRef('009049', 'CN', 'FUND')
+  const equity = portfolioInstrumentRef('009049', 'CN', 'EQUITY')
+  assert.equal(fund.assetClass, 'FUND')
+  assert.notEqual(instrumentRefKey(fund), instrumentRefKey(equity))
+  assert.notEqual(portfolioDisplayCode('009049', 'CN', 'FUND'), portfolioDisplayCode('009049', 'CN', 'EQUITY'))
+  const holdingAsFund = portfolioInstrumentRef({
+    market: 'CN',
+    assetClass: 'FUND',
+    symbol: '009049',
+    exchange: 'PF',
+  })
+  assert.equal(instrumentRefKey(holdingAsFund), instrumentRefKey(fund))
+  assert.notEqual(instrumentRefKey(holdingAsFund), instrumentRefKey(equity))
+})
+
+test('portfolioCodeAliases — dual-read Opptrix + bare + CN:PF', () => {
+  const fundAliases = portfolioCodeAliases('009049', 'CN', 'FUND')
+  assert.ok(fundAliases.has('CN:OTC:009049.OF'))
+  assert.ok(fundAliases.has('009049'))
+  assert.ok(fundAliases.has('CN:PF.009049'))
+
+  const equityAliases = portfolioCodeAliases('600519', 'CN')
+  assert.ok(equityAliases.has('CN:STOCK:600519.SH'))
+  assert.ok(equityAliases.has('600519'))
+
+  const usAliases = portfolioCodeAliases('AAPL', 'US')
+  assert.ok(usAliases.has('US:STOCK:AAPL.US'))
+  assert.ok(usAliases.has('AAPL'))
+})

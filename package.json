@@ -1,0 +1,125 @@
+{
+  "name": "research-canvas",
+  "private": true,
+  "description": "Research Canvas — AI 投研 Agent 与交互式数据分析画布（Web + Docker 自托管）",
+  "license": "Apache-2.0",
+  "keywords": [
+    "research-canvas",
+    "investment-research",
+    "stock",
+    "a-share",
+    "agent",
+    "fastify",
+    "react"
+  ],
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "client-ui"
+  ],
+  "scripts": {
+    "dev": "node scripts/dev-with-ports.mjs",
+    "selfhost": "node packages/selfhost/bin/opptrix.js",
+    "build:selfhost": "npm run build -w @opptrix/selfhost",
+    "publish:selfhost": "npm run build -w @opptrix/selfhost && npm publish -w @opptrix/selfhost",
+    "release:selfhost": "node scripts/release-selfhost.mjs",
+    "release:selfhost-app": "node scripts/release-selfhost-app.mjs",
+    "pre-release:selfhost": "node scripts/pre-release-selfhost.mjs",
+    "dev:api": "npm run dev -w @opptrix/server",
+    "dev:web": "npm run dev -w research-canvas-client",
+    "build": "npm run build:packages && npm run build -w research-canvas-client",
+    "build:packages": "node scripts/ensure-dev-deps.mjs && npm run build -w @opptrix/shared -w @opptrix/system-update -w @opptrix/canvas -w @opptrix/user-store -w @opptrix/plugin-storage -w @opptrix/event-bus -w @opptrix/doc-library -w @opptrix/schedule -w @opptrix/local-inference -w @opptrix/market-data-core -w @opptrix/a-stock-layer -w @opptrix/news-feed -w @opptrix/article-enrichment -w @opptrix/provider-sdk -w @opptrix/extension-sdk -w @opptrix/market-data-providers-cn -w @opptrix/market-data-providers-us -w @opptrix/institutions -w @opptrix/research-hub -w @opptrix/agent-browser -w @opptrix/agent-workspace -w @opptrix/agent-skills -w @opptrix/agent -w @opptrix/search-hub -w @opptrix/server",
+    "typecheck:ui": "tsc -p client-ui/tsconfig.json --noEmit",
+    "lint:ui": "eslint client-ui/src --max-warnings 9999 --quiet",
+    "audit:ui": "node scripts/audit-client-ui-react.mjs",
+    "audit:npm": "npm audit --registry=https://registry.npmjs.org/",
+    "check:ui": "node scripts/check-client-ui.mjs",
+    "release:notes": "node scripts/assemble-release-notes.mjs",
+    "audit:selfhost-release": "node scripts/audit-selfhost-release.mjs --all",
+    "audit:selfhost-npm": "node scripts/audit-selfhost-release.mjs --npm",
+    "audit:selfhost-runtime": "node scripts/audit-selfhost-release.mjs --runtime",
+    "audit:selfhost-docker": "node scripts/audit-selfhost-release.mjs --docker --skip-build",
+    "prepare:pwa-icons": "node scripts/generate-product-icons.mjs && node scripts/prepare-pwa-icons.mjs",
+    "pack:runtime": "node scripts/pack-opptrix-runtime.mjs",
+    "optimize:sponsors": "node scripts/optimize-sponsor-images.mjs",
+    "start": "npm run start -w @opptrix/server",
+    "serve": "concurrently -k -n api,web -c blue,cyan \"npm run start\" \"npm run preview -w research-canvas-client -- --host 0.0.0.0\"",
+    "clean": "find packages apps -name dist -type d -prune -exec rm -rf {} + 2>/dev/null; find packages apps -name tsconfig.tsbuildinfo -delete 2>/dev/null; rm -rf client-ui/dist",
+    "test": "npm run build:packages && node scripts/run-tests.mjs",
+    "test:gate": "node scripts/run-test-gate.mjs",
+    "predev": "node scripts/ensure-native-bindings.mjs",
+    "pretest": "node scripts/ensure-native-bindings.mjs",
+    "test:ci": "node scripts/run-tests.mjs",
+    "test:live-network": "OPPTRIX_LIVE_NETWORK_TESTS=1 node scripts/run-tests.mjs",
+    "harness:lab": "node scripts/harness-lab-auto.mjs",
+    "postinstall": "node scripts/scrub-install-deps.mjs",
+    "scrub:install-deps": "node scripts/scrub-install-deps.mjs",
+    "test:ui": "npm run test -w research-canvas-client"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "bin": {
+    "research-canvas": "packages/selfhost/bin/opptrix.js",
+    "opptrix": "packages/selfhost/bin/opptrix.js"
+  },
+  "devDependencies": {
+    "@aws-sdk/client-s3": "^3.1124.0",
+    "@eslint/js": "^9.17.0",
+    "@types/node": "^24.13.0",
+    "concurrently": "^9.1.2",
+    "eslint": "^9.17.0",
+    "eslint-plugin-react": "^7.37.3",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.67.0"
+  },
+  "dependencies": {
+    "apache-arrow": "18.1.0",
+    "onnxruntime-web": "file:scripts/stubs/empty-onnxruntime-web",
+    "sharp": "0.35.3"
+  },
+  "overrides": {
+    "tar": "^7.5.22",
+    "node-gyp": "^12.4.0",
+    "find-my-way": "9.7.0",
+    "fast-uri@3": "3.1.5",
+    "fast-uri@4": "4.1.2",
+    "dompurify": "^3.4.13",
+    "hono": "^4.13.1",
+    "@hono/node-server": "^1.19.15",
+    "brace-expansion@1": "1.1.18",
+    "brace-expansion@2": "2.1.4",
+    "brace-expansion@4": "4.0.1",
+    "brace-expansion@5": "5.0.9",
+    "undici": "^7.29.0",
+    "js-yaml": "^4.3.1",
+    "ip-address": "^10.5.0",
+    "nanoid@3": "3.3.18",
+    "postcss": "^8.5.26",
+    "browserslist": "4.28.8",
+    "nodemailer": "^9.1.1",
+    "sharp": "$sharp",
+    "onnxruntime-node": "1.21.0",
+    "onnxruntime-web": "$onnxruntime-web",
+    "@huggingface/transformers": "3.8.1",
+    "@gutenye/ocr-node": {
+      "sharp": "$sharp",
+      "onnxruntime-node": "1.21.0"
+    },
+    "@lancedb/lancedb": {
+      "sharp": "$sharp",
+      "@huggingface/transformers": "3.8.1"
+    },
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "allowScripts": {
+    "better-sqlite3": true,
+    "duckdb": true,
+    "esbuild": true,
+    "node-llama-cpp": true,
+    "fsevents": true,
+    "sharp": true
+  }
+}

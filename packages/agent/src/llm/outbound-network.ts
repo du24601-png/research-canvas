@@ -1,0 +1,16 @@
+export {
+  initOutboundNetwork,
+  getOutboundNetworkStatus,
+  getOutboundConnectFamily,
+  ensureOutboundNetworkReady,
+  getConnectFamiliesForHost,
+  noteHostConnectSuccess,
+  noteHostConnectFailure,
+  noteOutboundConnectFailure,
+  isOutboundConnectError,
+  resetOutboundNetworkForTests,
+  setOutboundNetworkStatusForTests,
+  type OutboundConnectFamily,
+  type OutboundFamilyMode,
+  type OutboundNetworkStatus,
+} from '@opptrix/shared'

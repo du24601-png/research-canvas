@@ -1,0 +1,2020 @@
+import type {
+  FinancialSummary, QueryResult, QueryResultMeta, StockKline, StockListItem, StockRealtime,
+} from '@opptrix/shared'
+import { inferCnAssetClassFromSymbol } from '@opptrix/shared'
+import { CACHE_TYPE, Capability } from './core/capabilities.js'
+import { Cache } from './core/cache.js'
+import { watchlistCacheTtl } from '@opptrix/market-data-core'
+import { DriverRegistry } from './core/registry.js'
+import { CAP_METHOD } from './providers/common/base.js'
+import { createProviderLoader, type ProviderLoader } from './providers/loader.js'
+import { getProviderHealthTracker, type HealthSnapshot } from './core/provider-health.js'
+import {
+  getProviderPermissionDenialSnapshot,
+  clearProviderPermissionDenials,
+  clearAllProviderPermissionDenials,
+  isProviderCapabilityDenied,
+} from './providers/common/permission-denial.js'
+import {
+  getFreeProviderThrottle,
+  pickNextDriver,
+  recordProviderQueryEmpty,
+  recordProviderQueryError,
+  recordProviderQueryInvalid,
+  recordProviderQuerySuccess,
+  shouldSkipProviderQuery,
+} from './core/free-provider-throttle.js'
+import { ProviderSpeedRanker } from './core/speed-ranker.js'
+import { LoadBalancer } from './core/load-balancer.js'
+import { validateResponse } from './core/data-validator.js'
+import { wireRegistryMethodArgs } from './core/provider-wire.js'
+import {
+  ENGINE_COMPOSED_CAPABILITY_ROUTES,
+  MARKET_LEVEL_CAPABILITIES,
+  isEngineComposedMarketCapability,
+  isMarketLevelCapability,
+} from './core/market-capabilities.js'
+import { buildCapabilityCatalog, type CapabilityCatalogEntry } from './core/capability-catalog.js'
+import { getProviderConfigStore } from './providers/config-store.js'
+import { resolveProviderAlias } from './providers/common/provider-aliases.js'
+import { getUserDataStore } from '@opptrix/user-store'
+import { createProviderCatalog, ProviderCatalogService } from './providers/catalog.js'
+import {
+  isCnExchangeListedFundAssetClass,
+  inferCnAssetClass,
+  instrumentId,
+  toInstrumentRef,
+} from './core/instrument.js'
+import { QueryPlanExecutor, defaultCacheType } from './core/query-plan.js'
+import { executeIntradaySessionsPlan } from './core/query-plan-intraday.js'
+import { normalizeUsSymbol } from './utils/us-market.js'
+import { isRegionalEquityMarket, normalizeRegionalSymbol, type RegionalEquityMarket } from './utils/regional-symbol.js'
+import { parseCryptoPair } from './utils/crypto-market.js'
+import type { AssetClass, Market, InstrumentRef } from '@opptrix/shared'
+import { instrumentProviderSymbol, normalizeInstrumentRef, buildOpptrixInstrumentId } from '@opptrix/shared'
+import {
+  resolveInstrumentQueryPlan,
+  unsupportedInstrumentCapabilityMessage,
+  type InstrumentDataCapability,
+  type InstrumentQueryOpts,
+} from './core/instrument-query.js'
+import type {
+  Dividend, DragonTiger, GlobalIndex, IndexKline, IndexRealtime,
+  LimitUpDown, MarketMoneyFlow, MoneyFlow, NewsItem, SectorMoneyFlow,
+  SentimentData, StockProfile, TechnicalIndicator,
+} from './core/schema.js'
+import { computeIndicators } from './utils/indicators.js'
+import { PortfolioManager } from './portfolio/manager.js'
+import { WatchlistManager } from './watchlist/manager.js'
+import { watchlistItemKey } from './watchlist/instrument.js'
+import { normalizeCode, resolveStockMarketCode } from './utils/helpers.js'
+import { isCnListedFundSymbol } from './core/fund-instrument.js'
+import {
+  BATCH_REALTIME_CHUNK,
+  BATCH_REALTIME_ENGINE_CONCURRENCY,
+  chunkArray,
+  mapPool,
+} from './utils/batch-chunk.js'
+
+import {
+  normalizePreOpenRealtimeQuote,
+  normalizePreOpenRealtimeQuotes,
+} from './utils/quote-normalize.js'
+
+const MINUTE_PERIODS = new Set(['1m', '5m', '15m', '30m', '60m'])
+
+/** ETF 净值序列可能升序/降序 — 按 date 取最新一条，避免误用成立日 nav[0] */
+function pickLatestNavRow<T extends Record<string, unknown>>(
+  rows: T[] | null | undefined,
+): T | null {
+  if (!rows?.length) return null
+  let best = rows[0]!
+  let bestDate = String(best.date ?? best.navDate ?? '').slice(0, 10)
+  for (let i = 1; i < rows.length; i += 1) {
+    const row = rows[i]!
+    const date = String(row.date ?? row.navDate ?? '').slice(0, 10)
+    if (!date) continue
+    if (!bestDate || date > bestDate) {
+      best = row
+      bestDate = date
+    }
+  }
+  return best
+}
+
+/** 追加 provider 失败原因 — 保留更早的明确错误（如 not found），避免被后续 空数据 覆盖 */
+function appendProviderError(prev: string, next: string): string {
+  return prev ? `${prev}; ${next}` : next
+}
+
+/** 引擎内 A 股分流：显式 assetClass 优先，其次 exchange，禁止无 exchange 时用裸码把 000001 猜成指数。 */
+function resolveCnEngineAssetClass(
+  code: string,
+  market?: import('./utils/helpers.js').StockMarket,
+  assetClass?: AssetClass,
+): AssetClass {
+  if (
+    assetClass === 'INDEX'
+    || assetClass === 'ETF'
+    || assetClass === 'LOF'
+    || assetClass === 'REIT'
+    || assetClass === 'EQUITY'
+  ) return assetClass
+  if (market) return inferCnAssetClassFromSymbol(code, market)
+  return inferCnAssetClass(code)
+}
+
+function mapIndexRealtimeResultToStock(
+  result: QueryResult<IndexRealtime[]>,
+): QueryResult<StockRealtime[]> {
+  if (!result.success || !result.data?.length) return { ...result, data: undefined }
+  const data = result.data.map(row => ({
+    code: row.code,
+    name: row.name,
+    price: row.price,
+    open: row.open,
+    high: row.high,
+    low: row.low,
+    preClose: row.preClose,
+    volume: row.volume,
+    amount: row.amount,
+    changePct: row.changePct,
+    pe: (row as IndexRealtime & { pe?: number | null }).pe ?? null,
+    pb: (row as IndexRealtime & { pb?: number | null }).pb ?? null,
+    turnoverRate: (row as IndexRealtime & { turnoverRate?: number | null }).turnoverRate ?? null,
+  })) as StockRealtime[]
+  return { ...result, data: normalizePreOpenRealtimeQuotes(data) }
+}
+
+export type { InstrumentDataCapability } from './core/instrument-query.js'
+
+/** Multi-market data engine — provider fallback + cache (canonical name: MarketDataEngine) */
+export class MarketDataEngine {
+  readonly registry = new DriverRegistry()
+  readonly cache = new Cache()
+  readonly providerCatalog: ProviderCatalogService
+  readonly providerLoader: ProviderLoader
+  private readonly queryPlans: QueryPlanExecutor
+  private readonly speedRanker: ProviderSpeedRanker
+  private readonly loadBalancer: LoadBalancer
+  private _portfolio?: PortfolioManager
+  private _watchlist?: WatchlistManager
+
+  /** Portfolio trade manager (lazy init) */
+  get portfolio() {
+    if (!this._portfolio) this._portfolio = new PortfolioManager(this)
+    return this._portfolio
+  }
+
+  /** User watchlist (synced from client) */
+  get watchlist() {
+    if (!this._watchlist) this._watchlist = new WatchlistManager()
+    return this._watchlist
+  }
+  constructor(autoDiscover = true) {
+    const configStore = getProviderConfigStore()
+    this.registry.bindConfigStore(configStore)
+    this.providerLoader = createProviderLoader(this.registry, configStore)
+    if (autoDiscover) {
+      this.providerLoader.registerBuiltins()
+      void this.providerLoader.loadInstalled()
+        .catch(err => {
+          console.warn('[MarketDataEngine] loadInstalled failed:', err)
+        })
+    }
+    this.registry.refreshPriorities(configStore)
+    this.speedRanker = new ProviderSpeedRanker(getUserDataStore().speedRanking)
+    this.registry.attachSpeedRanker(this.speedRanker)
+    this.loadBalancer = new LoadBalancer({ defaultMaxConcurrent: 3 })
+    this.loadBalancer.attachSpeedRanker(this.speedRanker)
+    this.registry.attachLoadBalancer(this.loadBalancer)
+    this.providerCatalog = createProviderCatalog(this.registry)
+    this.queryPlans = new QueryPlanExecutor(this.registry, this.cache, this.speedRanker)
+  }
+
+  private isWatchlistTarget(market: Market, assetClass: AssetClass, args: unknown[]): boolean {
+    const symbol = this.extractSymbolFromArgs(market, assetClass, args)
+    if (!symbol) return false
+    const ref = market === 'CRYPTO'
+      ? normalizeInstrumentRef({
+        market,
+        assetClass,
+        symbol: symbol.split('/')[0]!,
+        quote: symbol.split('/')[1] ?? 'USDT',
+        exchange: 'binance',
+      })
+      : normalizeInstrumentRef({ market, assetClass, symbol })
+    const key = instrumentId(ref)
+    return this.watchlist.list().some(item => watchlistItemKey(item) === key)
+  }
+
+  private extractSymbolFromArgs(market: Market, assetClass: AssetClass, args: unknown[]): string {
+    const first = String(args[0] ?? '').trim()
+    if (!first) return ''
+    if (market === 'CRYPTO') {
+      const [base, quote] = first.includes('/') ? first.split('/') : [first, 'USDT']
+      return instrumentProviderSymbol(normalizeInstrumentRef({
+        market: 'CRYPTO',
+        assetClass,
+        symbol: base!,
+        quote: quote ?? 'USDT',
+      }))
+    }
+    return instrumentProviderSymbol(normalizeInstrumentRef({ market, assetClass, symbol: first }))
+  }
+
+  private async queryScoped<T>(
+    market: Market,
+    assetClass: AssetClass,
+    cap: Capability,
+    method: string,
+    cacheType: string,
+    useCache: boolean,
+    args: unknown[],
+    providerTimeoutMs = 15_000,
+    instrumentRef?: InstrumentRef,
+  ): Promise<QueryResult<T[]>> {
+    const cacheParams = { method, market, assetClass, args: JSON.stringify(args) }
+    const watchlistCache = useCache && cacheType && this.isWatchlistTarget(market, assetClass, args)
+    if (watchlistCache) {
+      const ttl = watchlistCacheTtl(cacheType)
+      const cached = this.cache.getEntryWithTtl<T[]>(cacheType, method, cacheParams, ttl)
+      if (cached && cached.data) {
+        const meta: QueryResultMeta = { cached: true, expiresAt: cached.expiresAt }
+        if (cached.source) meta.provider = cached.source
+        if (cached.storedAt !== undefined) meta.cachedAt = cached.storedAt
+        return { success: true, data: cached.data, source: 'cache', cached: true, meta }
+      }
+    }
+
+    const health = getProviderHealthTracker()
+    const capStr = String(cap)
+    let lastError = ''
+
+    // 最多尝试 3 个 provider（负载均衡选择 + fallback）
+    const attempted = new Set<string>()
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const assetClassResolved = assetClass
+      const allDrivers = this.registry.getProvidersWithFallback(market, assetClassResolved, cap)
+      let driver = this.registry.getLoadAwareProvider(market, assetClassResolved, cap)
+      if (!driver) {
+        return { success: false, error: `没有可用的 provider 支持 [${market}/${assetClass}/${cap}]` }
+      }
+      const nextDriver = pickNextDriver(driver, allDrivers, attempted)
+      if (!nextDriver) break
+      driver = nextDriver
+      attempted.add(driver.name)
+
+      const skip = shouldSkipProviderQuery(driver.name, capStr, health)
+      if (skip.skip) {
+        lastError = appendProviderError(lastError, skip.lastError)
+        continue
+      }
+
+      const fn = (driver as unknown as Record<string, unknown>)[method] as
+        ((...a: unknown[]) => Promise<unknown[] | null> | unknown[] | null) | undefined
+      if (!fn) continue
+
+      // 通知负载均衡器：请求开始
+      this.registry.notifyAcquire(driver.name)
+
+      try {
+        const wiredArgs = instrumentRef
+          ? wireRegistryMethodArgs(driver.name, method, args, instrumentRef)
+          : args
+        const call = () => fn.apply(driver, wiredArgs) as Promise<unknown[] | null>
+        const t0 = Date.now()
+        const data = driver.selfThrottled
+          ? await call()
+          : await this.withProviderTimeout(call, providerTimeoutMs, driver.name)
+        const elapsed = Date.now() - t0
+
+        if (!data?.length) {
+          recordProviderQueryEmpty(driver.name, capStr, health)
+          this.registry.notifyRelease(driver.name, elapsed, false)
+          this.speedRanker.recordResult(driver.name, capStr, elapsed, false)
+          lastError = appendProviderError(lastError, `${driver.name}: 空数据`)
+          continue
+        }
+
+        const validation = validateResponse(cap, data)
+        if (!validation.valid) {
+          recordProviderQueryInvalid(driver.name, capStr, validation.reason ?? 'invalid_response', health)
+          this.registry.notifyRelease(driver.name, elapsed, false)
+          this.speedRanker.recordResult(driver.name, capStr, elapsed, false)
+          lastError = appendProviderError(lastError, `${driver.name}: ${validation.reason}`)
+          continue
+        }
+
+        recordProviderQuerySuccess(driver.name, capStr, health)
+        this.registry.notifyRelease(driver.name, elapsed, true)
+        this.speedRanker.recordResult(driver.name, capStr, elapsed, true)
+        if (watchlistCache) {
+          const ttl = watchlistCacheTtl(cacheType)
+          this.cache.setWithTtl(cacheType, data, method, cacheParams, ttl, driver.name)
+        }
+        return {
+          success: true,
+          data: data as T[],
+          source: driver.name,
+          cached: false,
+          meta: { provider: driver.name, cached: false, cachedAt: Date.now() },
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        lastError = appendProviderError(lastError, `${driver.name}: ${msg}`)
+        recordProviderQueryError(driver.name, capStr, e, health)
+        // auth denial 已在 record 内登记；重建索引以立刻踢出无钥/鉴权失败源
+        if (isProviderCapabilityDenied(driver.name, capStr)) {
+          this.registry.rebuildIndicesWithRanking()
+        }
+        this.registry.notifyRelease(driver.name, 0, false)
+        this.speedRanker.recordResult(driver.name, capStr, 0, false)
+        if (this.speedRanker.shouldRebuildIndices(driver.name, capStr)) {
+          this.registry.rebuildIndicesWithRanking()
+        }
+      }
+    }
+    return { success: false, error: `所有 provider 均失败: ${lastError}` }
+  }
+
+  /** Wrap a provider call with a timeout — distinguishes timeout from other errors. */
+  private withProviderTimeout<T>(
+    fn: () => Promise<T>,
+    timeoutMs: number,
+    providerName: string,
+  ): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error(`provider ${providerName} 超时 (${timeoutMs}ms)`))
+      }, timeoutMs)
+
+      fn().then(
+        val => { clearTimeout(timer); resolve(val) },
+        err => { clearTimeout(timer); reject(err) },
+      )
+    })
+  }
+
+  private async query<T>(
+    cap: Capability,
+    method: string,
+    cacheType: string,
+    useCache: boolean,
+    args: unknown[],
+  ): Promise<QueryResult<T[]>> {
+    return this.queryScoped('CN', 'EQUITY', cap, method, cacheType, useCache, args)
+  }
+
+  private qScoped<T>(
+    market: Market,
+    assetClass: AssetClass,
+    cap: Capability,
+    method: string,
+    useCache: boolean,
+    ...args: unknown[]
+  ) {
+    const cacheType = CACHE_TYPE[cap] ?? method
+    return this.queryScoped<T>(market, assetClass, cap, method, cacheType, useCache, args)
+  }
+
+  private qCrypto<T>(
+    cap: Capability,
+    method: string,
+    cacheType: string,
+    useCache: boolean,
+    ...args: unknown[]
+  ) {
+    return this.queryScoped<T>('CRYPTO', 'CRYPTO_SPOT', cap, method, cacheType, useCache, args)
+  }
+
+  private q<T>(cap: Capability, method: string, useCache: boolean, ...args: unknown[]) {
+    const cacheType = CACHE_TYPE[cap] ?? method
+    return this.query<T>(cap, method, cacheType, useCache, args)
+  }
+
+  // ── Core market data ──
+  realtime(
+    code: string,
+    market?: import('./utils/helpers.js').StockMarket,
+    assetClass?: AssetClass,
+  ): Promise<QueryResult<StockRealtime[]>> {
+    const resolved = resolveCnEngineAssetClass(code, market, assetClass)
+    if (resolved === 'INDEX') {
+      return this.qScoped<IndexRealtime>(
+        'CN', 'INDEX', Capability.INDEX_REALTIME, 'indexRealtime', false, code,
+      ).then(mapIndexRealtimeResultToStock)
+    }
+    // 关注列表标的启用 stock_realtime 短 TTL 缓存（见 watchlist-cache）；live 失败时可 stale 回退
+    return this.qScoped<StockRealtime>(
+      'CN', resolved, Capability.STOCK_REALTIME, 'realtime', true, code, market, resolved,
+    ).then(result => {
+      if (!result.success || !result.data?.length) return result
+      return { ...result, data: normalizePreOpenRealtimeQuotes(result.data) }
+    })
+  }
+  batchRealtime(
+    codes: string[],
+    markets?: Record<string, import('./utils/helpers.js').StockMarket | undefined>,
+    assetClasses?: Record<string, AssetClass | undefined>,
+  ): Promise<QueryResult<StockRealtime[]>> {
+    return this.fetchBatchRealtime(codes, markets, assetClasses)
+  }
+
+  kline(code: string, periodOrCount: number): Promise<QueryResult<StockKline[]>>
+  kline(
+    code: string,
+    period?: string,
+    start?: string,
+    end?: string,
+    count?: number,
+    market?: import('./utils/helpers.js').StockMarket,
+    assetClass?: AssetClass,
+  ): Promise<QueryResult<StockKline[]>>
+  kline(
+    code: string,
+    periodOrCount: string | number = 'daily',
+    start = '',
+    end = '',
+    count?: number,
+    market?: import('./utils/helpers.js').StockMarket,
+    assetClass?: AssetClass,
+  ) {
+    const resolved = resolveCnEngineAssetClass(code, market, assetClass)
+    if (resolved === 'INDEX') {
+      if (typeof periodOrCount === 'number') {
+        return this.indexKline(code, periodOrCount) as Promise<QueryResult<StockKline[]>>
+      }
+      if (count != null) {
+        return this.indexKline(code, periodOrCount, start, end, count) as Promise<QueryResult<StockKline[]>>
+      }
+      return this.indexKline(code, periodOrCount, start, end) as Promise<QueryResult<StockKline[]>>
+    }
+    if (typeof periodOrCount === 'number') {
+      return this.fetchDailyKline(code, periodOrCount, 0, 'daily', market, resolved)
+    }
+    if (MINUTE_PERIODS.has(periodOrCount)) {
+      return this.minuteKline(code, periodOrCount, count ?? 800, 0, market, resolved)
+    }
+    if (periodOrCount === 'daily' || periodOrCount === 'weekly' || periodOrCount === 'monthly') {
+      return this.fetchDailyKline(code, count ?? 800, 0, periodOrCount, market, resolved)
+    }
+    const args = count != null
+      ? [code, periodOrCount, start, end, count, market]
+      : [code, periodOrCount, start, end, market]
+    return this.query<StockKline>(Capability.STOCK_KLINE, 'kline', 'stock_kline', true, args)
+  }
+
+  private async fetchBatchRealtime(
+    codes: string[],
+    markets?: Record<string, import('./utils/helpers.js').StockMarket | undefined>,
+    assetClasses?: Record<string, AssetClass | undefined>,
+  ): Promise<QueryResult<StockRealtime[]>> {
+    if (!codes.length) {
+      return { success: true, data: [] }
+    }
+    // 大批量：Engine 层再切片并行，片失败隔离；任一 chunk 成功则整体 success
+    if (codes.length > BATCH_REALTIME_CHUNK) {
+      const parts = chunkArray(codes, BATCH_REALTIME_CHUNK)
+      const chunkResults = await mapPool(
+        parts,
+        BATCH_REALTIME_ENGINE_CONCURRENCY,
+        async part => {
+          const subsetMarkets = markets
+            ? Object.fromEntries(
+              part
+                .map(c => {
+                  const key = normalizeCode(String(c))
+                  const m = markets[key] ?? markets[c]
+                  return m != null ? ([key, m] as const) : null
+                })
+                .filter((e): e is readonly [string, import('./utils/helpers.js').StockMarket] => e != null),
+            )
+            : undefined
+          const subsetAssetClasses = assetClasses
+            ? Object.fromEntries(
+              part
+                .map(c => {
+                  const key = normalizeCode(String(c))
+                  const ac = assetClasses[key] ?? assetClasses[c]
+                  return ac != null ? ([key, ac] as const) : null
+                })
+                .filter((e): e is readonly [string, AssetClass] => e != null),
+            )
+            : undefined
+          try {
+            return await this.fetchBatchRealtimeChunk(part, subsetMarkets, subsetAssetClasses)
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e)
+            return { success: false as const, error: msg, data: [] as StockRealtime[] }
+          }
+        },
+      )
+      const merged: StockRealtime[] = []
+      const errors: string[] = []
+      let source: string | undefined
+      for (const r of chunkResults) {
+        if (r.success && r.data?.length) {
+          merged.push(...r.data)
+          if (!source && r.source) source = r.source
+        } else if (!r.success && r.error) {
+          errors.push(r.error)
+        }
+      }
+      if (merged.length) {
+        return { success: true, data: merged, source }
+      }
+      return {
+        success: false,
+        error: errors.length ? errors.join('; ') : '所有 batchRealtime 分片均失败',
+      }
+    }
+    return this.fetchBatchRealtimeChunk(codes, markets, assetClasses)
+  }
+
+  private writeWatchlistStockRealtimeFromBatch(
+    rows: StockRealtime[],
+    assetClass: AssetClass,
+    markets: Record<string, import('./utils/helpers.js').StockMarket | undefined> | undefined,
+    source?: string,
+  ): void {
+    const ttl = watchlistCacheTtl('stock_realtime')
+    if (ttl <= 0) return
+    for (const row of rows) {
+      const code = normalizeCode(String(row.code ?? ''))
+      if (!code) continue
+      const marketArg = markets?.[code] ?? markets?.[String(row.code ?? '')]
+      const args: unknown[] = marketArg ? [code, marketArg] : [code]
+      if (!this.isWatchlistTarget('CN', assetClass, args)) continue
+      this.cache.setWithTtl(
+        'stock_realtime',
+        [row],
+        'realtime',
+        {
+          method: 'realtime',
+          market: 'CN',
+          assetClass,
+          args: JSON.stringify(args),
+        },
+        ttl,
+        source,
+      )
+    }
+  }
+
+  private async fetchBatchRealtimeChunk(
+    codes: string[],
+    markets?: Record<string, import('./utils/helpers.js').StockMarket | undefined>,
+    assetClasses?: Record<string, AssetClass | undefined>,
+  ): Promise<QueryResult<StockRealtime[]>> {
+    const batchAssetClass = codes.some(c => {
+      const key = normalizeCode(String(c))
+      const ac = assetClasses?.[key] ?? assetClasses?.[c]
+      return isCnExchangeListedFundAssetClass(ac)
+    }) ? 'ETF' : 'EQUITY'
+    const result = await this.queryPlans.execute<StockRealtime>(
+      this.queryPlans.getPlan('cn_equity_stock_realtime_batch'),
+      {
+        method: 'batchRealtime',
+        cacheType: defaultCacheType(Capability.STOCK_REALTIME, 'batchRealtime'),
+        useCache: false,
+        args: [codes, markets, assetClasses],
+        assetClass: batchAssetClass,
+        mergeKey: item => normalizeCode(String((item as StockRealtime).code)),
+      },
+    )
+    if (result.success && result.data?.length) {
+      this.writeWatchlistStockRealtimeFromBatch(result.data, batchAssetClass, markets, result.source)
+    }
+    return result
+  }
+
+  private fetchDailyKline(
+    code: string,
+    count: number,
+    startOffset = 0,
+    period = 'daily',
+    market?: import('./utils/helpers.js').StockMarket,
+    assetClass?: AssetClass,
+  ): Promise<QueryResult<StockKline[]>> {
+    const resolved = resolveCnEngineAssetClass(code, market, assetClass)
+    if (resolved === 'INDEX') {
+      return this.fetchIndexKline(code, count, period) as Promise<QueryResult<StockKline[]>>
+    }
+    const want = Math.max(1, count)
+    const klineAssetClass = resolved === 'LOF'
+      ? 'LOF'
+      : resolved === 'ETF'
+        ? 'ETF'
+        : 'EQUITY'
+    // 读缓存保留（兼容旧盘）；写仅 watchlist，与 queryScoped 对齐，避免长 K 键空间爆炸
+    const writeCache = this.isWatchlistTarget('CN', klineAssetClass, [code])
+    return this.queryPlans.execute<StockKline>(
+      this.queryPlans.getPlan('cn_equity_stock_kline_daily'),
+      {
+        method: 'kline',
+        cacheType: defaultCacheType(Capability.STOCK_KLINE, 'stock_kline'),
+        useCache: true,
+        writeCache,
+        args: [code, period, '', '', want, market, startOffset],
+        assetClass: klineAssetClass,
+      },
+    )
+  }
+
+  /** Minute OHLC — Tushare when configured (daily+ only; minute bars may be unavailable). */
+  minuteKline(
+    code: string,
+    period: string,
+    count = 800,
+    startOffset = 0,
+    market?: import('./utils/helpers.js').StockMarket,
+    assetClass?: AssetClass,
+  ): Promise<QueryResult<StockKline[]>> {
+    const safeCount = Math.max(1, Math.min(count, 800))
+    const safeOffset = Math.max(0, startOffset)
+    return this.fetchMinuteKline(code, period, safeCount, safeOffset, market, assetClass)
+  }
+
+  private async fetchMinuteKline(
+    code: string,
+    period: string,
+    count: number,
+    startOffset: number,
+    market?: import('./utils/helpers.js').StockMarket,
+    assetClass?: AssetClass,
+  ): Promise<QueryResult<StockKline[]>> {
+    const resolved = resolveCnEngineAssetClass(code, market, assetClass)
+    if (resolved === 'INDEX') {
+      const primary = await this.indexKline(code, period, '', '', count) as QueryResult<StockKline[]>
+      if (primary.success && primary.data?.length) return primary
+      return { success: false, error: '指数分钟 K 暂无数据' }
+    }
+    const klineAssetClass = resolved === 'LOF'
+      ? 'LOF'
+      : resolved === 'ETF'
+        ? 'ETF'
+        : 'EQUITY'
+    const writeCache = this.isWatchlistTarget('CN', klineAssetClass, [code])
+    const viaPlan = await this.queryPlans.execute<StockKline>(
+      this.queryPlans.getPlan('cn_equity_stock_kline_minute'),
+      {
+        method: 'kline',
+        cacheType: defaultCacheType(Capability.STOCK_KLINE, 'stock_kline'),
+        useCache: true,
+        writeCache,
+        args: [code, period, '', '', count, market, startOffset],
+        assetClass: klineAssetClass,
+      },
+    )
+    return viaPlan
+  }
+
+  /** 1-minute multi-day history — licensed providers only. */
+  minuteTrendKline(
+    code: string,
+    ndays = 1,
+    count = 0,
+    market?: import('./utils/helpers.js').StockMarket,
+  ): Promise<QueryResult<StockKline[]>> {
+    return this.query<StockKline>(
+      Capability.STOCK_KLINE, 'minuteTrendKline', 'stock_minute_trend', false, [code, ndays, count, market],
+    )
+  }
+
+  moneyFlow(code: string): Promise<QueryResult<MoneyFlow[]>> {
+    return this.q(Capability.STOCK_MONEY_FLOW, 'moneyFlow', true, code)
+  }
+  indexRealtime(code: string): Promise<QueryResult<IndexRealtime[]>> {
+    return this.qScoped('CN', 'INDEX', Capability.INDEX_REALTIME, 'indexRealtime', false, code)
+  }
+
+  indexKline(code: string, periodOrCount: number): Promise<QueryResult<IndexKline[]>>
+  indexKline(code: string, period?: string, start?: string, end?: string, count?: number): Promise<QueryResult<IndexKline[]>>
+  indexKline(code: string, periodOrCount: string | number = 'daily', start = '', end = '', count?: number) {
+    if (typeof periodOrCount === 'number') {
+      return this.fetchIndexKline(code, periodOrCount)
+    }
+    if (periodOrCount === 'daily' || periodOrCount === 'weekly' || periodOrCount === 'monthly') {
+      return this.fetchIndexKline(code, count ?? 800, periodOrCount)
+    }
+    const args = count ? [code, periodOrCount, start, end, count] : [code, periodOrCount, start, end]
+    return this.qScoped('CN', 'INDEX', Capability.INDEX_KLINE, 'indexKline', true, ...args)
+  }
+
+  private fetchIndexKline(
+    code: string,
+    count: number,
+    period = 'daily',
+  ): Promise<QueryResult<IndexKline[]>> {
+    const want = Math.max(1, count)
+    const writeCache = this.isWatchlistTarget('CN', 'INDEX', [code])
+    return this.queryPlans.execute<IndexKline>(
+      this.queryPlans.getPlan('cn_index_index_kline'),
+      {
+        method: 'indexKline',
+        cacheType: defaultCacheType(Capability.INDEX_KLINE, 'index_kline'),
+        useCache: true,
+        writeCache,
+        args: [code, period, '', '', want],
+        assetClass: 'INDEX',
+      },
+    )
+  }
+
+  marketMoneyFlow(direction = 'north'): Promise<QueryResult<MarketMoneyFlow[]>> {
+    return this.q(Capability.MARKET_MONEY_FLOW, 'marketMoneyFlow', true, direction)
+  }
+  sectorMoneyFlow(sectorType = 'industry'): Promise<QueryResult<SectorMoneyFlow[]>> {
+    return this.q(Capability.SECTOR_MONEY_FLOW, 'sectorMoneyFlow', true, sectorType)
+  }
+
+  // ── Research data ──
+  profile(code: string): Promise<QueryResult<StockProfile[]>> {
+    return this.q(Capability.STOCK_PROFILE, 'profile', true, code)
+  }
+  shareholders(code: string, reportDate = ''): Promise<QueryResult<Record<string, unknown>[]>> {
+    return this.q(Capability.SHAREHOLDER, 'shareholders', true, code, reportDate)
+  }
+  financials(code: string, reportDate = '', reportType = 'annual'): Promise<QueryResult<FinancialSummary[]>> {
+    return this.q(Capability.FINANCIAL_SUMMARY, 'financials', true, code, reportDate, reportType)
+  }
+  financialsQuarterly(code: string): Promise<QueryResult<FinancialSummary[]>> {
+    return this.financials(code, '', 'quarter')
+  }
+  news(code: string, page = 1, pageSize = 20, newsType = 'all'): Promise<QueryResult<NewsItem[]>> {
+    return this.q(Capability.NEWS, 'news', page <= 2, code, page, pageSize, newsType)
+  }
+  /** 按公告 URL 提取正文（HTML 去标签 / PDF 文字），压缩后供 Agent 阅读 */
+  async announcementContent(
+    url: string,
+    maxChars = 16_000,
+  ): Promise<QueryResult<import('./announcement/index.js').AnnouncementContent>> {
+    const { fetchAnnouncementContentByUrl } = await import('./announcement/index.js')
+    try {
+      const data = await fetchAnnouncementContentByUrl(url, { maxChars })
+      if (!data?.text) {
+        return { success: false, error: '未能提取公告正文' }
+      }
+      return { success: true, data, source: data.source }
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e.message : String(e) }
+    }
+  }
+  sentiment(code: string): Promise<QueryResult<SentimentData[]>> {
+    return this.q(Capability.SENTIMENT, 'sentiment', false, code)
+  }
+
+  // ── Trading derivatives ──
+  dragonTiger(date = ''): Promise<QueryResult<DragonTiger[]>> {
+    return this.q(Capability.DRAGON_TIGER, 'dragonTiger', true, date)
+  }
+  marginTrade(code: string): Promise<QueryResult<Record<string, unknown>[]>> {
+    return this.q(Capability.MARGIN_TRADE, 'marginTrade', true, code)
+  }
+  dividend(code: string): Promise<QueryResult<Dividend[]>> {
+    return this.q(Capability.DIVIDEND, 'dividend', true, code)
+  }
+  cashFlow(code: string, reportDate = ''): Promise<QueryResult<Record<string, unknown>[]>> {
+    return this.q(Capability.CASH_FLOW, 'cashFlow', true, code, reportDate)
+  }
+  stockList(market = 'all'): Promise<QueryResult<StockListItem[]>> {
+    return this.q(Capability.STOCK_LIST, 'stockList', true, market)
+  }
+  stockBasic(code = '', listStatus = 'L'): Promise<QueryResult<StockListItem[]>> {
+    return this.q(Capability.STOCK_BASIC, 'stockBasic', true, code, listStatus)
+  }
+  limitUpdown(date = ''): Promise<QueryResult<LimitUpDown[]>> {
+    return this.q(Capability.LIMIT_UPDOWN, 'limitUpdown', false, date)
+  }
+  marketBreadth(date = ''): Promise<QueryResult<Record<string, unknown>[]>> {
+    return this.q(Capability.MARKET_BREADTH, 'marketBreadth', false, date)
+  }
+  tradeCalendar(year = 0): Promise<QueryResult<Record<string, unknown>[]>> {
+    return this.q(Capability.TRADE_CALENDAR, 'tradeCalendar', true, year)
+  }
+  globalIndex(code = ''): Promise<QueryResult<GlobalIndex[]>> {
+    return this.q(Capability.GLOBAL_INDEX, 'globalIndex', false, code)
+  }
+  exchangeRate(pair = ''): Promise<QueryResult<Record<string, unknown>[]>> {
+    return this.q(Capability.EXCHANGE_RATE, 'exchangeRate', true, pair)
+  }
+
+  balanceSheet(code: string, reportDate = ''): Promise<QueryResult<Record<string, unknown>[]>> {
+    return this.q(Capability.BALANCE_SHEET, 'balanceSheet', true, code, reportDate)
+  }
+  incomeStatement(code: string, reportDate = ''): Promise<QueryResult<Record<string, unknown>[]>> {
+    return this.q(Capability.INCOME_STMT, 'incomeStatement', true, code, reportDate)
+  }
+  instHolding(code: string): Promise<QueryResult<Record<string, unknown>[]>> {
+    return this.q(Capability.INST_HOLDING, 'instHolding', true, code)
+  }
+  blockTrade(code: string): Promise<QueryResult<Record<string, unknown>[]>> {
+    return this.q(Capability.BLOCK_TRADE, 'blockTrade', true, code)
+  }
+  lockupExpiry(code: string): Promise<QueryResult<Record<string, unknown>[]>> {
+    return this.q(Capability.LOCKUP_EXPIRY, 'lockupExpiry', true, code)
+  }
+  sharePledge(code: string): Promise<QueryResult<Record<string, unknown>[]>> {
+    return this.q(Capability.SHARE_PLEDGE, 'sharePledge', true, code)
+  }
+  intradayTick(code: string, date = ''): Promise<QueryResult<Record<string, unknown>[]>> {
+    return this.q(Capability.INTRADAY_TICK, 'intradayTick', false, code, date)
+  }
+
+  /** Multi-day intraday — licensed providers only. */
+  async fetchIntradaySessions(
+    code: string,
+    ndays = 5,
+    market?: import('./utils/helpers.js').StockMarket,
+  ) {
+    return executeIntradaySessionsPlan(this.registry, code, ndays, market)
+  }
+
+  indexConstituents(indexCode: string): Promise<QueryResult<Record<string, unknown>[]>> {
+    return this.qScoped('CN', 'INDEX', Capability.INDEX_CONST, 'indexConstituents', true, indexCode)
+  }
+  insiderTrade(code: string): Promise<QueryResult<Record<string, unknown>[]>> {
+    return this.q(Capability.INSIDER_TRADE, 'insiderTrade', true, code)
+  }
+  perfForecast(code: string): Promise<QueryResult<Record<string, unknown>[]>> {
+    return this.q(Capability.PERF_FORECAST, 'perfForecast', true, code)
+  }
+  ipoData(): Promise<QueryResult<Record<string, unknown>[]>> {
+    return this.q(Capability.IPO_DATA, 'ipoData', true)
+  }
+  convertibleBonds(): Promise<QueryResult<Record<string, unknown>[]>> {
+    return this.q(Capability.CONVERTIBLE_BOND, 'convertibleBonds', false)
+  }
+  etfData(etfCode = '') {
+    return this.etfList(etfCode)
+  }
+
+  etfList(etfCode = '') {
+    return this.qScoped('CN', 'ETF', Capability.ETF_LIST, 'etfList', true, 'CN', etfCode)
+  }
+
+  etfProfile(etfCode: string) {
+    return this.qScoped('CN', 'ETF', Capability.ETF_PROFILE, 'etfProfile', true, etfCode)
+  }
+
+  etfNav(etfCode: string) {
+    return this.qScoped('CN', 'ETF', Capability.ETF_NAV, 'etfNav', true, etfCode)
+  }
+
+  etfHoldings(etfCode: string) {
+    return this.qScoped('CN', 'ETF', Capability.ETF_HOLDINGS, 'etfHoldings', true, etfCode)
+  }
+
+  fundList(fundCode = '') {
+    return this.qScoped('CN', 'FUND', Capability.FUND_LIST, 'fundList', true, 'CN', fundCode)
+  }
+
+  fundProfile(fundCode: string) {
+    return this.qScoped('CN', 'FUND', Capability.FUND_PROFILE, 'fundProfile', true, fundCode)
+  }
+
+  fundNav(fundCode: string) {
+    const code = normalizeCode(fundCode)
+    return this.fundNavWithDepthFallback(code)
+  }
+
+  /**
+   * 净值序列过短时尝试其他已注册 Provider。
+   * 扶摇在传 range（如 fyear）后应返回完整序列；本 fallback 仍留给未配置扶摇 /
+   * 扶摇失败时由 Tushare 等补齐。
+   */
+  private async fundNavWithDepthFallback(
+    code: string,
+  ): Promise<QueryResult<Record<string, unknown>[]>> {
+    const MIN_NAV_ROWS = 20
+    const primary = await this.qScoped<Record<string, unknown>>(
+      'CN', 'FUND', Capability.FUND_NAV, 'fundNav', true, code,
+    )
+    if (primary.success && (primary.data?.length ?? 0) >= MIN_NAV_ROWS) return primary
+
+    const tried = new Set<string>()
+    if (primary.source) tried.add(primary.source)
+
+    let best: QueryResult<Record<string, unknown>[]> = primary
+    const drivers = this.registry.getProvidersWithFallback('CN', 'FUND', Capability.FUND_NAV)
+    for (const driver of drivers) {
+      if (tried.has(driver.name)) continue
+      tried.add(driver.name)
+      const fn = (driver as unknown as Record<string, unknown>).fundNav as
+        | ((c: string) => Promise<Record<string, unknown>[] | null>)
+        | undefined
+      if (!fn) continue
+      try {
+        const rows = await fn.call(driver, code)
+        if (!rows?.length) continue
+        if (!best.success || rows.length > (best.data?.length ?? 0)) {
+          best = { success: true, data: rows, source: driver.name }
+        }
+        if (rows.length >= MIN_NAV_ROWS) break
+      } catch {
+        /* try next provider */
+      }
+    }
+    return best
+  }
+
+  fundHoldings(fundCode: string) {
+    return this.qScoped('CN', 'FUND', Capability.FUND_HOLDINGS, 'fundHoldings', true, fundCode)
+  }
+
+  fundQuote(fundCode: string) {
+    const code = normalizeCode(fundCode)
+    // 与 resolveInstrumentQueryPlan(fund_quote) useCache 对齐：净值日更可缓存
+    return this.qScoped('CN', 'FUND', Capability.FUND_QUOTE, 'fundQuote', true, code)
+      .then(result => this.listedFundQuoteFallback(code, result as QueryResult<Record<string, unknown>[]>))
+  }
+
+  /** 场内基金 / REIT fundQuote 失败时，回退 A 股实时行情（交易所价） */
+  private async listedFundQuoteFallback(
+    code: string,
+    primary: QueryResult<Record<string, unknown>[]>,
+    ref?: InstrumentRef,
+  ): Promise<QueryResult<Record<string, unknown>[]>> {
+    if (primary.success && primary.data?.length) return primary
+    const normalized = ref ? normalizeInstrumentRef(ref) : null
+    const assetClass = normalized?.assetClass
+    const isReit = assetClass === 'REIT'
+    const isListed = isCnListedFundSymbol(code) || isReit
+    if (!isListed) return primary
+    const exRaw = normalized?.exchange?.toUpperCase()
+    const market = (exRaw === 'SH' || exRaw === 'SZ' || exRaw === 'BJ')
+      ? exRaw as import('./utils/helpers.js').StockMarket
+      : resolveStockMarketCode(code)
+    // REIT 尚无独立 STOCK_REALTIME binding 时，同码走 EQUITY 交易所快照
+    const rtClass: AssetClass = isReit ? 'EQUITY' : (assetClass ?? inferCnAssetClass(code))
+    const rt = await this.realtime(code, market, rtClass)
+    const row = rt.data?.[0]
+    if (!rt.success || !row) return primary
+    return {
+      success: true,
+      data: [{
+        code,
+        name: row.name,
+        price: row.price,
+        exchangePrice: row.price,
+        changePct: row.changePct,
+        change: row.change,
+        open: row.open,
+        high: row.high,
+        low: row.low,
+        preClose: row.preClose,
+        volume: row.volume,
+        amount: row.amount,
+        exchangeVolume: row.volume,
+        exchangeAmount: row.amount,
+        source: rt.source,
+      }],
+      source: rt.source,
+    }
+  }
+
+  async fundSnapshotFromRef(ref: InstrumentRef) {
+    const normalized = normalizeInstrumentRef(ref)
+    const code = normalized.symbol
+    const assetClass = normalized.assetClass === 'REIT' ? 'REIT' : 'FUND'
+    const exchangeListed = assetClass === 'REIT' || isCnListedFundSymbol(code)
+
+    const [profile, quoteRes] = await Promise.all([
+      this.queryScoped<Record<string, unknown>>(
+        'CN',
+        assetClass,
+        Capability.FUND_PROFILE,
+        'fundProfile',
+        'fund_profile',
+        true,
+        [code],
+        15_000,
+        normalized,
+      ),
+      exchangeListed
+        ? this.queryScoped<Record<string, unknown>>(
+          'CN',
+          assetClass,
+          Capability.FUND_QUOTE,
+          'fundQuote',
+          'fund_quote',
+          true,
+          [code],
+          15_000,
+          normalized,
+        ).then(result =>
+          exchangeListed
+            ? this.listedFundQuoteFallback(code, result as QueryResult<Record<string, unknown>[]>, normalized)
+            : result as QueryResult<Record<string, unknown>[]>,
+        )
+        : Promise.resolve(null),
+    ])
+    const profileRow = profile.data?.[0] as Record<string, unknown> | undefined
+    let quoteRow = quoteRes?.success
+      ? quoteRes.data?.[0] as Record<string, unknown> | undefined
+      : undefined
+    if (!quoteRow && exchangeListed) {
+      const cached = this.peekInstrumentQuoteCache(normalized)
+      if (cached) {
+        quoteRow = {
+          code,
+          name: cached.name,
+          price: cached.price,
+          exchangePrice: cached.price,
+          changePct: cached.changePct,
+          change: cached.change,
+          open: cached.open,
+          high: cached.high,
+          low: cached.low,
+          preClose: cached.preClose,
+          volume: cached.volume,
+          amount: cached.amount,
+          exchangeVolume: cached.volume,
+          exchangeAmount: cached.amount,
+          source: 'cache',
+        }
+      }
+    }
+    const success = profile.success || (exchangeListed && quoteRes?.success && quoteRow)
+    if (!success) {
+      const quoteErr = quoteRes && !quoteRes.success && 'error' in quoteRes
+        ? String(quoteRes.error ?? '')
+        : ''
+      const err = [profile.error, quoteErr].filter(Boolean).join('; ')
+        || '基金档案与行情均不可用，请确认同花顺数据密钥已启用'
+      return {
+        success: false,
+        data: null,
+        source: profile.source ?? quoteRes?.source,
+        error: err,
+      }
+    }
+    const mergedProfile = profileRow ?? (quoteRow
+      ? {
+          code,
+          name: quoteRow.name,
+          unitNav: quoteRow.unitNav,
+          accNav: quoteRow.accNav,
+          changePct: quoteRow.changePct,
+          navDate: quoteRow.navDate,
+        }
+      : null)
+    const navSource = mergedProfile ?? quoteRow
+    const latestNav = navSource
+      ? {
+          date: String(navSource.navDate ?? '').slice(0, 10),
+          nav: navSource.unitNav,
+          accNav: navSource.accNav,
+          changePct: navSource.changePct,
+        }
+      : null
+    const quote = quoteRow ?? (profileRow
+      ? {
+          unitNav: profileRow.unitNav,
+          accNav: profileRow.accNav,
+          changePct: profileRow.changePct,
+          navDate: profileRow.navDate,
+          name: profileRow.name,
+        }
+      : null)
+    return {
+      success: true,
+      data: {
+        code: buildOpptrixInstrumentId(normalized),
+        instrument: normalized,
+        profile: mergedProfile ?? null,
+        nav: latestNav ?? null,
+        quote,
+      },
+      source: profile.source ?? quoteRes?.source,
+    }
+  }
+
+  async fundSnapshot(fundCode: string) {
+    return this.fundSnapshotFromRef(normalizeInstrumentRef({
+      market: 'CN',
+      assetClass: 'FUND',
+      symbol: fundCode,
+      exchange: 'PF',
+    }))
+  }
+
+  async etfSnapshotFromRef(ref: InstrumentRef): Promise<{
+    success: boolean
+    data: {
+      code: string
+      profile: Record<string, unknown> | null
+      nav: ReturnType<typeof pickLatestNavRow> | null
+      quote: StockRealtime | null
+    }
+    source?: string
+  }> {
+    const normalized = normalizeInstrumentRef(ref)
+    const listedClass = normalized.assetClass === 'LOF' ? 'LOF' : 'ETF'
+    const code = normalized.symbol
+    const market = normalized.exchange as import('./utils/helpers.js').StockMarket | undefined
+    const [profile, nav, quote]: [
+      QueryResult<Record<string, unknown>[]>,
+      QueryResult<Record<string, unknown>[]>,
+      QueryResult<StockRealtime[]>,
+    ] = await Promise.all([
+      this.queryScoped<Record<string, unknown>>(
+        'CN',
+        listedClass,
+        Capability.ETF_PROFILE,
+        'etfProfile',
+        defaultCacheType(Capability.ETF_PROFILE, 'etfProfile'),
+        true,
+        [code],
+        15_000,
+        normalized,
+      ),
+      this.queryScoped<Record<string, unknown>>(
+        'CN',
+        listedClass,
+        Capability.ETF_NAV,
+        'etfNav',
+        defaultCacheType(Capability.ETF_NAV, 'etfNav'),
+        true,
+        [code],
+        15_000,
+        normalized,
+      ),
+      this.realtime(code, market, normalized.assetClass),
+    ])
+    return {
+      success: Boolean(profile.success || nav.success || quote.success),
+      data: {
+        code,
+        profile: profile.data?.[0] ?? null,
+        nav: pickLatestNavRow(nav.data as Record<string, unknown>[] | undefined) ?? null,
+        quote: quote.data?.[0]
+          ?? this.peekInstrumentQuoteCache(normalized)
+          ?? null,
+      },
+      source: profile.source ?? nav.source ?? quote.source,
+    }
+  }
+
+  /** @deprecated 使用 etfSnapshotFromRef / queryInstrumentData(ref, 'etf_snapshot') */
+  async etfSnapshot(etfCode: string) {
+    return this.etfSnapshotFromRef(toInstrumentRef(etfCode, { market: 'CN' }))
+  }
+
+  // ── US equities (Phase 2) ──
+
+  /** @deprecated Prefer `queryInstrumentData({ market: 'US', ... }, 'realtime')` */
+  usRealtime(symbol: string) {
+    const sym = normalizeUsSymbol(symbol)
+    return this.qScoped('US', 'EQUITY', Capability.STOCK_REALTIME, 'realtime', true, sym)
+  }
+
+  /**
+   * US / HK / CRYPTO 批量实时。
+   * 优先走 Provider `batchRealtime`（如 Tickflow quotes 批量 HTTP）；
+   * 无 batch 实现的源会失败，由 Hub 回退到逐标的 realtime。
+   * symbols > BATCH_REALTIME_CHUNK 时 Engine 自动分片并行，片失败隔离。
+   */
+  async batchRealtimeByMarket(
+    market: 'US' | 'HK' | 'CRYPTO',
+    symbols: string[],
+  ) {
+    if (!symbols.length) {
+      return { success: true as const, data: [] as StockRealtime[] }
+    }
+    if (symbols.length > BATCH_REALTIME_CHUNK) {
+      const parts = chunkArray(symbols, BATCH_REALTIME_CHUNK)
+      const chunkResults = await mapPool(
+        parts,
+        BATCH_REALTIME_ENGINE_CONCURRENCY,
+        async part => {
+          try {
+            return await this.batchRealtimeByMarketChunk(market, part)
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e)
+            return { success: false as const, error: msg, data: [] as StockRealtime[] }
+          }
+        },
+      )
+      const merged: StockRealtime[] = []
+      const errors: string[] = []
+      let source: string | undefined
+      for (const r of chunkResults) {
+        if (r.success && r.data?.length) {
+          merged.push(...(r.data as StockRealtime[]))
+          if (!source && r.source) source = r.source
+        } else if (!r.success && 'error' in r && r.error) {
+          errors.push(String(r.error))
+        }
+      }
+      if (merged.length) {
+        return { success: true as const, data: merged, source }
+      }
+      return {
+        success: false as const,
+        error: errors.length ? errors.join('; ') : '所有 batchRealtime 分片均失败',
+      }
+    }
+    return this.batchRealtimeByMarketChunk(market, symbols)
+  }
+
+  private batchRealtimeByMarketChunk(
+    market: 'US' | 'HK' | 'CRYPTO',
+    symbols: string[],
+  ) {
+    if (market === 'CRYPTO') {
+      return this.qCrypto<StockRealtime>(
+        Capability.STOCK_REALTIME,
+        'batchRealtime',
+        'crypto_realtime',
+        false,
+        symbols,
+      )
+    }
+    const normalized = market === 'US'
+      ? symbols.map(s => normalizeUsSymbol(s))
+      : symbols
+    const marketsMap = Object.fromEntries(
+      normalized.flatMap(code => {
+        const key = code.trim()
+        const padded = market === 'HK' ? key.padStart(5, '0') : key
+        return [[key, market], [padded, market], [key.toUpperCase(), market]]
+      }),
+    )
+    return this.qScoped(
+      market,
+      'EQUITY',
+      Capability.STOCK_REALTIME,
+      'batchRealtime',
+      false,
+      [normalized, marketsMap],
+    )
+  }
+
+  /** @deprecated Prefer `queryInstrumentData({ market: 'US', ... }, 'kline')` */
+  usKline(symbol: string, count = 180) {
+    const sym = normalizeUsSymbol(symbol)
+    return this.qScoped(
+      'US', 'EQUITY', Capability.STOCK_KLINE, 'kline', true,
+      sym, 'daily', '', '', count,
+    )
+  }
+
+  /** @deprecated Prefer `queryInstrumentData({ market: 'US', ... }, 'profile')` */
+  usProfile(symbol: string) {
+    const sym = normalizeUsSymbol(symbol)
+    return this.qScoped('US', 'EQUITY', Capability.STOCK_PROFILE, 'profile', true, sym)
+  }
+
+  /** @deprecated Prefer `queryInstrumentData({ market: 'US', ... }, 'stock_list')` */
+  usStockList(keyword = '') {
+    return this.qScoped('US', 'EQUITY', Capability.STOCK_LIST, 'stockList', true, 'US', keyword)
+  }
+
+  /** @deprecated Prefer `queryInstrumentData({ market: 'US', ... }, 'financials')` */
+  usFinancials(symbol: string, reportDate = '', reportType = 'annual') {
+    const sym = normalizeUsSymbol(symbol)
+    return this.qScoped('US', 'EQUITY', Capability.FINANCIAL_SUMMARY, 'financials', true, sym, reportDate, reportType)
+  }
+
+  /** @deprecated Prefer `queryInstrumentData({ market: 'US', ... }, 'snapshot')` */
+  async usSnapshot(symbol: string) {
+    const sym = normalizeUsSymbol(symbol)
+    const [profile, quote, klines] = await Promise.all([
+      this.usProfile(sym),
+      this.usRealtime(sym),
+      this.usKline(sym, 10),
+    ])
+    return {
+      success: profile.success || quote.success || klines.success,
+      data: {
+        code: sym,
+        profile: profile.data?.[0] ?? null,
+        quote: quote.data?.[0] ?? null,
+        recentKlines: klines.data ?? [],
+      },
+      source: profile.source ?? quote.source ?? klines.source,
+    }
+  }
+
+  // ── JP / KR / HK equities ──
+
+  /** @deprecated Prefer `queryInstrumentData({ market, ... }, 'realtime')` */
+  regionalRealtime(market: RegionalEquityMarket, symbol: string) {
+    return this.qScoped(market, 'EQUITY', Capability.STOCK_REALTIME, 'realtime', true, symbol)
+  }
+
+  /** @deprecated Prefer `queryInstrumentData({ market, ... }, 'kline')` */
+  regionalKline(market: RegionalEquityMarket, symbol: string, count = 180) {
+    return this.qScoped(
+      market, 'EQUITY', Capability.STOCK_KLINE, 'kline', true,
+      symbol, 'daily', '', '', count,
+    )
+  }
+
+  /** @deprecated Prefer `queryInstrumentData({ market, ... }, 'stock_list')` */
+  regionalStockList(market: RegionalEquityMarket, keyword = '') {
+    return this.qScoped(
+      market, 'EQUITY', Capability.STOCK_LIST, 'stockList', true, market, keyword,
+    )
+  }
+
+  /** @deprecated Prefer `queryInstrumentData({ market, ... }, 'profile')` */
+  regionalProfile(market: RegionalEquityMarket, symbol: string) {
+    return this.qScoped(market, 'EQUITY', Capability.STOCK_PROFILE, 'profile', true, symbol)
+  }
+
+  /** @deprecated Prefer `queryInstrumentData({ market, ... }, 'snapshot')` */
+  async regionalSnapshot(market: RegionalEquityMarket, symbol: string) {
+    const [profile, quote, klines] = await Promise.all([
+      this.regionalProfile(market, symbol),
+      this.regionalRealtime(market, symbol),
+      this.regionalKline(market, symbol, 10),
+    ])
+    return {
+      success: profile.success || quote.success || klines.success,
+      data: {
+        code: symbol,
+        profile: profile.data?.[0] ?? null,
+        quote: quote.data?.[0] ?? null,
+        recentKlines: klines.data ?? [],
+      },
+      source: profile.source ?? quote.source ?? klines.source,
+    }
+  }
+
+  /** DataEngine 收敛入口 — 按 InstrumentRef + capability 经 Registry 路由 */
+  queryInstrumentData(
+    ref: InstrumentRef,
+    capability: InstrumentDataCapability,
+    opts?: InstrumentQueryOpts,
+  ) {
+    const plan = resolveInstrumentQueryPlan(ref, capability, opts)
+    if (!plan) {
+      return Promise.resolve({
+        success: false,
+        error: unsupportedInstrumentCapabilityMessage(ref, capability),
+      })
+    }
+
+    switch (plan.kind) {
+      case 'cn_realtime':
+        return this.realtime(
+          plan.symbol,
+          plan.exchange as import('./utils/helpers.js').StockMarket | undefined,
+          plan.assetClass,
+        )
+      case 'cn_kline':
+        if ((plan.period && plan.period !== 'daily') || plan.start || plan.end) {
+          return this.kline(
+            plan.symbol,
+            plan.period ?? 'daily',
+            plan.start ?? '',
+            plan.end ?? '',
+            plan.count,
+            plan.exchange as import('./utils/helpers.js').StockMarket | undefined,
+            plan.assetClass,
+          )
+        }
+        return this.kline(
+          plan.symbol,
+          'daily',
+          '',
+          '',
+          plan.count ?? 120,
+          plan.exchange as import('./utils/helpers.js').StockMarket | undefined,
+          plan.assetClass,
+        )
+      case 'composite_snapshot':
+        if (plan.market === 'US') return this.usSnapshot(plan.symbol)
+        if (plan.market === 'CRYPTO') return this.cryptoSnapshot(plan.symbol)
+        if (plan.market === 'CN' && (plan.assetClass === 'ETF' || plan.assetClass === 'LOF')) {
+          const snapRef = plan.ref ?? normalizeInstrumentRef({
+            market: 'CN',
+            assetClass: plan.assetClass,
+            symbol: plan.symbol,
+            exchange: resolveStockMarketCode(plan.symbol),
+          })
+          return this.etfSnapshotFromRef(snapRef)
+        }
+        if (plan.market === 'CN' && plan.assetClass === 'REIT') {
+          const snapRef = plan.ref ?? normalizeInstrumentRef({
+            market: 'CN', assetClass: 'REIT', symbol: plan.symbol,
+            exchange: resolveStockMarketCode(plan.symbol),
+          })
+          return this.fundSnapshotFromRef(snapRef)
+        }
+        if (plan.market === 'CN' && plan.assetClass === 'FUND') {
+          const snapRef = plan.ref ?? normalizeInstrumentRef({
+            market: 'CN', assetClass: 'FUND', symbol: plan.symbol,
+            exchange: 'PF',
+          })
+          return this.fundSnapshotFromRef(snapRef)
+        }
+        if (isRegionalEquityMarket(plan.market)) {
+          return this.regionalSnapshot(plan.market, plan.symbol)
+        }
+        return Promise.resolve({ success: false, error: `不支持 snapshot: ${plan.market}` })
+      case 'registry': {
+        const cacheType = CACHE_TYPE[plan.capability] ?? plan.method
+        return this.queryScoped(
+          plan.market,
+          plan.assetClass,
+          plan.capability,
+          plan.method,
+          cacheType,
+          plan.useCache,
+          plan.args,
+          15_000,
+          plan.ref,
+        ).then(result => {
+          if (plan.capability === Capability.INDEX_REALTIME) {
+            return mapIndexRealtimeResultToStock(result as QueryResult<IndexRealtime[]>)
+          }
+          if (
+            plan.capability === Capability.FUND_QUOTE
+            && plan.market === 'CN'
+            && (plan.assetClass === 'FUND' || plan.assetClass === 'REIT')
+          ) {
+            const code = normalizeCode(String(plan.args[0] ?? ''))
+            return this.listedFundQuoteFallback(
+              code,
+              result as QueryResult<Record<string, unknown>[]>,
+              plan.ref,
+            )
+          }
+          return result
+        })
+      }
+      default:
+        return Promise.resolve({
+          success: false,
+          error: unsupportedInstrumentCapabilityMessage(ref, capability),
+        })
+    }
+  }
+
+  // ── Crypto SPOT (Phase 3) ──
+
+  /** @deprecated Prefer `queryInstrumentData({ market: 'CRYPTO', ... }, 'realtime')` */
+  cryptoRealtime(pair: string) {
+    const sym = parseCryptoPair(pair)?.pair ?? pair
+    return this.qCrypto<StockRealtime>(Capability.STOCK_REALTIME, 'realtime', 'crypto_realtime', true, sym)
+  }
+
+  /** @deprecated Prefer `queryInstrumentData({ market: 'CRYPTO', ... }, 'kline')` */
+  cryptoKline(pair: string, count = 180) {
+    const sym = parseCryptoPair(pair)?.pair ?? pair
+    return this.qCrypto<StockKline>(
+      Capability.STOCK_KLINE, 'kline', 'crypto_kline', true,
+      sym, 'daily', '', '', count,
+    )
+  }
+
+  /** @deprecated Prefer `queryInstrumentData({ market: 'CRYPTO', ... }, 'stock_list')` */
+  cryptoList(keyword = '') {
+    return this.qCrypto<StockListItem>(Capability.STOCK_LIST, 'stockList', 'stock_list', true, 'CRYPTO', keyword)
+  }
+
+  /** @deprecated Prefer `queryInstrumentData({ market: 'CRYPTO', ... }, 'snapshot')` */
+  async cryptoSnapshot(pair: string) {
+    const sym = parseCryptoPair(pair)?.pair ?? pair
+    const [quote, klines] = await Promise.all([
+      this.cryptoRealtime(sym),
+      this.cryptoKline(sym, 10),
+    ])
+    return {
+      success: quote.success || klines.success,
+      data: {
+        pair: sym,
+        quote: quote.data?.[0] ?? null,
+        recentKlines: klines.data ?? [],
+      },
+      source: quote.source ?? klines.source,
+    }
+  }
+
+  managerInfo(code: string): Promise<QueryResult<Record<string, unknown>[]>> {
+    return this.q(Capability.MANAGER_INFO, 'managerInfo', true, code)
+  }
+  shareholderPlans(code: string): Promise<QueryResult<Record<string, unknown>[]>> {
+    return this.q(Capability.SHAREHOLDER_PLAN, 'shareholderPlans', true, code)
+  }
+  buyback(code: string): Promise<QueryResult<Record<string, unknown>[]>> {
+    return this.q(Capability.BUYBACK, 'buyback', true, code)
+  }
+  macroIndicator(indicator = ''): Promise<QueryResult<Record<string, unknown>[]>> {
+    return this.q(Capability.MACRO_INDICATOR, 'macroIndicator', true, indicator)
+  }
+
+  mainBusiness(code: string): Promise<QueryResult<Record<string, unknown>[]>> {
+    return this.q(Capability.MAIN_BUSINESS, 'mainBusiness', true, code)
+  }
+  topCustomerSupplier(code: string, direction = 'customer'): Promise<QueryResult<Record<string, unknown>[]>> {
+    return this.q(Capability.TOP_CUSTOMER, 'topCustomerSupplier', true, code, direction)
+  }
+  actualController(code: string): Promise<QueryResult<Record<string, unknown>[]>> {
+    return this.q(Capability.ACTUAL_CONTROLLER, 'actualController', true, code)
+  }
+  subsidiaries(code: string): Promise<QueryResult<Record<string, unknown>[]>> {
+    return this.q(Capability.SUBSIDIARY, 'subsidiaries', true, code)
+  }
+  relatedPartyTrades(code: string): Promise<QueryResult<Record<string, unknown>[]>> {
+    return this.q(Capability.RELATED_PARTY, 'relatedPartyTrades', true, code)
+  }
+  rdInvestment(code: string): Promise<QueryResult<Record<string, unknown>[]>> {
+    return this.q(Capability.RD_INVESTMENT, 'rdInvestment', true, code)
+  }
+  maEvents(code: string): Promise<QueryResult<Record<string, unknown>[]>> {
+    return this.q(Capability.MERGER_ACQUISITION, 'maEvents', true, code)
+  }
+  employeeComposition(code: string): Promise<QueryResult<Record<string, unknown>[]>> {
+    return this.q(Capability.EMPLOYEE_COMP, 'employeeComposition', true, code)
+  }
+  institutionalVisits(code: string): Promise<QueryResult<Record<string, unknown>[]>> {
+    return this.q(Capability.INSTITUTIONAL_VISIT, 'institutionalVisits', true, code)
+  }
+  peerCompanies(code: string): Promise<QueryResult<Record<string, unknown>[]>> {
+    return this.q(Capability.PEER_COMPANY, 'peerCompanies', true, code)
+  }
+
+  chipDistribution(code: string, adjust = ''): Promise<QueryResult<import('./core/schema.js').ChipDistribution[]>> {
+    return this.q(Capability.CHIP_DISTRIBUTION, 'chipDistribution', true, code, adjust)
+  }
+
+  chipProfile(code: string, adjust = ''): Promise<QueryResult<import('./core/schema.js').ChipDistributionProfile[]>> {
+    return this.q(Capability.CHIP_DISTRIBUTION, 'chipProfile', true, code, adjust)
+  }
+
+  async techIndicator(code: string, period = 'daily', count = 120): Promise<QueryResult<TechnicalIndicator[]>> {
+    const kl = await this.kline(code, count)
+    if (!kl.success || !kl.data?.length) return { success: false, error: kl.error ?? 'kline failed' }
+    const indicators = computeIndicators(code, kl.data)
+    return { success: true, data: indicators, source: 'calc' }
+  }
+
+  // ── Cache / driver management ──
+  /**
+   * 关注列表增删后失效行情覆盖层缓存。
+   * 避免 membership 已变但 stock_realtime / fund_quote 仍按旧 watchlist 上下文命中。
+   */
+  invalidateWatchlistQuoteCache(): number {
+    let cleared = 0
+    cleared += this.cache.clearType('stock_realtime')
+    cleared += this.cache.clearType('fund_quote')
+    return cleared
+  }
+
+  /** live 拉价失败时：读 Engine 覆盖层缓存（含 TTL 内 + 过期宽限内的 stale） */
+  peekInstrumentQuoteCache(ref: InstrumentRef): StockRealtime | null {
+    const STALE_GRACE_MS = 86_400_000
+    const normalized = normalizeInstrumentRef(ref)
+    for (const candidate of this.instrumentQuoteCacheCandidates(normalized)) {
+      const entry = this.cache.peekEntry<StockRealtime[]>(
+        candidate.cacheType,
+        candidate.method,
+        candidate.cacheParams,
+      )
+      if (!entry) continue
+      const withinFresh = Date.now() <= entry.expires
+      const withinStaleGrace = Date.now() - entry.expires <= STALE_GRACE_MS
+      if (!withinFresh && !withinStaleGrace) continue
+      const row = entry.data?.[0]
+      if (row && this.isValidInstrumentQuoteRow(row)) return row
+    }
+    return null
+  }
+
+  private isValidInstrumentQuoteRow(row: StockRealtime): boolean {
+    return typeof row.price === 'number' && Number.isFinite(row.price) && row.price > 0
+  }
+
+  private instrumentQuoteCacheCandidates(ref: InstrumentRef): Array<{
+    cacheType: string
+    method: string
+    cacheParams: Record<string, unknown>
+  }> {
+    const out: Array<{ cacheType: string; method: string; cacheParams: Record<string, unknown> }> = []
+    const push = (
+      market: Market,
+      assetClass: AssetClass,
+      cacheType: string,
+      method: string,
+      args: unknown[],
+    ) => {
+      out.push({
+        cacheType,
+        method,
+        cacheParams: { method, market, assetClass, args: JSON.stringify(args) },
+      })
+    }
+
+    if (ref.market === 'CN' && ref.assetClass === 'FUND') {
+      const sym = normalizeCode(ref.symbol)
+      push('CN', 'FUND', 'fund_quote', 'fundQuote', [sym])
+      push('CN', 'FUND', 'fund_quote', 'fundQuote', [ref.symbol])
+      return out
+    }
+
+    if (ref.market === 'CRYPTO') {
+      const pair = instrumentProviderSymbol(ref)
+      push('CRYPTO', 'CRYPTO_SPOT', 'crypto_realtime', 'realtime', [pair])
+      push('CRYPTO', 'CRYPTO_SPOT', 'stock_realtime', 'realtime', [pair])
+      return out
+    }
+
+    if (ref.market === 'US') {
+      const sym = normalizeUsSymbol(ref.symbol)
+      push('US', 'EQUITY', 'stock_realtime', 'realtime', [sym])
+      push('US', 'EQUITY', 'stock_realtime', 'realtime', [ref.symbol])
+      return out
+    }
+
+    if (ref.market === 'HK') {
+      const sym = normalizeRegionalSymbol('HK', ref.symbol)
+      push('HK', 'EQUITY', 'stock_realtime', 'realtime', [sym])
+      push('HK', 'EQUITY', 'stock_realtime', 'realtime', [ref.symbol])
+      return out
+    }
+
+    if (ref.market === 'CN') {
+      const code = normalizeCode(ref.symbol)
+      const assetClass = ref.assetClass === 'INDEX'
+        ? 'INDEX'
+        : isCnExchangeListedFundAssetClass(ref.assetClass)
+          ? ref.assetClass
+          : 'EQUITY'
+      const marketArg = ref.exchange as import('./utils/helpers.js').StockMarket | undefined
+      if (ref.assetClass === 'INDEX') {
+        push('CN', 'INDEX', 'index_realtime', 'indexRealtime', [code])
+      }
+      push('CN', assetClass, 'stock_realtime', 'realtime', marketArg ? [code, marketArg, assetClass] : [code, undefined, assetClass])
+      if (isCnExchangeListedFundAssetClass(ref.assetClass)) {
+        push('CN', ref.assetClass, 'stock_realtime', 'realtime', marketArg ? [code, marketArg, ref.assetClass] : [code, undefined, ref.assetClass])
+      }
+      // 关注列表 batch 写入 per-symbol 缓存为 [code, exchange] 两参形态
+      if (marketArg) {
+        push('CN', assetClass, 'stock_realtime', 'realtime', [code, marketArg])
+        if (isCnExchangeListedFundAssetClass(ref.assetClass)) {
+          push('CN', ref.assetClass, 'stock_realtime', 'realtime', [code, marketArg])
+        }
+      }
+      push('CN', assetClass, 'stock_realtime', 'realtime', [code])
+      return out
+    }
+
+    return out
+  }
+
+  /** 单标的 fresh quote：失效其 stock_realtime / fund_quote 覆盖层缓存 */
+  invalidateInstrumentQuoteCache(ref: InstrumentRef): number {
+    const normalized = normalizeInstrumentRef(ref)
+    const needles = new Set<string>()
+    const pushNeedle = (raw: string | undefined | null) => {
+      const v = String(raw ?? '').trim()
+      if (v) needles.add(v)
+    }
+    pushNeedle(normalized.symbol)
+    pushNeedle(normalizeCode(normalized.symbol))
+    pushNeedle(instrumentProviderSymbol(normalized))
+    if (normalized.market === 'US') pushNeedle(normalizeUsSymbol(normalized.symbol))
+    if (normalized.market === 'HK') pushNeedle(normalizeRegionalSymbol('HK', normalized.symbol))
+    return this.cache.clearMatching((cacheType, _method, paramsJson) => {
+      if (cacheType !== 'stock_realtime' && cacheType !== 'fund_quote') return false
+      return [...needles].some(n => paramsJson.includes(n))
+    })
+  }
+
+  clearCache(dataType?: string) {
+    return dataType ? this.cache.clearType(dataType) : this.cache.clearAll()
+  }
+  clearCacheForProvider(providerId: string) {
+    return this.cache.clearBySource(providerId) + this.cache.clearBySource('mixed')
+  }
+  cacheStats() { return this.cache.stats() }
+  listDrivers() { return this.registry.listDriverInfo() }
+  listProviders() { return this.providerCatalog.listCatalog() }
+  getProviderConfig(providerId: string) { return this.providerCatalog.getPublic(providerId) }
+  saveProviderConfig(providerId: string, patch: Parameters<ProviderCatalogService['saveConfig']>[1]) {
+    const result = this.providerCatalog.saveConfig(providerId, patch)
+    this.clearCacheForProvider(providerId)
+    return result
+  }
+  saveProviderOrder(orderedProviderIds: string[]) {
+    const catalog = this.providerCatalog.saveProviderOrder(orderedProviderIds)
+    for (const id of orderedProviderIds) this.clearCacheForProvider(id)
+    return catalog
+  }
+  listProviderBindingOverrides(providerId: string) {
+    return this.providerCatalog.listPublicBindingOverrides(providerId)
+  }
+  saveProviderBindingOverride(
+    providerId: string,
+    market: string,
+    assetClass: string,
+    capability: string,
+    patch: import('@opptrix/shared').ProviderBindingOverridePatch,
+  ) {
+    const items = this.providerCatalog.saveBindingOverride(providerId, market, assetClass, capability, patch)
+    this.clearCacheForProvider(providerId)
+    return items
+  }
+  testProviderConnection(providerId: string, overrides?: Record<string, unknown>) {
+    return this.providerCatalog.testConnection(providerId, overrides)
+  }
+  async reloadProvider(providerId: string) {
+    this.clearCacheForProvider(providerId)
+    return this.providerLoader.reload(providerId)
+  }
+  async rescanProviders() {
+    const prev = new Set(this.providerLoader.listInstalled().map(r => r.providerId))
+    const loaded = await this.providerLoader.rescan()
+    const touched = new Set([...prev, ...loaded.map(r => r.providerId)])
+    for (const id of touched) this.clearCacheForProvider(id)
+    return loaded
+  }
+  listInstalledProviders() {
+    return this.providerLoader.listInstalled()
+  }
+  registerDriver(driver: Parameters<DriverRegistry['register']>[0]) { this.registry.register(driver) }
+  unregisterDriver(name: string) { this.registry.unregister(name) }
+
+  // ── Provider health / circuit breaker ──
+
+  /** Get health snapshot for all provider×capability combinations. */
+  providerHealth(): HealthSnapshot {
+    return getProviderHealthTracker().getAll()
+  }
+
+  /** Reset health for a specific provider (or all if no args). */
+  resetProviderHealth(providerId?: string, capability?: string) {
+    getProviderHealthTracker().reset(providerId, capability)
+  }
+
+  /** Force-close a tripped circuit for a provider×capability. */
+  forceCloseProviderCircuit(providerId: string, capability: string) {
+    getProviderHealthTracker().forceClose(providerId, capability)
+  }
+
+  /** Prune stale health entries. */
+  pruneStaleHealth(): number {
+    return getProviderHealthTracker().prune()
+  }
+
+  /** 免费源限流冷却状态（持久化，跨进程生效） */
+  freeProviderThrottleStatus() {
+    return getFreeProviderThrottle().listAll()
+  }
+
+  freeProviderThrottleLogs(providerId?: string, limit = 100) {
+    return getFreeProviderThrottle().listLogs(providerId, limit)
+  }
+
+  resetFreeProviderThrottle(providerId?: string) {
+    getFreeProviderThrottle().reset(providerId)
+  }
+
+  /** 已登记「权限不足」的 provider×接口（换 Key / 重启用后清除）。 */
+  providerPermissionDenials() {
+    return getProviderPermissionDenialSnapshot()
+  }
+
+  /** 清除权限拒绝登记并重建路由索引。 */
+  resetProviderPermissionDenials(providerId?: string) {
+    if (providerId) clearProviderPermissionDenials(providerId)
+    else clearAllProviderPermissionDenials()
+    this.registry.rebuildIndicesWithRanking()
+  }
+
+  // ── Provider custom methods ──
+
+  /**
+   * 市场级标准能力调用（v3）——能力必须在 MARKET_LEVEL_CAPABILITIES 白名单内，
+   * 经 registry binding 路由到 provider，与 queryInstrumentData 共享
+   * 负载均衡 / 熔断 / 免费源限流 / 超时 / 数据校验管道。
+   *
+   * 引擎复合能力（ENGINE_COMPOSED_MARKET_CAPABILITIES）走专用分支：
+   * 实现为引擎方法聚合，不经单 provider driver 反射，也无 provider binding。
+   * args 为单对象形状：
+   * - REALTIME_BATCH：`{ market: 'CN'|'US'|'HK'|'CRYPTO', symbols: string[], asset_class? }`；
+   *   CN 分支消费逐码记录表 `markets`（Record<code, 交易所>）与 `assetClasses`（Record<code, 资产类别>）
+   * - INTRADAY_SESSIONS：`{ symbol: string, exchange?: 'SH'|'SZ'|'BJ', days?: number }`
+   *   （days 默认 5；exchange 为标准名，旧名 market 兼容读取；
+   *     data 为 IntradayTrendFetchResult 复合对象，非数组）
+   */
+  async queryMarketCapability<T>(
+    capability: Capability,
+    args: unknown[],
+    opts?: { market?: Market; assetClass?: AssetClass; timeoutMs?: number; ref?: InstrumentRef },
+  ): Promise<QueryResult<T[]>> {
+    if (!isMarketLevelCapability(capability)) {
+      return { success: false, error: `不支持的市场级能力 [${String(capability)}]` }
+    }
+    if (isEngineComposedMarketCapability(capability)) {
+      return this.queryEngineComposedCapability<T>(capability, args)
+    }
+    const method = CAP_METHOD[capability]
+    if (!method) {
+      return { success: false, error: `能力未映射到实现方法 [${String(capability)}]` }
+    }
+    const market = opts?.market ?? 'CN'
+    const assetClass = opts?.assetClass ?? 'EQUITY'
+    const cacheType = CACHE_TYPE[capability] ?? String(capability)
+    return this.queryScoped<T>(
+      market,
+      assetClass,
+      capability,
+      method,
+      cacheType,
+      false,
+      args,
+      opts?.timeoutMs ?? 15_000,
+      opts?.ref,
+    )
+  }
+
+  /**
+   * 引擎复合能力专用分支 —— 按 ENGINE_COMPOSED_CAPABILITY_ROUTES
+   * 分发到引擎聚合方法（batchRealtimeByMarket / fetchIntradaySessions），
+   * 与 registry 管道共享返回形状（QueryResult）。
+   */
+  private queryEngineComposedCapability<T>(
+    capability: Capability,
+    args: unknown[],
+  ): Promise<QueryResult<T[]>> {
+    const spec = (args[0] ?? {}) as Record<string, unknown>
+    switch (capability) {
+      case Capability.REALTIME_BATCH: {
+        const marketRaw = String(spec.market ?? '').trim().toUpperCase() as Market
+        const symbols = Array.isArray(spec.symbols)
+          ? spec.symbols.map(s => String(s).trim()).filter(Boolean)
+          : []
+        if (marketRaw === 'CN') {
+          // CN 聚合入口：codes + 逐码市场/资产类别记录表（原 de.batchRealtime 语义）
+          const markets = (spec.markets ?? {}) as Record<string, import('./utils/helpers.js').StockMarket | undefined>
+          const assetClasses = (spec.assetClasses ?? {}) as Record<string, AssetClass | undefined>
+          return this.batchRealtime(symbols, markets, assetClasses) as Promise<QueryResult<T[]>>
+        }
+        if (marketRaw !== 'US' && marketRaw !== 'HK' && marketRaw !== 'CRYPTO') {
+          return Promise.resolve({
+            success: false,
+            error: '批量实时行情当前支持 CN / US / HK / CRYPTO 市场，请传入 market: CN / US / HK / CRYPTO',
+          })
+        }
+        // assetClass 为预留参数：作用域由 batchRealtimeByMarket 内部按 market 决定
+        return this.batchRealtimeByMarket(marketRaw, symbols) as Promise<QueryResult<T[]>>
+      }
+      case Capability.INTRADAY_SESSIONS: {
+        const symbol = String(spec.symbol ?? '').trim()
+        if (!symbol) {
+          return Promise.resolve({ success: false, error: '请提供需要查询分时的标的代码（symbol）' })
+        }
+        // exchange 为标准名（交易所维度 SH/SZ/BJ）；旧名 market 与 realtime_batch 的
+        // 市场维度（CN/US/HK/CRYPTO）同名异义，仅作兼容输入，优先 exchange。
+        const exchangeRaw = String(spec.exchange ?? spec.market ?? '').trim().toUpperCase()
+        const exchange = (['SH', 'SZ', 'BJ'].includes(exchangeRaw)
+          ? exchangeRaw
+          : undefined) as import('./utils/helpers.js').StockMarket | undefined
+        const daysRaw = Number(spec.days)
+        const days = Number.isFinite(daysRaw) && daysRaw >= 1 ? Math.floor(daysRaw) : 5
+        return this.fetchIntradaySessions(symbol, days, exchange) as Promise<QueryResult<T[]>>
+      }
+      default: {
+        const target = ENGINE_COMPOSED_CAPABILITY_ROUTES[capability]
+        return Promise.resolve({
+          success: false,
+          error: `引擎复合能力缺少实现分支 [${String(capability)} → ${String(target ?? '未登记')}]`,
+        })
+      }
+    }
+  }
+
+  /** 系统方法探查：列出全部市场级标准能力及其当前注册的 provider。 */
+  listMarketCapabilities(): Array<{ capability: string; providers: string[] }> {
+    const scopes: Array<[Market, AssetClass]> = [
+      ['CN', 'EQUITY'],
+      ['CN', 'INDEX'],
+      ['CN', 'FUND'],
+      ['US', 'EQUITY'],
+      ['HK', 'EQUITY'],
+    ]
+    return MARKET_LEVEL_CAPABILITIES.map(capability => {
+      const providers = new Set<string>()
+      for (const [market, assetClass] of scopes) {
+        for (const driver of this.registry.getProvidersWithFallback(market, assetClass, capability)) {
+          providers.add(driver.name)
+        }
+      }
+      return { capability: String(capability), providers: [...providers] }
+    })
+  }
+
+  /**
+   * 系统方法探查（v3.5）：三界能力目录（instrument / market / app）。
+   * markets/assetClasses/providers 由 registry binding 实时聚合；
+   * 引擎复合能力（realtime_batch / intraday_sessions）providers=['internal']。
+   */
+  listCapabilities(): CapabilityCatalogEntry[] {
+    return buildCapabilityCatalog(this.registry)
+  }
+
+}
+
+export { MarketDataEngine as AshareEngine }
+
+export { DriverRegistry } from './core/registry.js'
+export { Capability, CACHE_TYPE } from './core/capabilities.js'
+export { Cache, DEFAULT_TTL } from './core/cache.js'
+export * from './core/schema.js'
+export { BaseDriver, CAP_METHOD } from './providers/common/base.js'
+export {
+  ProviderHealthTracker,
+  getProviderHealthTracker,
+  CircuitState,
+  FAILURE_THRESHOLD,
+  BASE_COOLDOWN_MS,
+  MAX_COOLDOWN_MS,
+} from './core/provider-health.js'
+export {
+  getFreeProviderThrottle,
+  shouldSkipProviderQuery,
+  recordProviderQuerySuccess,
+  recordProviderQueryEmpty,
+  recordProviderQueryError,
+  isFreeMarketDataProvider,
+  classifyProviderQueryError,
+} from './core/free-provider-throttle.js'
+export type { ProviderQueryErrorClass } from './core/provider-query-error.js'
+export { invokeProviderDriverMethod } from './core/provider-driver-guard.js'
+export type { InterfaceHealth, HealthSnapshot } from './core/provider-health.js'
+export {
+  MARKET_LEVEL_CAPABILITIES,
+  isMarketLevelCapability,
+  LEGACY_REGISTRY_MARKET_CAPABILITIES,
+  PENDING_PROVIDER_MARKET_CAPABILITIES,
+  ENGINE_COMPOSED_MARKET_CAPABILITIES,
+  ENGINE_COMPOSED_CAPABILITY_ROUTES,
+  isEngineComposedMarketCapability,
+} from './core/market-capabilities.js'
+export { buildCapabilityCatalog } from './core/capability-catalog.js'
+export type { CapabilityCatalogEntry, CapabilityParamSpec, CapabilityScope } from './core/capability-catalog.js'
+export {
+  TushareDriver,
+  TickflowDriver,
+  StockIndexDriver,
+  TonghuashunDriver,
+  registerAllDrivers,
+} from './providers/register.js'
+export { loadTushareConfig, isTushareEnabled, saveTushareConfig, publicTushareConfig, resolveTushareHttpUrl, TUSHARE_DEFAULT_HTTP_URL } from './providers/tushare/config.js'
+export { testTushareConnection } from './providers/tushare/api/client.js'
+export { testTickflowConnection } from './providers/tickflow/api/client.js'
+export { loadTickflowConfig, isTickflowEnabled } from './providers/tickflow/config.js'
+export { getProviderConfigStore, ProviderConfigStore } from './providers/config-store.js'
+export { ProviderCatalogService, createProviderCatalog } from './providers/catalog.js'
+export { PROVIDER_MANIFESTS, listProviderManifests, getProviderManifest } from './providers/manifests.js'
+export {
+  ProviderLoader,
+  createProviderLoader,
+  getProviderLoader,
+} from './providers/loader.js'
+export { ManifestRegistry, getManifestRegistry } from './providers/manifest-registry.js'
+export {
+  packOppx,
+  unpackOppx,
+  inspectOppxPackage,
+  validateOppxSignature,
+  validatePluginDirectory,
+  suggestOppxFilename,
+  installFromOppx,
+  installFromDirectory,
+  uninstallProviderPlugin,
+  readInstalledIndex,
+  writeInstalledIndex,
+  listInstalledProviders,
+  providersRootDir,
+  installedIndexPath,
+  installedProviderDir,
+} from './providers/index.js'
+export type {
+  OppxPackageMetadata,
+  ProviderPluginManifest,
+  OppxPackageInspectResult,
+  InstalledProviderEntry,
+  InstalledProvidersIndex,
+} from './providers/index.js'
+export { normalizePreOpenRealtimeQuote, normalizePreOpenRealtimeQuotes, isMissingLivePrice } from './utils/quote-normalize.js'
+export { computeIndicators } from './utils/indicators.js'
+export { computeChipDistribution, computeLatestChipProfile } from './utils/cyq.js'
+export {
+  QueryPlanExecutor,
+  QUERY_PLANS,
+  defaultCacheType,
+} from './core/query-plan.js'
+export type {
+  QueryPlan,
+  QueryPlanId,
+  QueryPlanStrategy,
+  QueryExecutionContext,
+} from './core/query-plan.js'
+export { executeIntradaySessionsPlan } from './core/query-plan-intraday.js'

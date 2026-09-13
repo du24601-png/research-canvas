@@ -1,0 +1,154 @@
+/**
+ * 方案 A：多市场标的 ID 统一化最小闭环
+ * — 歧义短码不得 pad 成 CN；Tickflow 灌库字段；本地 hit namespace
+ */
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import {
+  parseCanonicalInstrumentInput,
+  parseOpptrixInstrumentId,
+  isAmbiguousNumericCode,
+  isUnambiguousCnDigits,
+  buildInstrumentNamespace,
+  normalizeInstrumentRef,
+} from '../packages/shared/dist/instrument-symbol.js'
+import {
+  isLikelyCnEquityInput,
+  instrumentRefKey,
+  instrumentDisplayCode,
+} from '../packages/shared/dist/instrument-ref.js'
+import {
+  resolveInstrumentFromParams,
+  instrumentRefsFromList,
+} from '../packages/shared/dist/instrument-param.js'
+
+test('歧义 1–5 位裸数字：权威解析返回 null，不得变成 pad 后的 CN', () => {
+  assert.equal(isAmbiguousNumericCode('700'), true)
+  assert.equal(isAmbiguousNumericCode('00700'), true)
+  assert.equal(isAmbiguousNumericCode('0700'), true)
+  assert.equal(isUnambiguousCnDigits('600519'), true)
+  assert.equal(isUnambiguousCnDigits('700'), false)
+
+  assert.equal(parseCanonicalInstrumentInput('700'), null)
+  assert.equal(parseCanonicalInstrumentInput('00700'), null)
+  assert.equal(parseCanonicalInstrumentInput('0700'), null)
+
+  assert.equal(isLikelyCnEquityInput('700'), false)
+  assert.equal(isLikelyCnEquityInput('00700'), false)
+  assert.equal(isLikelyCnEquityInput('600519'), true)
+
+  assert.equal(resolveInstrumentFromParams({ code: '700' }), null)
+  assert.equal(resolveInstrumentFromParams({ code: '00700' }), null)
+
+  const refs = instrumentRefsFromList(['700', '00700', '600519'])
+  assert.equal(refs.length, 1)
+  assert.equal(refs[0]?.market, 'CN')
+  assert.equal(refs[0]?.symbol, '600519')
+})
+
+test('显式港股 / 后缀可解析；与假想 CN:SZ.000700 分键', () => {
+  const hk = parseCanonicalInstrumentInput('HK:00700')
+  assert.equal(hk?.market, 'HK')
+  assert.equal(hk?.symbol, '00700')
+  assert.equal(buildInstrumentNamespace(hk), 'HK:00700')
+
+  const hkDot = parseCanonicalInstrumentInput('00700.HK')
+  assert.equal(hkDot?.market, 'HK')
+  assert.equal(hkDot?.symbol, '00700')
+  assert.equal(instrumentRefKey(hkDot), 'HK:00700')
+
+  const hkShort = parseCanonicalInstrumentInput('HK:700')
+  assert.equal(hkShort?.symbol, '00700')
+
+  const cnPad = parseCanonicalInstrumentInput('CN:SZ.000700')
+  assert.ok(cnPad)
+  assert.equal(cnPad.market, 'CN')
+  assert.equal(cnPad.symbol, '000700')
+  assert.notEqual(instrumentRefKey(hk), instrumentRefKey(cnPad))
+})
+
+test('6 位无歧义仍可解析 CN', () => {
+  const cn = parseCanonicalInstrumentInput('600519')
+  assert.equal(cn?.market, 'CN')
+  assert.equal(cn?.symbol, '600519')
+  assert.match(buildInstrumentNamespace(cn), /^CN:(SH|SZ|BJ)\.600519$/)
+})
+
+test('本地 hit 形态：namespace code + 完整 InstrumentRef', () => {
+  const instrument = normalizeInstrumentRef({
+    market: 'HK',
+    assetClass: 'EQUITY',
+    symbol: '00700',
+    exchange: 'HK',
+  })
+  const code = instrumentDisplayCode(instrument)
+  assert.equal(code, 'HK:STOCK:00700.HK')
+  assert.equal(instrument.market, 'HK')
+  assert.equal(instrument.symbol, '00700')
+})
+
+test('looksLikeInstrumentCode — 4–5 位与短码可精确补强', async () => {
+  const { looksLikeInstrumentCode } = await import(
+    '../packages/a-stock-layer/dist/search/instrument-search.js'
+  )
+  assert.equal(looksLikeInstrumentCode('00700'), true)
+  assert.equal(looksLikeInstrumentCode('0700'), true)
+  assert.equal(looksLikeInstrumentCode('700'), true)
+  assert.equal(looksLikeInstrumentCode('600519'), true)
+})
+
+
+test('parseOpptrixInstrumentId — CN:of / CN:etf / CN:stock / US:stock / HK:stock', () => {
+  const of = parseOpptrixInstrumentId('CN:of:009049')
+  assert.ok(of)
+  assert.equal(of.market, 'CN')
+  assert.equal(of.assetClass, 'FUND')
+  assert.equal(of.symbol, '009049')
+  assert.equal(of.exchange, 'PF')
+
+  const etf = parseOpptrixInstrumentId('CN:etf:510300')
+  assert.ok(etf)
+  assert.equal(etf.assetClass, 'ETF')
+  assert.equal(etf.symbol, '510300')
+
+  const cn = parseOpptrixInstrumentId('CN:stock:600519')
+  assert.ok(cn)
+  assert.equal(cn.assetClass, 'EQUITY')
+  assert.equal(cn.symbol, '600519')
+
+  const us = parseOpptrixInstrumentId('US:stock:AAPL')
+  assert.ok(us)
+  assert.equal(us.market, 'US')
+  assert.equal(us.symbol, 'AAPL')
+
+  const hk = parseOpptrixInstrumentId('HK:stock:00700')
+  assert.ok(hk)
+  assert.equal(hk.market, 'HK')
+  assert.equal(hk.symbol, '00700')
+})
+
+test('parseCanonicalInstrumentInput — OpptrixQuant id 优先于旧命名空间', () => {
+  const of = parseCanonicalInstrumentInput('CN:of:009049')
+  assert.ok(of)
+  assert.equal(of.market, 'CN')
+  assert.equal(of.assetClass, 'FUND')
+  assert.equal(of.symbol, '009049')
+  assert.equal(of.exchange, 'PF')
+
+  const us = parseCanonicalInstrumentInput('US:stock:AAPL')
+  assert.ok(us)
+  assert.equal(us.market, 'US')
+  assert.equal(us.symbol, 'AAPL')
+
+  // 旧格式仍兼容
+  const legacy = parseCanonicalInstrumentInput('CN:SZ.600519')
+  assert.ok(legacy)
+  assert.equal(legacy.market, 'CN')
+  assert.equal(legacy.symbol, '600519')
+  assert.equal(legacy.exchange, 'SZ')
+
+  const legacyPf = parseCanonicalInstrumentInput('CN:PF.009049')
+  assert.ok(legacyPf)
+  assert.equal(legacyPf.assetClass, 'FUND')
+  assert.equal(legacyPf.exchange, 'PF')
+})

@@ -1,0 +1,443 @@
+import assert from 'node:assert/strict'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { after, before, describe, test } from 'node:test'
+
+let dataDir = ''
+
+describe('search and archive', { concurrency: false }, () => {
+  before(async () => {
+    dataDir = await mkdtemp(join(tmpdir(), 'opptrix-search-'))
+    process.env.OPPTRIX_DATA_DIR = dataDir
+  })
+
+  after(async () => {
+    const { getUserDataStore } = await import('../packages/user-store/dist/index.js')
+    getUserDataStore().close()
+    if (dataDir) {
+      await rm(dataDir, { recursive: true, force: true })
+    }
+  })
+
+  test('default session archive folders are seeded', async () => {
+    const { SessionArchiveFolderStore, DEFAULT_SESSION_ARCHIVE_FOLDERS } = await import(
+      '../packages/agent/dist/archive-folders.js'
+    )
+    const store = new SessionArchiveFolderStore()
+    const folders = store.ensureDefaults()
+    assert.equal(folders.length, DEFAULT_SESSION_ARCHIVE_FOLDERS.length)
+    assert.ok(folders.some(f => f.id === 'research' && f.title === '投研精选'))
+  })
+
+  test('empty store listArchivedByFolderAll returns 4 default folders with empty sessions', async () => {
+    const { getUserDataStore } = await import('../packages/user-store/dist/index.js')
+    const { SessionStore } = await import('../packages/agent/dist/sessions.js')
+    const { DEFAULT_SESSION_ARCHIVE_FOLDERS, SessionArchiveFolderStore } = await import(
+      '../packages/agent/dist/archive-folders.js'
+    )
+    // 模拟全新空库：无 preference/session_archive_folders
+    getUserDataStore().deleteDocument('preference', 'session_archive_folders')
+    const sessions = new SessionStore()
+    const grouped = sessions.listArchivedByFolderAll()
+    assert.equal(grouped.length, DEFAULT_SESSION_ARCHIVE_FOLDERS.length)
+    const ids = grouped.map(g => g.folder.id).sort()
+    assert.deepEqual(ids, ['other', 'research', 'review', 'trades'])
+    for (const g of grouped) {
+      assert.equal(g.sessions.length, 0)
+      assert.equal(g.folder.isDefault, true)
+    }
+    // 已持久化到 user-store（经 OPPTRIX_DATA_DIR，非本机硬编码路径）
+    const persisted = new SessionArchiveFolderStore().list()
+    assert.equal(persisted.length, 4)
+    getUserDataStore().close()
+  })
+
+  test('ensureDefaults merges missing default folder ids without dropping custom', async () => {
+    const { SessionArchiveFolderStore, DEFAULT_SESSION_ARCHIVE_FOLDERS } = await import(
+      '../packages/agent/dist/archive-folders.js'
+    )
+    const { getUserDataStore } = await import('../packages/user-store/dist/index.js')
+    const store = new SessionArchiveFolderStore()
+    store.save([
+      { id: 'research', title: '投研精选', sortOrder: 0, isDefault: true },
+      { id: 'custom-only', title: '我的文件夹', sortOrder: 10, isDefault: false },
+    ])
+    const merged = store.ensureDefaults()
+    assert.ok(merged.some(f => f.id === 'custom-only' && f.title === '我的文件夹'))
+    for (const def of DEFAULT_SESSION_ARCHIVE_FOLDERS) {
+      const hit = merged.find(f => f.id === def.id)
+      assert.ok(hit, `missing default id ${def.id}`)
+      assert.equal(hit.isDefault, true)
+    }
+    assert.ok(merged.length >= DEFAULT_SESSION_ARCHIVE_FOLDERS.length + 1)
+    getUserDataStore().close()
+  })
+
+  test('listActive hides archived sessions', async () => {
+  const { SessionStore } = await import('../packages/agent/dist/sessions.js')
+  const { getUserDataStore } = await import('../packages/user-store/dist/index.js')
+
+  const sessions = new SessionStore()
+  const a = sessions.create('活跃对话')
+  const b = sessions.create('待归档')
+  sessions.archive(b.id, 'research')
+
+  const active = sessions.listActive()
+  assert.ok(active.some(s => s.id === a.id))
+  assert.ok(!active.some(s => s.id === b.id))
+
+  getUserDataStore().close()
+})
+
+test('archived session can move to another folder', async () => {
+  const { SessionStore } = await import('../packages/agent/dist/sessions.js')
+  const { getUserDataStore } = await import('../packages/user-store/dist/index.js')
+
+  const sessions = new SessionStore()
+  const s = sessions.create('已归档')
+  sessions.archive(s.id, 'research')
+
+  const moved = sessions.archive(s.id, 'trades')
+  assert.ok(moved)
+  assert.equal(moved.archiveFolderId, 'trades')
+  assert.ok(moved.archivedAt)
+
+  const grouped = sessions.listArchivedByFolderAll()
+  const trades = grouped.find(g => g.folder.id === 'trades')
+  assert.ok(trades?.sessions.some(x => x.id === s.id))
+
+  getUserDataStore().close()
+})
+
+test('default folders can be cleared', async () => {
+  const { SessionStore } = await import('../packages/agent/dist/sessions.js')
+  const { getUserDataStore } = await import('../packages/user-store/dist/index.js')
+
+  const sessions = new SessionStore()
+  const a = sessions.create('A')
+  const b = sessions.create('B')
+  sessions.archive(a.id, 'review')
+  sessions.archive(b.id, 'review')
+
+  const result = sessions.clearArchiveFolder('review')
+  assert.equal(result.ok, true)
+  assert.equal(result.deletedCount, 2)
+  assert.equal(sessions.listArchivedByFolderAll().find(g => g.folder.id === 'review')?.sessions.length, 0)
+
+  getUserDataStore().close()
+})
+
+test('FTS indexes and searches session content', async () => {
+  const { getUserDataStore } = await import('../packages/user-store/dist/index.js')
+
+  const store = getUserDataStore()
+
+  store.indexSessionSearch({
+    session_id: 'sess-1',
+    title: '宁德时代走势分析',
+    body: '讨论动力电池龙头估值与产能扩张',
+    archived: 0,
+    archive_folder_id: '',
+    updated_at: new Date().toISOString(),
+  })
+  store.indexSessionSearch({
+    session_id: 'sess-2',
+    title: '归档笔记',
+    body: '宁德时代 季度财报',
+    archived: 1,
+    archive_folder_id: 'research',
+    updated_at: new Date().toISOString(),
+  })
+
+  const hits = store.searchSessions('宁德时代', { limit: 10, includeArchived: true })
+  assert.ok(hits.length >= 2)
+  assert.ok(hits.some(h => h.session_id === 'sess-2'))
+
+  store.close()
+})
+
+test('ensureIndexes pages session/news into FTS without holding full article arrays', async () => {
+  // 独立临时库，避免本 suite 前序 close()/FTS 手工灌入干扰 INDEX_FLAG 与检索。
+  const isolatedDir = await mkdtemp(join(tmpdir(), 'opptrix-ensure-idx-'))
+  const prevDataDir = process.env.OPPTRIX_DATA_DIR
+  process.env.OPPTRIX_DATA_DIR = isolatedDir
+  try {
+    const { getUserDataStore } = await import('../packages/user-store/dist/index.js')
+    const { SessionStore } = await import('../packages/agent/dist/sessions.js')
+    const { SearchHub } = await import('../packages/search-hub/dist/hub.js')
+    const { getEnrichmentStore } = await import('../packages/article-enrichment/dist/index.js')
+
+    // 若前序用例关过 singleton，这里重新打开到 isolatedDir
+    try {
+      getUserDataStore().close()
+    } catch {
+      /* already closed */
+    }
+
+    const store = getUserDataStore()
+    const sessions = new SessionStore()
+    const sess = sessions.create('ensure index session')
+    const record = sessions.get(sess.id)
+    assert.ok(record)
+    record.turns.push({
+      role: 'user',
+      content: 'talk about TOKENBYD session body',
+      at: new Date().toISOString(),
+    })
+    sessions.save(record)
+
+    const articleId = 'news-fts-1'
+    store.setDocument('news_article', articleId, {
+      id: articleId,
+      subscription_id: 'sub-1',
+      title: 'TOKENNEWTITLE weekly',
+      link: 'https://example.com/a1',
+      pub_date: new Date().toISOString(),
+      summary: 'summary mentions TOKENSUMMARY',
+      content_html: '<p>body keyword <strong>TOKENLFP</strong> production</p>',
+      source_title: 'TestSource',
+    })
+    getEnrichmentStore().save({
+      article_id: articleId,
+      status: 'ready',
+      segments: [
+        {
+          id: 'seg-1',
+          kind: 'html_text',
+          text: 'enrichment TOKENSOLIDSTATE materials',
+          anchor: { insert: 'append_block' },
+          created_at: new Date().toISOString(),
+        },
+      ],
+      updated_at: new Date().toISOString(),
+      version: 1,
+    })
+
+    const stubHub = {
+      marketData: { searchStocks: () => [] },
+    }
+    const hub = new SearchHub(/** @type {any} */ (stubHub), sessions)
+    hub.ensureIndexes()
+
+    assert.equal(store.getMetaFlag('search_index_v1'), true)
+
+    const result = await hub.search('TOKENBYD', 10)
+    assert.ok(result.sessions.some(h => h.id === sess.id))
+
+    assert.ok((await hub.search('TOKENNEWTITLE', 10)).news.some(h => h.id === articleId))
+    assert.ok((await hub.search('TOKENLFP', 10)).news.some(h => h.id === articleId))
+    assert.ok((await hub.search('TOKENSOLIDSTATE', 10)).news.some(h => h.id === articleId))
+
+    hub.ensureIndexes()
+    assert.ok((await hub.search('TOKENLFP', 5)).news.some(h => h.id === articleId))
+
+    store.close()
+  } finally {
+    process.env.OPPTRIX_DATA_DIR = prevDataDir
+    await rm(isolatedDir, { recursive: true, force: true })
+  }
+})
+
+test('search hydrates session meta by hit id without listAll', async () => {
+  const isolatedDir = await mkdtemp(join(tmpdir(), 'opptrix-search-meta-'))
+  const prevDataDir = process.env.OPPTRIX_DATA_DIR
+  process.env.OPPTRIX_DATA_DIR = isolatedDir
+  try {
+    const { getUserDataStore } = await import('../packages/user-store/dist/index.js')
+    const { SessionStore } = await import('../packages/agent/dist/sessions.js')
+    const { SearchHub } = await import('../packages/search-hub/dist/hub.js')
+
+    try {
+      getUserDataStore().close()
+    } catch {
+      /* already closed */
+    }
+
+    const sessions = new SessionStore()
+    let listAllCalls = 0
+    const originalListAll = sessions.listAll.bind(sessions)
+    sessions.listAll = () => {
+      listAllCalls += 1
+      return originalListAll()
+    }
+
+    // 多会话噪音：确保 listAll 全表扫描会很「贵」，但 search 不应调用它。
+    for (let i = 0; i < 12; i++) {
+      sessions.create(`filler-${i}`)
+    }
+
+    const active = sessions.create('METAKEYWORD 活跃会话')
+    const activeRec = sessions.get(active.id)
+    assert.ok(activeRec)
+    activeRec.turns.push({
+      role: 'user',
+      content: 'body mentions METAKEYWORD for active hit',
+      at: new Date().toISOString(),
+    })
+    sessions.save(activeRec)
+
+    const archived = sessions.create('METAKEYWORD 归档会话')
+    const archivedRec = sessions.get(archived.id)
+    assert.ok(archivedRec)
+    archivedRec.turns.push({
+      role: 'user',
+      content: 'body mentions METAKEYWORD for archived hit',
+      at: new Date().toISOString(),
+    })
+    sessions.save(archivedRec)
+    const archivedAfter = sessions.archive(archived.id, 'research')
+    assert.ok(archivedAfter)
+
+    const stubHub = {
+      marketData: { searchStocks: () => [] },
+    }
+    const hub = new SearchHub(/** @type {any} */ (stubHub), sessions)
+    hub.ensureIndexes()
+
+    listAllCalls = 0
+    const empty = await hub.search('ZZZNOHITTOKENXYZ', 10)
+    assert.equal(empty.sessions.length, 0)
+    assert.equal(listAllCalls, 0, 'FTS miss must not call listAll')
+
+    listAllCalls = 0
+    const result = await hub.search('METAKEYWORD', 20)
+    assert.equal(listAllCalls, 0, 'search must not call listAll to hydrate meta')
+
+    const activeHit = result.sessions.find(h => h.id === active.id)
+    assert.ok(activeHit)
+    assert.equal(activeHit.title, 'METAKEYWORD 活跃会话')
+    assert.equal(activeHit.archived, false)
+    assert.equal(activeHit.archiveFolderId, null)
+    assert.ok(activeHit.updatedAt)
+
+    const archivedHit = result.sessions.find(h => h.id === archived.id)
+    assert.ok(archivedHit)
+    assert.equal(archivedHit.title, 'METAKEYWORD 归档会话')
+    assert.equal(archivedHit.archived, true)
+    assert.equal(archivedHit.archiveFolderId, 'research')
+    assert.ok(archivedHit.updatedAt)
+
+    getUserDataStore().close()
+  } finally {
+    process.env.OPPTRIX_DATA_DIR = prevDataDir
+    await rm(isolatedDir, { recursive: true, force: true })
+  }
+})
+
+test('after INDEX_FLAG, incremental session/news upsert+delete are searchable without rebuild', async () => {
+  const isolatedDir = await mkdtemp(join(tmpdir(), 'opptrix-search-incr-'))
+  const prevDataDir = process.env.OPPTRIX_DATA_DIR
+  process.env.OPPTRIX_DATA_DIR = isolatedDir
+  try {
+    const { getUserDataStore } = await import('../packages/user-store/dist/index.js')
+    const { SessionStore, setSessionPersistHooks } = await import('../packages/agent/dist/sessions.js')
+    const { SearchHub } = await import('../packages/search-hub/dist/hub.js')
+    const {
+      syncSessionSearchIndex,
+      removeSessionSearchIndex,
+      syncNewsSearchIndex,
+      removeNewsSearchIndex,
+      rebuildSessionSearchIndex,
+      rebuildNewsSearchIndex,
+    } = await import('../packages/search-hub/dist/index.js')
+    const {
+      NewsFeedStore,
+      setNewsArticlePersistHook,
+      setNewsArticleDeleteHook,
+    } = await import('../packages/news-feed/dist/index.js')
+
+    try {
+      getUserDataStore().close()
+    } catch {
+      /* already closed */
+    }
+
+    setSessionPersistHooks({
+      onPersist: syncSessionSearchIndex,
+      onDelete: removeSessionSearchIndex,
+    })
+    setNewsArticlePersistHook(article => syncNewsSearchIndex(article))
+    setNewsArticleDeleteHook(removeNewsSearchIndex)
+
+    const store = getUserDataStore()
+    const sessions = new SessionStore()
+    const stubHub = { marketData: { searchStocks: () => [] } }
+    const hub = new SearchHub(/** @type {any} */ (stubHub), sessions)
+
+    // 全量路径：空库建 INDEX_FLAG
+    hub.ensureIndexes()
+    assert.equal(store.getMetaFlag('search_index_v1'), true)
+
+    // 增量新增会话（不清 flag）
+    const sess = sessions.create('INCRSESS 增量会话')
+    const rec = sessions.get(sess.id)
+    assert.ok(rec)
+    rec.turns.push({
+      role: 'user',
+      content: 'body keyword INCRSESSBODY for incremental hit',
+      at: new Date().toISOString(),
+    })
+    sessions.save(rec)
+
+    assert.equal(store.getMetaFlag('search_index_v1'), true, 'incremental must not clear INDEX_FLAG')
+    assert.ok((await hub.search('INCRSESSBODY', 10)).sessions.some(h => h.id === sess.id))
+
+    // 增量新增资讯（经 NewsFeedStore persist hook）
+    const feed = new NewsFeedStore()
+    feed.upsertSubscription({
+      id: 'sub-incr',
+      title: 'incr',
+      url: 'https://example.com/feed',
+      resolved_url: 'https://example.com/feed',
+      kind: 'rss',
+      enabled: true,
+    })
+    const articleId = 'news-incr-1'
+    feed.upsertArticlesForSubscription('sub-incr', [{
+      id: articleId,
+      subscription_id: 'sub-incr',
+      title: 'INCRNEWSTITLE weekly',
+      link: 'https://example.com/incr',
+      pub_date: new Date().toISOString(),
+      summary: 'summary INCRNEWSBODY',
+      content_html: '<p>INCRNEWSBODY</p>',
+      source_title: 'IncrSource',
+    }])
+
+    assert.equal(store.getMetaFlag('search_index_v1'), true)
+    assert.ok((await hub.search('INCRNEWSTITLE', 10)).news.some(h => h.id === articleId))
+    assert.ok((await hub.search('INCRNEWSBODY', 10)).news.some(h => h.id === articleId))
+
+    // 删除后不再命中
+    sessions.delete(sess.id)
+    assert.equal((await hub.search('INCRSESSBODY', 10)).sessions.some(h => h.id === sess.id), false)
+
+    feed.deleteSubscription('sub-incr')
+    assert.equal((await hub.search('INCRNEWSTITLE', 10)).news.some(h => h.id === articleId), false)
+
+    // 全量 rebuild 路径仍可用（显式 rebuild，不清 INDEX_FLAG 语义）
+    const sess2 = sessions.create('REBUILDTOKEN session')
+    const rec2 = sessions.get(sess2.id)
+    assert.ok(rec2)
+    rec2.turns.push({
+      role: 'user',
+      content: 'REBUILDTOKEN body',
+      at: new Date().toISOString(),
+    })
+    sessions.save(rec2)
+    rebuildSessionSearchIndex()
+    rebuildNewsSearchIndex()
+    assert.ok((await hub.search('REBUILDTOKEN', 10)).sessions.some(h => h.id === sess2.id))
+    assert.equal(store.getMetaFlag('search_index_v1'), true)
+
+    setSessionPersistHooks({})
+    setNewsArticlePersistHook(null)
+    setNewsArticleDeleteHook(null)
+    store.close()
+  } finally {
+    process.env.OPPTRIX_DATA_DIR = prevDataDir
+    await rm(isolatedDir, { recursive: true, force: true })
+  }
+})
+})

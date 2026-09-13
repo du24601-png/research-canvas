@@ -1,0 +1,267 @@
+declare global {
+  interface Window {
+    electronAPI?: {
+      isElectron: boolean
+      platform?: NodeJS.Platform
+      windowMinimize?: () => void
+      windowMaximize?: () => void
+      windowClose?: () => void
+      /** Non-mac custom titlebar: top-level application menu labels */
+      appMenuList?: () => Promise<Array<{ index: number; label: string }>>
+      /** Popup native submenu at window content coordinates */
+      appMenuPopup?: (payload: { index: number; x: number; y: number }) => Promise<boolean>
+      getIsFullscreen?: () => Promise<boolean>
+      getIsMaximized?: () => Promise<boolean>
+      /** Grow the Electron window so content width ≥ minWidth */
+      windowEnsureContentWidth?: (minWidth: number) => Promise<{ ok: boolean; width: number; reason?: string }>
+      pickExportDirectory?: () => Promise<string | null>
+      writeBinaryFile?: (payload: {
+        dirPath: string
+        filename: string
+        data: ArrayBuffer
+      }) => Promise<string>
+      pickSaveFile?: (payload: {
+        defaultPath?: string
+        title?: string
+      }) => Promise<string | null>
+      writeTextFile?: (payload: {
+        filePath: string
+        text: string
+      }) => Promise<string>
+      openExternalUrl?: (url: string) => Promise<boolean>
+      clientVersion?: () => Promise<string>
+      appUpdateGetStatus?: () => Promise<AppUpdateStatus>
+      appUpdateCheck?: () => Promise<AppUpdateStatus>
+      appUpdateInstall?: () => Promise<boolean>
+      appUpdateDownload?: () => Promise<boolean>
+      appUpdateGetAutoDownload?: () => Promise<boolean>
+      appUpdateSetAutoDownload?: (enabled: boolean) => Promise<boolean>
+      onAppUpdateStatus?: (callback: (status: AppUpdateStatus) => void) => () => void
+      translationGetStatus?: () => Promise<TranslationEngineStatus>
+      translationGetModels?: () => Promise<TranslationModelsResult>
+      translationGetDownloadDir?: () => Promise<string>
+      translationOpenDownloadDir?: () => Promise<string>
+      /** 打开 ~/.opptrix/logs/chat-debug 目录 */
+      chatDebugOpenLogDir?: () => Promise<string>
+      /** Open a path under agent-workspace in the system file manager (validated in main) */
+      openLocalDirectory?: (dirPath: string) => Promise<string>
+      /** 立即 ack；完整下载走 onTranslationDownloadProgress / translationGetStatus.download */
+      translationStartDownload?: (modelId: string) => Promise<{
+        started: boolean
+        download: TranslationDownloadProgress | null
+        alreadyPresent?: boolean
+      }>
+      translationCancelDownload?: () => Promise<boolean>
+      translationTranslateArticle?: (payload: TranslationArticleRequest) => Promise<TranslationArticleResult>
+      onTranslationDownloadProgress?: (callback: (progress: TranslationDownloadProgress) => void) => () => void
+      onTranslationProgress?: (callback: (progress: TranslationProgress) => void) => () => void
+      onFullscreenChange?: (callback: (fullscreen: boolean) => void) => () => void
+      onProtocolOpen?: (callback: (payload: OpptrixProtocolPayload) => void) => () => void
+      windowIsFocused?: () => Promise<boolean>
+      notificationIsSupported?: () => Promise<boolean>
+      notificationGetPermission?: () => Promise<NotificationPermissionState>
+      notificationRequestPermission?: () => Promise<NotificationPermissionState>
+      notificationOpenSettings?: () => Promise<boolean>
+      showLocalNotification?: (payload: LocalNotificationPayload) => Promise<boolean>
+      mediaGetMicPermission?: () => Promise<'default' | 'granted' | 'denied'>
+      mediaRequestMicPermission?: () => Promise<'default' | 'granted' | 'denied'>
+      mediaOpenMicSettings?: () => Promise<boolean>
+      speechTranscribe?: (payload: {
+        data: ArrayBuffer
+        mime?: string
+      }) => Promise<{ ok: true; text: string; model: string } | { ok: false; error: string }>
+      speechGetStatus?: () => Promise<{
+        ready: boolean
+        modelReady?: boolean
+        ffmpegReady?: boolean
+        modelName: string
+        modelsDir?: string
+        engine?: string
+        error?: 'unreachable'
+      }>
+      signalShellReady?: () => void
+      setThemeSource?: (source: 'system' | 'light' | 'dark') => void
+      shellInstallWindowsSandbox?: () => Promise<{ ok: boolean; cancelled?: boolean; message?: string }>
+      shellInstallLinuxSandbox?: () => Promise<{ ok: boolean; cancelled?: boolean; message?: string }>
+      /** 同步登录项并注销遗留 OS 计划任务 */
+      scheduleOsReconcile?: () => Promise<unknown>
+      scheduleEnsureAutostart?: (enabled: boolean) => Promise<unknown>
+    }
+    showDirectoryPicker?: (options?: { mode?: 'read' | 'readwrite' }) => Promise<FileSystemDirectoryHandle>
+    showSaveFilePicker?: (options?: {
+      suggestedName?: string
+      types?: Array<{ description?: string; accept: Record<string, string[]> }>
+    }) => Promise<FileSystemFileHandle>
+  }
+}
+
+export type TranslationServiceMode = 'offline' | 'remote'
+
+export type TranslationDownloadProgress = {
+  modelId: string
+  filename: string
+  receivedBytes: number
+  totalBytes: number
+  status: 'downloading' | 'completed' | 'error'
+  filePath?: string
+  error?: string
+  source?: string
+  sourceLabel?: string
+}
+
+export type TranslationModelCatalogItem = {
+  id: string
+  name: string
+  filename: string
+  sizeBytes: number
+  sizeLabel: string
+  family: string
+  purpose?: 'translation' | 'vision'
+  purposeLabel?: string
+  recommended?: boolean
+  installed: boolean
+  downloadSource?: string
+}
+
+export type TranslationInstalledModel = {
+  filename: string
+  path: string
+  sizeLabel: string
+}
+
+export type TranslationModelsResult = {
+  catalog: TranslationModelCatalogItem[]
+  installed: TranslationInstalledModel[]
+  defaultDownloadSource?: string
+  /** 相对数据根的目录标签（服务端 HTTP）；与 downloadDir 二选一兼容 */
+  downloadDirLabel?: string
+  downloadDir?: string
+}
+
+export type TranslationEngineStatus = {
+  supported: boolean
+  modelFound: boolean
+  modelPath: string | null
+  modelName: string | null
+  modelFamily?: string | null
+  ready: boolean
+  loading?: boolean
+  lastError: string | null
+  serviceMode?: TranslationServiceMode
+  offlineModel?: string
+  remoteConfigured?: boolean
+  localAvailable?: boolean
+  canTranslate?: boolean
+  downloading?: boolean
+  download?: TranslationDownloadProgress | null
+  /** 相对数据根的目录标签（服务端 HTTP）；与 downloadDir 二选一兼容 */
+  downloadDirLabel?: string
+  downloadDir?: string
+}
+
+export type TranslationSegment = {
+  id: string
+  text: string
+  kind?: 'text' | 'html'
+}
+
+export type TranslationArticleRequest = {
+  articleId: string
+  title: string
+  bodyText?: string
+  segments?: TranslationSegment[]
+  targetLang?: string
+}
+
+export type TranslationArticleResult = {
+  title: string
+  body?: string
+  segments?: TranslationSegment[]
+  fromCache?: boolean
+  skipped?: boolean
+  message?: string
+  engine?: 'offline' | 'remote'
+}
+
+export type TranslationProgress = {
+  articleId: string
+  phase: 'loading' | 'title' | 'body' | 'segment'
+  current: number
+  total: number
+  segmentId?: string
+  translatedText?: string
+  translatedTitle?: string
+  done?: boolean
+  engine?: 'offline' | 'remote'
+}
+
+export type AppUpdateState =
+  | 'idle'
+  | 'checking'
+  | 'available'
+  | 'downloading'
+  | 'ready'
+  | 'installing'
+  | 'not-available'
+  | 'error'
+
+export type AppUpdateStatus = {
+  state: AppUpdateState
+  currentVersion?: string | null
+  version?: string | null
+  percent?: number
+  message?: string | null
+  /** 自动安装反复失败后，引导官网覆盖安装 + 交流群求助 */
+  manual_install_help?: boolean
+}
+
+export type NotificationPermissionState = 'default' | 'granted' | 'denied'
+
+export type LocalNotificationKind = 'chat_done' | 'chat_ask'
+
+export type LocalNotificationPayload = {
+  title: string
+  body?: string
+  silent?: boolean
+  tag?: string
+  sessionId?: string
+  kind?: LocalNotificationKind
+}
+
+export type OpptrixProtocolPayload = {
+  url: string
+  host: string
+  pathname: string
+  route: string
+  params: Record<string, string>
+}
+
+export function isElectron(): boolean {
+  if (typeof window === 'undefined') return false
+  return window.electronAPI?.isElectron === true
+}
+
+export function electronPlatform(): NodeJS.Platform | undefined {
+  return window.electronAPI?.platform
+}
+
+/** Desktop shell (Electron) or explicit Vite flag */
+export function isDesktopApp(): boolean {
+  if (typeof window === 'undefined') return false
+  return isElectron() || import.meta.env.VITE_DESKTOP === '1'
+}
+
+export function isDesktopRuntime(): boolean {
+  return isDesktopApp()
+}
+
+export function useElectronChrome(): boolean {
+  return isElectron()
+}
+
+/** macOS vibrancy / Windows mica — sidebar can punch through to OS blur */
+export function supportsNativeWindowVibrancy(): boolean {
+  if (!isElectron()) return false
+  const platform = electronPlatform()
+  return platform === 'darwin' || platform === 'win32'
+}

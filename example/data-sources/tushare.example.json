@@ -1,0 +1,5 @@
+{
+  "enabled": false,
+  "token": "YOUR_TUSHARE_TOKEN",
+  "httpUrl": ""
+}

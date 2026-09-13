@@ -1,0 +1,611 @@
+/* Markdown content layout — uses variables from tokens.css */
+
+.opptrix-md {
+  font-size: inherit;
+  line-height: var(--opptrix-md-line-height);
+  color: var(--opptrix-md-text);
+  word-break: break-word;
+}
+
+.opptrix-md > :first-child { margin-top: 0; }
+.opptrix-md > :last-child { margin-bottom: 0; }
+
+.opptrix-md p {
+  margin: 6px 0 2px;
+}
+
+.opptrix-md ul,
+.opptrix-md ol,
+.opptrix-md blockquote,
+.opptrix-md .opptrix-md-pre-shell,
+.opptrix-md pre,
+.opptrix-md table,
+.opptrix-md .opptrix-md-mermaid {
+  margin: var(--opptrix-md-block-gap) 0;
+}
+
+.opptrix-md h1,
+.opptrix-md h2,
+.opptrix-md h3,
+.opptrix-md h4,
+.opptrix-md h5,
+.opptrix-md h6 {
+  margin: var(--opptrix-md-heading-gap-top) 0 var(--opptrix-md-heading-gap-bottom);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.28;
+  color: var(--opptrix-md-text);
+}
+
+.opptrix-md h1 { font-size: 1.21em; }
+.opptrix-md h2 { font-size: 1.21em; }
+.opptrix-md h3 { font-size: 1.04em; }
+.opptrix-md h4 { font-size: 1em; font-weight: 600; }
+.opptrix-md h5,
+.opptrix-md h6 {
+  font-size: 0.95em;
+  font-weight: 600;
+  color: var(--opptrix-md-text-muted);
+}
+
+.opptrix-md ul,
+.opptrix-md ol {
+  padding-left: var(--opptrix-md-list-indent);
+}
+
+.opptrix-md ul {
+  list-style-type: disc;
+}
+
+.opptrix-md ol {
+  list-style-type: decimal;
+}
+
+.opptrix-md ul ul,
+.opptrix-md ol ul {
+  list-style-type: circle;
+}
+
+.opptrix-md ul ul ul,
+.opptrix-md ol ul ul,
+.opptrix-md ul ol ul,
+.opptrix-md ol ol ul {
+  list-style-type: square;
+}
+
+.opptrix-md ol ol,
+.opptrix-md ul ol {
+  list-style-type: lower-alpha;
+}
+
+.opptrix-md ul ul,
+.opptrix-md ul ol,
+.opptrix-md ol ul,
+.opptrix-md ol ol {
+  margin-top: 0.2em;
+  margin-bottom: 0.15em;
+}
+
+.opptrix-md li + li {
+  margin-top: var(--opptrix-md-list-item-gap);
+}
+
+.opptrix-md li > p {
+  margin: 0.2em 0;
+}
+
+.opptrix-md li > ul,
+.opptrix-md li > ol {
+  margin-top: 0.2em;
+  margin-bottom: 0.1em;
+}
+
+.opptrix-md .contains-task-list {
+  list-style: none;
+  padding-left: 0;
+}
+
+.opptrix-md .task-list-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4em;
+}
+
+.opptrix-md .task-list-item input[type="checkbox"] {
+  margin: 0.2em 0 0;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  accent-color: #007AFF;
+}
+
+.opptrix-md strong {
+  font-weight: 650;
+  color: var(--opptrix-md-strong-fg);
+}
+
+.opptrix-md em {
+  font-style: italic;
+  color: var(--opptrix-md-em-fg);
+}
+
+.opptrix-md strong em,
+.opptrix-md em strong {
+  font-weight: 650;
+  font-style: italic;
+  color: var(--opptrix-md-strong-fg);
+}
+
+.opptrix-md mark,
+.opptrix-md .opptrix-md-mark {
+  background: var(--opptrix-md-mark-bg);
+  color: var(--opptrix-md-mark-fg);
+  padding: 0 0.15em;
+  border-radius: 2px;
+}
+
+.opptrix-md del,
+.opptrix-md s,
+.opptrix-md .opptrix-md-del {
+  color: var(--opptrix-md-del-fg);
+  text-decoration: line-through;
+  text-decoration-color: rgba(174, 174, 178, 0.65);
+}
+
+.opptrix-md u,
+.opptrix-md ins,
+.opptrix-md .opptrix-md-underline {
+  text-decoration: underline;
+  text-decoration-color: var(--opptrix-md-underline);
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+}
+
+.opptrix-md sub,
+.opptrix-md .opptrix-md-sub {
+  font-size: 0.78em;
+  line-height: 0;
+  vertical-align: sub;
+}
+
+.opptrix-md sup,
+.opptrix-md .opptrix-md-sup {
+  font-size: 0.78em;
+  line-height: 0;
+  vertical-align: super;
+}
+
+.opptrix-md kbd,
+.opptrix-md .opptrix-md-kbd {
+  display: inline-block;
+  padding: 0.06em 0.38em;
+  border-radius: 4px;
+  border: 1px solid var(--opptrix-md-kbd-border);
+  background: var(--opptrix-md-kbd-bg);
+  font-family: var(--opptrix-font-mono);
+  font-size: 0.84em;
+  line-height: 1.35;
+  color: var(--opptrix-md-text);
+  box-shadow: inset 0 -1px 0 rgba(60, 60, 67, 0.06);
+}
+
+.opptrix-md blockquote,
+.opptrix-md .opptrix-md-blockquote {
+  margin: var(--opptrix-md-block-gap) 0;
+  padding: 0.35em 0 0.35em 0.75em;
+  border-left: 2px solid var(--opptrix-md-blockquote-border);
+  border-radius: 0 6px 6px 0;
+  background: var(--opptrix-md-blockquote-bg);
+  color: var(--opptrix-md-blockquote-fg);
+}
+
+.opptrix-md blockquote blockquote,
+.opptrix-md .opptrix-md-blockquote .opptrix-md-blockquote {
+  margin-top: 0.35em;
+  margin-bottom: 0;
+  padding-left: 0.65em;
+  border-left-color: var(--opptrix-md-blockquote-border-nested);
+  background: transparent;
+  color: var(--opptrix-md-text-subtle);
+}
+
+.opptrix-md blockquote > :first-child { margin-top: 0; }
+.opptrix-md blockquote > :last-child { margin-bottom: 0; }
+
+.opptrix-md blockquote ul,
+.opptrix-md blockquote ol {
+  margin-top: 0.25em;
+  margin-bottom: 0.25em;
+}
+
+.opptrix-md a {
+  color: var(--opptrix-md-link);
+  text-decoration: underline;
+  text-decoration-color: var(--opptrix-md-link-underline);
+  text-underline-offset: 2px;
+}
+
+.opptrix-md a:hover {
+  color: var(--opptrix-md-link-hover);
+  text-decoration-color: currentColor;
+}
+
+.opptrix-md-inline-code,
+.opptrix-md :not(pre) > code {
+  font-family: var(--opptrix-font-mono);
+  font-size: 0.86em;
+  padding: 0.08em 0.32em;
+  border-radius: var(--opptrix-md-radius-code);
+  background: var(--opptrix-md-code-bg);
+  color: var(--opptrix-md-code-fg);
+}
+
+.opptrix-md-pre-shell {
+  position: relative;
+  margin: var(--opptrix-md-block-gap) 0;
+}
+
+.opptrix-md-pre-lang {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 0.72em;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  color: var(--opptrix-md-pre-lang-fg);
+}
+
+.opptrix-md-pre {
+  margin: 0;
+  padding: var(--opptrix-md-pre-padding);
+  border: 1px solid var(--opptrix-md-pre-border);
+  border-radius: var(--opptrix-md-radius-pre);
+  background: var(--opptrix-md-pre-bg);
+  overflow-x: auto;
+  font-size: 0.86em;
+  line-height: 1.48;
+}
+
+.opptrix-md-pre code {
+  font-family: var(--opptrix-font-mono);
+  background: transparent;
+  padding: 0;
+  color: var(--opptrix-md-code-fg);
+}
+
+.opptrix-md-pre--error {
+  border: 1px solid var(--opptrix-md-error-border);
+}
+
+.opptrix-md-mermaid-err {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--opptrix-md-error);
+}
+
+.opptrix-md-mermaid {
+  padding: var(--opptrix-md-mermaid-padding);
+  border-radius: var(--opptrix-md-radius-mermaid);
+  background: var(--opptrix-md-mermaid-bg);
+  overflow-x: auto;
+}
+
+.opptrix-md-mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.opptrix-md-chart {
+  margin: var(--opptrix-md-block-gap) auto;
+  max-width: 480px;
+  width: 100%;
+  text-align: center;
+  overflow: visible;
+}
+
+.opptrix-md-chart--error {
+  max-width: 320px;
+  padding: 10px 12px;
+  border-radius: var(--opptrix-md-radius-mermaid);
+  border: 1px solid var(--opptrix-md-error-border);
+  background: var(--opptrix-md-mermaid-bg);
+  text-align: left;
+}
+
+.opptrix-md-chart-err {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--opptrix-md-error);
+}
+
+.opptrix-md-chart-err-reason {
+  font-weight: 400;
+  opacity: 0.85;
+}
+
+.opptrix-md-table-wrap {
+  overflow-x: auto;
+  margin: var(--opptrix-md-block-gap) 0;
+  outline: none;
+}
+
+.opptrix-md-table-copy-col {
+  width: calc(var(--opptrix-md-table-copy-icon-size) + var(--opptrix-md-cell-padding-x));
+  min-width: calc(var(--opptrix-md-table-copy-icon-size) + var(--opptrix-md-cell-padding-x));
+  max-width: calc(var(--opptrix-md-table-copy-icon-size) + var(--opptrix-md-cell-padding-x));
+  padding-top: var(--opptrix-md-cell-padding-y);
+  padding-bottom: var(--opptrix-md-cell-padding-y);
+  padding-left: 4px;
+  padding-right: 0;
+  text-align: center;
+  vertical-align: top;
+  box-sizing: border-box;
+}
+
+.opptrix-md-table-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--opptrix-md-table-copy-fg);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.opptrix-md-table-wrap:hover .opptrix-md-table-copy,
+.opptrix-md-table-wrap:focus-within .opptrix-md-table-copy {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.opptrix-md-table-copy:hover {
+  color: var(--opptrix-md-table-copy-fg-hover);
+}
+
+.opptrix-md-table-copy:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+  outline: 2px solid rgba(0, 122, 255, 0.35);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.opptrix-md-table-copy:active {
+  opacity: 0.72;
+}
+
+.opptrix-md-table-copy svg {
+  width: var(--opptrix-md-table-copy-icon-size);
+  height: var(--opptrix-md-table-copy-icon-size);
+}
+
+.opptrix-md table {
+  width: 100%;
+  border-collapse: collapse;
+  border-spacing: 0;
+  font-size: 0.92em;
+  background: transparent;
+}
+
+.opptrix-md thead,
+.opptrix-md tbody,
+.opptrix-md tr {
+  background: transparent;
+}
+
+.opptrix-md th,
+.opptrix-md td {
+  padding: var(--opptrix-md-cell-padding-y) var(--opptrix-md-cell-padding-x);
+  border: none;
+  background: transparent;
+  text-align: left;
+  vertical-align: top;
+}
+
+.opptrix-md thead th {
+  border-bottom: 1px solid var(--opptrix-md-table-row-divider);
+}
+
+.opptrix-md tbody td {
+  border-bottom: 1px solid var(--opptrix-md-table-row-divider);
+}
+
+.opptrix-md tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.opptrix-md th {
+  font-weight: 650;
+  color: var(--opptrix-md-table-header-fg);
+}
+
+.opptrix-md td {
+  color: var(--opptrix-md-table-cell-fg);
+}
+
+.opptrix-md hr {
+  border: none;
+  border-top: 1px solid var(--opptrix-md-hr);
+  margin: 0.65em 0;
+}
+
+.opptrix-md img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--opptrix-md-radius-pre);
+}
+
+.opptrix-md .katex-display {
+  margin: 0.55em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.opptrix-md .katex {
+  font-size: 1.02em;
+}
+
+/* Optional semantic tags in HTML/markdown output */
+.opptrix-md .opptrix-md-tag {
+  display: inline-block;
+  padding: 0.08em 0.45em;
+  border-radius: 4px;
+  font-size: 0.82em;
+  font-weight: 600;
+  line-height: 1.35;
+  vertical-align: baseline;
+}
+
+.opptrix-md .opptrix-md-tag--neutral {
+  background: var(--opptrix-md-tag-neutral-bg);
+  color: var(--opptrix-md-tag-neutral-fg);
+}
+
+.opptrix-md .opptrix-md-tag--info {
+  background: var(--opptrix-md-tag-info-bg);
+  color: var(--opptrix-md-tag-info-fg);
+}
+
+.opptrix-md .opptrix-md-tag--success {
+  background: var(--opptrix-md-tag-success-bg);
+  color: var(--opptrix-md-tag-success-fg);
+}
+
+.opptrix-md .opptrix-md-tag--warning {
+  background: var(--opptrix-md-tag-warning-bg);
+  color: var(--opptrix-md-tag-warning-fg);
+}
+
+.opptrix-md .opptrix-md-tag--error {
+  background: var(--opptrix-md-tag-error-bg);
+  color: var(--opptrix-md-tag-error-fg);
+}
+
+/* Inline tone colors — use <span class="opptrix-md-tone--success">涨</span> */
+.opptrix-md .opptrix-md-tone--muted {
+  color: var(--opptrix-md-text-muted);
+}
+
+.opptrix-md .opptrix-md-tone--subtle {
+  color: var(--opptrix-md-text-subtle);
+}
+
+.opptrix-md .opptrix-md-tone--accent {
+  color: var(--opptrix-md-tone-accent);
+}
+
+.opptrix-md .opptrix-md-tone--success {
+  color: var(--opptrix-md-tag-success-fg);
+  font-weight: 600;
+}
+
+.opptrix-md .opptrix-md-tone--warning {
+  color: var(--opptrix-md-tag-warning-fg);
+  font-weight: 600;
+}
+
+.opptrix-md .opptrix-md-tone--error {
+  color: var(--opptrix-md-tag-error-fg);
+  font-weight: 600;
+}
+
+/* GFM footnotes */
+.opptrix-md .footnotes {
+  margin-top: 0.85em;
+  padding-top: 0.55em;
+  border-top: 1px solid var(--opptrix-md-hr);
+  font-size: 0.88em;
+  color: var(--opptrix-md-text-muted);
+}
+
+.opptrix-md .footnotes ol {
+  padding-left: 1.2em;
+}
+
+.opptrix-md .footnote-ref,
+.opptrix-md .data-footnote-backref {
+  color: var(--opptrix-md-link);
+  text-decoration: none;
+}
+
+.opptrix-md .footnote-ref:hover,
+.opptrix-md .data-footnote-backref:hover {
+  color: var(--opptrix-md-link-hover);
+  text-decoration: underline;
+}
+
+.opptrix-md .opptrix-md-img,
+.opptrix-md img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--opptrix-md-radius-code);
+  display: block;
+  margin: 0.5em 0;
+}
+
+.opptrix-md .opptrix-md-video,
+.opptrix-md video {
+  max-width: 100%;
+  display: block;
+  margin: 0.5em 0;
+  border-radius: var(--opptrix-md-radius-code);
+  background: var(--opptrix-md-code-bg);
+}
+
+.opptrix-md .opptrix-md-audio,
+.opptrix-md audio {
+  width: 100%;
+  max-width: 420px;
+  display: block;
+  margin: 0.5em 0;
+}
+
+.opptrix-md .opptrix-md-media-fallback {
+  display: inline-block;
+  padding: 0.35em 0.65em;
+  border-radius: var(--opptrix-md-radius-code);
+  background: var(--opptrix-md-code-bg);
+  color: var(--opptrix-md-text-subtle);
+  font-size: 0.92em;
+  line-height: 1.4;
+}
+
+.opptrix-md .opptrix-md-file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  max-width: 100%;
+  padding: 0.28em 0.7em;
+  border-radius: 999px;
+  background: var(--opptrix-md-code-bg);
+  color: var(--opptrix-md-link);
+  text-decoration: none;
+  font-size: 0.92em;
+  line-height: 1.35;
+  vertical-align: middle;
+}
+
+.opptrix-md .opptrix-md-file-chip:hover {
+  color: var(--opptrix-md-link-hover);
+  text-decoration: none;
+}
+
+.opptrix-md .opptrix-md-file-chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 240px;
+}
+
+.opptrix-md .opptrix-md-file-chip-action {
+  flex-shrink: 0;
+  color: var(--opptrix-md-text-subtle);
+  font-size: 0.88em;
+}

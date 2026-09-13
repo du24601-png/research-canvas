@@ -1,0 +1,29 @@
+{
+  "name": "@opptrix/a-stock-layer",
+  "version": "0.4.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "npm run build -w @opptrix/provider-sdk && tsc -p tsconfig.json && node scripts/copy-akshare-worker.mjs",
+    "audit:apis": "npm run build && node scripts/audit-apis.mjs",
+    "test:tickflow": "npm run build && node scripts/test-tickflow-apis.mjs",
+    "test:oppx": "npm run build && node scripts/test-oppx.mjs"
+  },
+  "dependencies": {
+    "@opptrix/fuyao": "^1.0.2",
+    "@opptrix/market-data-core": "*",
+    "@opptrix/provider-sdk": "*",
+    "@opptrix/shared": "*",
+    "@opptrix/user-store": "*",
+    "pdf-parse": "^1.1.1",
+    "yahoo-finance2": "^4.0.2"
+  }
+}

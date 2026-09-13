@@ -1,0 +1,79 @@
+# Dependencies
+node_modules/
+client-ui/node_modules/
+
+# Build output
+dist/
+**/dist/
+client-ui/dist/
+*.tsbuildinfo
+
+# Python (legacy — removed from repo)
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+# Root Python venv only — do not ignore packages/*/src/env (source modules)
+/env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets & runtime data
+.env
+.env.*
+!.env.example
+compose.env
+.opptrix.json
+.opptrix-host.json
+packages/selfhost/bundle/
+*.key
+certs/
+api_keys.txt
+apps/server/data/
+
+# User-local state
+.opptrix/
+.research-canvas/
+.a_stock_layer/
+
+# Local LLM weights
+apps/server/llms/*.gguf
+llms/*.gguf
+
+# Logs & cache
+logs/
+data/cache/
+outputs/
+
+# CodeGraph / Cursor / MiMoCode — never track; keep entirely local
+.codegraph/
+.cursor/
+.mimocode/
+
+# Reasonix tool state / permissions cache — never track
+.reasonix/
+reasonix.toml
+
+# Runtime pack output (scripts/pack-opptrix-runtime.mjs test runs)
+dist-runtime/
+opptrix-runtime.json
+
+# Local trials when using example/ configs
+example/runtime-local/
+.akshare-ref/
+
+# Agent/MiMoCode generated files
+.agents/
+skills-lock.json
+
+# local prepare:fonts debug
+.prepare-fonts-out.tmp

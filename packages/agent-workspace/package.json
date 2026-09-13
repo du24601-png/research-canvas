@@ -1,0 +1,30 @@
+{
+  "name": "@opptrix/agent-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "templates",
+    "assets"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node -e \"import('node:fs').then(({cpSync,existsSync,mkdirSync})=>{if(existsSync('templates'))cpSync('templates','dist/templates',{recursive:true});else mkdirSync('dist/templates',{recursive:true});if(existsSync('assets'))cpSync('assets','dist/assets',{recursive:true});else mkdirSync('dist/assets',{recursive:true})})\""
+  },
+  "dependencies": {
+    "@anthropic-ai/sandbox-runtime": "^0.0.67",
+    "@opptrix/shared": "*",
+    "@opptrix/user-store": "*"
+  },
+  "optionalDependencies": {
+    "koffi": "^2.9.0"
+  }
+}
