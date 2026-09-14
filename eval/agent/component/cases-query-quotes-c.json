@@ -1,0 +1,115 @@
+{
+  "file": "cases-query-quotes-c.json",
+  "family": "tushare_query_profile",
+  "cases": [
+    {
+      "id": "qq-016",
+      "split": "held_in",
+      "family": "tushare_query_profile",
+      "question": "给我平安银行的财务摘要",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "get_instrument_financials",
+            "required": true,
+            "args": { "symbol_any": ["000001", "平安银行"] }
+          }
+        ],
+        "optional_before": ["search_instruments"],
+        "forbidden": ["query_data", "propose_widget", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "instrument_financials",
+        "judge_notes": "财务摘要走 financials。"
+      }
+    },
+    {
+      "id": "qq-017",
+      "split": "held_in",
+      "family": "tushare_query_profile",
+      "question": "深度分析一下宁德时代",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "get_instrument_snapshot",
+            "required": true,
+            "args": { "symbol_any": ["300750", "宁德时代", "宁德"] }
+          }
+        ],
+        "optional_before": ["search_instruments"],
+        "forbidden": ["web_search", "create_canvas", "create_widget"],
+        "max_calls": 4,
+        "tushare_via": "instrument_snapshot",
+        "judge_notes": "深度分析 → snapshot。"
+      }
+    },
+    {
+      "id": "qq-018",
+      "split": "held_out",
+      "family": "tushare_query_profile",
+      "question": "000333 是做什么的",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "get_instrument_profile",
+            "required": true,
+            "args": { "symbol_any": ["000333"] }
+          }
+        ],
+        "forbidden": ["query_data", "propose_widget", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 2,
+        "tushare_via": "instrument_profile",
+        "judge_notes": "概况走 profile。"
+      }
+    },
+    {
+      "id": "qq-019",
+      "split": "held_in",
+      "family": "tushare_query_profile",
+      "question": "中国石油的主营业务",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "get_instrument_profile",
+            "required": true,
+            "args": { "symbol_any": ["601857", "中国石油", "中石油"] }
+          }
+        ],
+        "optional_before": ["search_instruments"],
+        "forbidden": ["query_data", "propose_widget", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "instrument_profile",
+        "judge_notes": "主营 → profile。"
+      }
+    },
+    {
+      "id": "qq-020",
+      "split": "held_in",
+      "family": "tushare_query_profile",
+      "question": "立讯精密近几年财务摘要",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "get_instrument_financials",
+            "required": true,
+            "args": { "symbol_any": ["002475", "立讯精密", "立讯"] }
+          }
+        ],
+        "optional_before": ["search_instruments"],
+        "forbidden": ["query_data", "propose_widget", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "instrument_financials",
+        "judge_notes": "摘要不是 query_data。"
+      }
+    }
+  ]
+}

@@ -1,0 +1,151 @@
+{
+  "file": "cases-adopt.json",
+  "family": "adopt_boundary",
+  "cases": [
+    {
+      "id": "pl-016",
+      "split": "held_out",
+      "family": "adopt_boundary",
+      "toolset": "component_v1",
+      "task": "对比招商银行和平安银行 2020 到 2024 年净利润",
+      "user_script": [],
+      "gold": {
+        "chain": [
+          {
+            "name": "query_data",
+            "args": {
+              "metric": { "eq": "net_income" },
+              "start": { "eq": "2020" },
+              "end": { "eq": "2024" }
+            }
+          },
+          {
+            "name": "propose_widget"
+          }
+        ],
+        "optional": ["search_instruments"],
+        "max_decisions": 4
+      },
+      "constraints": [
+        {
+          "id": "no_steal_canvas",
+          "type": "forbid_tool",
+          "tools": ["create_widget", "create_canvas", "update_widget"]
+        },
+        {
+          "id": "no_web",
+          "type": "forbid_tool",
+          "tools": ["web_search"]
+        },
+        {
+          "id": "no_financials",
+          "type": "forbid_tool",
+          "tools": ["get_instrument_financials"]
+        }
+      ]
+    },
+    {
+      "id": "pl-017",
+      "split": "held_in",
+      "family": "adopt_boundary",
+      "toolset": "component_v1",
+      "task": "把刚才的预览加到右侧画布",
+      "context": {
+        "artifacts_enabled": false,
+        "datasets": [
+          {
+            "id": "research-ds-1",
+            "metric": "gross_margin",
+            "title": "三家轮胎毛利率",
+            "entityNames": [
+              "赛轮轮胎",
+              "玲珑轮胎",
+              "森麒麟"
+            ],
+            "periodRange": "2021–2025"
+          }
+        ],
+        "proposals": [
+          {
+            "id": "prop-1",
+            "type": "grouped_bar",
+            "title": "三家轮胎毛利率",
+            "datasetId": "research-ds-1"
+          }
+        ],
+        "widgets": []
+      },
+      "user_script": [],
+      "gold": {
+        "chain": [
+          {
+            "name": "create_widget"
+          }
+        ],
+        "optional": [],
+        "max_decisions": 2
+      },
+      "constraints": [
+        {
+          "id": "no_requery",
+          "type": "forbid_tool",
+          "tools": ["query_data"]
+        },
+        {
+          "id": "no_report_canvas",
+          "type": "forbid_tool",
+          "tools": ["create_canvas"]
+        }
+      ]
+    },
+    {
+      "id": "pl-018",
+      "split": "held_in",
+      "family": "adopt_boundary",
+      "toolset": "component_v1",
+      "task": "把右侧这张改成柱状图",
+      "context": {
+        "artifacts_enabled": false,
+        "datasets": [
+          {
+            "id": "research-ds-1",
+            "metric": "gross_margin",
+            "title": "三家轮胎毛利率",
+            "entityNames": [
+              "赛轮轮胎",
+              "玲珑轮胎",
+              "森麒麟"
+            ],
+            "periodRange": "2021–2025"
+          }
+        ],
+        "proposals": [],
+        "widgets": [
+          {
+            "id": "w-1",
+            "type": "line",
+            "title": "三家轮胎毛利率",
+            "datasetId": "research-ds-1"
+          }
+        ]
+      },
+      "user_script": [],
+      "gold": {
+        "chain": [
+          {
+            "name": "update_widget"
+          }
+        ],
+        "optional": [],
+        "max_decisions": 2
+      },
+      "constraints": [
+        {
+          "id": "canvas_not_preview",
+          "type": "forbid_tool",
+          "tools": ["update_proposal", "create_canvas"]
+        }
+      ]
+    }
+  ]
+}

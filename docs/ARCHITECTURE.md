@@ -41,4 +41,5 @@ Storage     user-store（SQLite）
 ## 相关
 
 - 数据层细节：[DATA-LAYER.md](./DATA-LAYER.md)
+- Agent 评测（与产品 CI 隔离）：[AGENT-EVAL.md](./AGENT-EVAL.md)
 - 阶段验收：[Research Canvas/HANDOFF.md](../Research%20Canvas/HANDOFF.md)

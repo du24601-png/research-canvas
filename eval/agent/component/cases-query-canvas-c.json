@@ -1,0 +1,256 @@
+{
+  "file": "cases-query-canvas-c.json",
+  "family": "tushare_query_canvas",
+  "cases": [
+    {
+      "id": "qc-013",
+      "split": "held_in",
+      "family": "tushare_query_canvas",
+      "question": "比较美的集团和格力电器 2020 到 2024 年营收",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": { "eq": "revenue" },
+              "entities": {
+                "covers": [
+                  { "any": ["美的集团", "美的", "000333"] },
+                  { "any": ["格力电器", "格力", "000651"] }
+                ]
+              },
+              "start": { "eq": "2020" },
+              "end": { "eq": "2024" }
+            }
+          }
+        ],
+        "optional_before": ["search_instruments"],
+        "forbidden": ["get_instrument_financials", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "query_data.financials",
+        "judge_notes": "两家家电营收走 query_data。"
+      }
+    },
+    {
+      "id": "qc-014",
+      "split": "held_in",
+      "family": "tushare_query_canvas",
+      "question": "看一下海康威视 2019 到 2024 年净资产收益率",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": { "eq": "roe" },
+              "entities": {
+                "covers": [
+                  { "any": ["海康威视", "海康", "002415"] }
+                ]
+              },
+              "start": { "eq": "2019" },
+              "end": { "eq": "2024" }
+            }
+          }
+        ],
+        "optional_before": ["search_instruments"],
+        "forbidden": ["get_instrument_financials", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "query_data.financials",
+        "judge_notes": "单只 ROE 走势仍走 query_data。"
+      }
+    },
+    {
+      "id": "qc-015",
+      "split": "held_in",
+      "family": "tushare_query_canvas",
+      "question": "对比恒瑞医药和迈瑞医疗 2021-2025 年毛利率",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": { "eq": "gross_margin" },
+              "entities": {
+                "covers": [
+                  { "any": ["恒瑞医药", "恒瑞", "600276"] },
+                  { "any": ["迈瑞医疗", "迈瑞", "300760"] }
+                ]
+              },
+              "start": { "eq": "2021" },
+              "end": { "in": ["2025", "2026"] }
+            }
+          }
+        ],
+        "optional_before": ["search_instruments"],
+        "forbidden": ["get_instrument_financials", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "query_data.financials",
+        "judge_notes": "医药两家毛利率。"
+      }
+    },
+    {
+      "id": "qc-016",
+      "split": "held_out",
+      "family": "tushare_query_canvas",
+      "question": "伊利股份 2020 到 2024 年净利润走势",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": { "eq": "net_income" },
+              "entities": {
+                "covers": [
+                  { "any": ["伊利股份", "伊利", "600887"] }
+                ]
+              },
+              "start": { "eq": "2020" },
+              "end": { "eq": "2024" }
+            }
+          }
+        ],
+        "optional_before": ["search_instruments"],
+        "forbidden": ["get_instrument_financials", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "query_data.financials",
+        "judge_notes": "净利润 = net_income。"
+      }
+    },
+    {
+      "id": "qc-017",
+      "split": "held_in",
+      "family": "tushare_query_canvas",
+      "question": "看一下中芯国际的K线",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": { "eq": "kline" },
+              "entities": {
+                "covers": [
+                  { "any": ["中芯国际", "中芯", "688981"] }
+                ]
+              }
+            }
+          }
+        ],
+        "optional_before": ["search_instruments"],
+        "forbidden": ["get_instrument_quotes", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "query_data.kline",
+        "judge_notes": "K 线 metric=kline。"
+      }
+    },
+    {
+      "id": "qc-018",
+      "split": "held_in",
+      "family": "tushare_query_canvas",
+      "question": "阳光电源和通威股份 2022 到 2025 年营收",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": { "eq": "revenue" },
+              "entities": {
+                "covers": [
+                  { "any": ["阳光电源", "300274"] },
+                  { "any": ["通威股份", "通威", "600438"] }
+                ]
+              },
+              "start": { "eq": "2022" },
+              "end": { "eq": "2025" }
+            }
+          }
+        ],
+        "optional_before": ["search_instruments"],
+        "forbidden": ["get_instrument_financials", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "query_data.financials",
+        "judge_notes": "光伏设备与硅料营收对比。"
+      }
+    },
+    {
+      "id": "qc-019",
+      "split": "held_in",
+      "family": "tushare_query_canvas",
+      "question": "中国神华 2018 到 2024 年净资产收益率",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": { "eq": "roe" },
+              "entities": {
+                "covers": [
+                  { "any": ["中国神华", "神华", "601088"] }
+                ]
+              },
+              "start": { "eq": "2018" },
+              "end": { "eq": "2024" }
+            }
+          }
+        ],
+        "optional_before": ["search_instruments"],
+        "forbidden": ["get_instrument_financials", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "query_data.financials",
+        "judge_notes": "煤炭龙头 ROE。"
+      }
+    },
+    {
+      "id": "qc-020",
+      "split": "held_in",
+      "family": "tushare_query_canvas",
+      "question": "比较海尔智家、美的集团 2021 到 2024 年净利率",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": { "eq": "net_margin" },
+              "entities": {
+                "covers": [
+                  { "any": ["海尔智家", "海尔", "600690"] },
+                  { "any": ["美的集团", "美的", "000333"] }
+                ]
+              },
+              "start": { "eq": "2021" },
+              "end": { "eq": "2024" }
+            }
+          }
+        ],
+        "optional_before": ["search_instruments"],
+        "forbidden": ["get_instrument_financials", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "query_data.financials",
+        "judge_notes": "净利率 = net_margin。"
+      }
+    }
+  ]
+}

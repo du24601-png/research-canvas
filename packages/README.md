@@ -100,6 +100,7 @@ npm run build            # + client-ui
 npm run check:ui         # client-ui 门禁
 npm run test:gate        # PR 门禁
 npm run test:ci          # 离线测试套件
+npm run eval:agent       # Agent 三层评测（不进 test:gate，见 docs/AGENT-EVAL.md）
 ```
 
 ## 扩展数据层

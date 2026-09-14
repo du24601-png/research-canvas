@@ -1,0 +1,40 @@
+{
+  "id": "agent-component-tushare-v1",
+  "track": "agent",
+  "layer": "component",
+  "focus": "tool_calling.tushare_query",
+  "as_of": "2026-09-14",
+  "description": "组件评测：Agent 是否对 Tushare 支持的问数正确调工具。Agent 不直连 Tushare API，经 query_data / get_instrument_* 入引擎。反例与正例共用同一工具清单，用于测工具幻觉。100 题；单轮 runner 跳过 qg-005。",
+  "tool_catalog": "./tool-catalog.json",
+  "schema": "./schema.json",
+  "default_toolset": "component_v1",
+  "cases": [
+    "./cases-query-canvas-a.json",
+    "./cases-query-canvas-b.json",
+    "./cases-query-canvas-c.json",
+    "./cases-query-canvas-d.json",
+    "./cases-query-canvas-e.json",
+    "./cases-query-quotes.json",
+    "./cases-query-quotes-b.json",
+    "./cases-query-quotes-c.json",
+    "./cases-query-gates.json",
+    "./cases-query-gates-b.json",
+    "./cases-query-gates-c.json",
+    "./cases-negative.json",
+    "./cases-negative-b.json"
+  ],
+  "counts": {
+    "query_canvas": 32,
+    "query_quotes_profile": 21,
+    "query_gates": 16,
+    "negative_no_tool": 31,
+    "total": 100,
+    "negative_ratio": 0.31
+  },
+  "scoring": {
+    "product_ci": false,
+    "mix_with_product_tests": false,
+    "judge": "./judge.mjs",
+    "notes": "本目录只服务 Agent 轨道。不得与 test:gate 准确率加权。判分入口 judgeComponentCase。"
+  }
+}

@@ -1,0 +1,1210 @@
+{
+  "schema": "opptrix.eval.planning.v1",
+  "kind": "official",
+  "track": "agent",
+  "layer": "planning",
+  "focus": "decision_chain.research_canvas",
+  "dataset_id": "agent-planning-canvas-v1",
+  "at": "2026-09-14T04:53:19.912Z",
+  "duration_ms": 102638,
+  "git": {
+    "commit": "739c6db39705f33a16b7bef01df46590ad2a9fd2",
+    "dirty": true
+  },
+  "sources": {
+    "hashes": {
+      "manifest.json": "8abb2413025859d8",
+      "schema.json": "899091d9526aa9bb",
+      "prompt.mjs": "b26b984f510917e6",
+      "judge.mjs": "5081e8496530d839",
+      "match-chain.mjs": "cfe1ddf98107dbcf",
+      "constraints.mjs": "fb8dd7bac9a033de",
+      "fixtures.mjs": "d3f1b8be387099a6",
+      "loop.mjs": "797837242a405431",
+      "cases-named.json": "05e90312b43aeb5c",
+      "cases-many.json": "1c4ff6c9f8a849ba",
+      "cases-industry.json": "d0cf0fe3c118c184",
+      "cases-refine.json": "69c334aaa7c34b1a",
+      "cases-adopt.json": "dd6cf3cf3a9ff361",
+      "cases-quotes-stop.json": "0f336023feded9a1"
+    }
+  },
+  "llm": {
+    "model": "deepseek-flash",
+    "temperature": 0,
+    "max_tokens": 1024,
+    "tool_choice": "auto"
+  },
+  "prompt": "你是 Research Canvas 投研助手。只能使用本轮提供的工具，禁止编造财务或行情数字。\n比较、走势、K 线：query_data 后再 propose_widget。不要 create_widget，除非用户明确要求加到右侧画布。禁止 create_canvas。\n点名不超过 3 家直接取数；超过 3 家首次不要传 confirmed:true，等用户确认后再 query_data(confirmed:true)。\n行业或板块对比：先 resolve_industry_universe，再 ask_user 确认名单，确认前禁止 query_data。\n已有数据集上去掉公司或收窄年份：refine_dataset 再 propose_widget，不要再 query_data，不要 update_widget。\n改看另一个指标：重新 query_data。只改图种：propose_widget。Preview 改颜色：update_proposal。\n现价涨跌：get_instrument_quotes。寒暄、概念、翻译、用户禁止调工具：不要调用任何工具。\n没有指数成分股工具。A 股财务和行情禁止 web_search。工具结果不含明细数字，不要编造数字。",
+  "skip": [],
+  "notes": "",
+  "summary": {
+    "judged": 24,
+    "skipped": 0,
+    "passed": 17,
+    "failed": 7,
+    "pass_rate": 0.7083333333333334,
+    "failure_rate": 0.2916666666666667,
+    "effective_ratio": 0.7083333333333334,
+    "avg_decisions": 2.0416666666666665,
+    "avg_decisions_passed": 1.4705882352941178,
+    "avg_step_precision": 0.8368055555555557,
+    "by_family": {
+      "named_compare": {
+        "judged": 4,
+        "passed": 3,
+        "failed": 1,
+        "skipped": 0
+      },
+      "many_preview": {
+        "judged": 3,
+        "passed": 0,
+        "failed": 3,
+        "skipped": 0
+      },
+      "industry": {
+        "judged": 3,
+        "passed": 2,
+        "failed": 1,
+        "skipped": 0
+      },
+      "refine_view": {
+        "judged": 5,
+        "passed": 5,
+        "failed": 0,
+        "skipped": 0
+      },
+      "adopt_boundary": {
+        "judged": 3,
+        "passed": 2,
+        "failed": 1,
+        "skipped": 0
+      },
+      "quotes_and_stop": {
+        "judged": 6,
+        "passed": 5,
+        "failed": 1,
+        "skipped": 0
+      }
+    },
+    "constraint_hits": {
+      "no_early_confirm": 3,
+      "no_fake_metric": 1
+    }
+  },
+  "results": [
+    {
+      "caseId": "pl-001",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "decisions": 2,
+        "gold_steps": 2,
+        "matched_steps": 2,
+        "step_precision": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data",
+        "propose_widget"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "美的集团",
+              "格力电器"
+            ],
+            "metric": "revenue",
+            "start": "2020",
+            "end": "2024"
+          }
+        },
+        {
+          "name": "propose_widget",
+          "args": {
+            "datasetId": "research-ds-eval-1",
+            "type": "grouped_bar",
+            "intent": "compare",
+            "title": "美的集团 vs 格力电器 营收对比（2020–2024）"
+          }
+        }
+      ],
+      "events": {
+        "user_confirm": false
+      },
+      "error": null,
+      "question": "比较美的集团和格力电器 2020 到 2024 年营收",
+      "family": "named_compare",
+      "split": "held_in"
+    },
+    {
+      "caseId": "pl-002",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "decisions": 2,
+        "gold_steps": 2,
+        "matched_steps": 2,
+        "step_precision": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data",
+        "propose_widget"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "海康威视"
+            ],
+            "metric": "roe",
+            "start": "2019",
+            "end": "2024"
+          }
+        },
+        {
+          "name": "propose_widget",
+          "args": {
+            "datasetId": "research-ds-eval-1",
+            "type": "grouped_bar",
+            "intent": "trend",
+            "title": "海康威视 2019-2024 年净资产收益率(ROE)"
+          }
+        }
+      ],
+      "events": {
+        "user_confirm": false
+      },
+      "error": null,
+      "question": "看海康威视 2019 到 2024 年净资产收益率",
+      "family": "named_compare",
+      "split": "held_in"
+    },
+    {
+      "caseId": "pl-003",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "decisions": 2,
+        "gold_steps": 2,
+        "matched_steps": 2,
+        "step_precision": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data",
+        "propose_widget"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "恒瑞医药",
+              "迈瑞医疗"
+            ],
+            "metric": "gross_margin",
+            "start": "2021",
+            "end": "2025"
+          }
+        },
+        {
+          "name": "propose_widget",
+          "args": {
+            "datasetId": "research-ds-eval-1",
+            "intent": "compare",
+            "type": "grouped_bar",
+            "title": "恒瑞医药 vs 迈瑞医疗 毛利率对比（2021–2025）"
+          }
+        }
+      ],
+      "events": {
+        "user_confirm": false
+      },
+      "error": null,
+      "question": "对比恒瑞医药和迈瑞医疗 2021 到 2025 年毛利率",
+      "family": "named_compare",
+      "split": "held_in"
+    },
+    {
+      "caseId": "pl-004",
+      "pass": false,
+      "reasons": [
+        "max_decisions 4，实际 6"
+      ],
+      "stats": {
+        "decisions": 6,
+        "gold_steps": 2,
+        "matched_steps": 2,
+        "step_precision": 0.3333333333333333
+      },
+      "skipped": false,
+      "tool_names": [
+        "search_instruments",
+        "search_instruments",
+        "search_instruments",
+        "ask_user",
+        "query_data",
+        "propose_widget"
+      ],
+      "calls": [
+        {
+          "name": "search_instruments",
+          "args": {
+            "keyword": "中芯国际"
+          }
+        },
+        {
+          "name": "search_instruments",
+          "args": {
+            "keyword": "688981"
+          }
+        },
+        {
+          "name": "search_instruments",
+          "args": {
+            "keyword": "00981"
+          }
+        },
+        {
+          "name": "ask_user",
+          "args": {
+            "prompt": "你想看中芯国际哪个市场的K线？",
+            "mode": "choice",
+            "options": [
+              "A股 688981（科创板）",
+              "港股 00981",
+              "两个都看"
+            ]
+          }
+        },
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "中芯国际"
+            ],
+            "metric": "kline",
+            "start": "2025",
+            "end": "2026"
+          }
+        },
+        {
+          "name": "propose_widget",
+          "args": {
+            "datasetId": "research-ds-eval-1",
+            "title": "中芯国际 日K线",
+            "type": "candlestick",
+            "intent": "price"
+          }
+        }
+      ],
+      "events": {
+        "user_confirm": false
+      },
+      "error": null,
+      "question": "看一下中芯国际的K线",
+      "family": "named_compare",
+      "split": "held_in"
+    },
+    {
+      "caseId": "pl-005",
+      "pass": false,
+      "reasons": [
+        "no_early_confirm：禁止参数 query_data"
+      ],
+      "stats": {
+        "decisions": 4,
+        "gold_steps": 3,
+        "matched_steps": 3,
+        "step_precision": 0.75
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data",
+        "ask_user",
+        "query_data",
+        "propose_widget"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "贵州茅台",
+              "五粮液",
+              "洋河股份",
+              "泸州老窖",
+              "山西汾酒"
+            ],
+            "metric": "revenue",
+            "start": "2020",
+            "end": "2024"
+          }
+        },
+        {
+          "name": "ask_user",
+          "args": {
+            "prompt": "将要取数：贵州茅台、五粮液、洋河股份、泸州老窖、山西汾酒 5 家公司，指标为营业收入，区间 2020–2024 年。确认后我正式取数并生成对比视图。",
+            "mode": "confirm"
+          }
+        },
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "贵州茅台",
+              "五粮液",
+              "洋河股份",
+              "泸州老窖",
+              "山西汾酒"
+            ],
+            "metric": "revenue",
+            "start": "2020",
+            "end": "2024",
+            "confirmed": true
+          }
+        },
+        {
+          "name": "propose_widget",
+          "args": {
+            "datasetId": "research-ds-eval-1",
+            "intent": "compare",
+            "type": "grouped_bar",
+            "title": "2020–2024 年营收对比：茅台 vs 五粮液 vs 洋河 vs 泸州老窖 vs 山西汾酒"
+          }
+        }
+      ],
+      "events": {
+        "user_confirm": false
+      },
+      "error": null,
+      "question": "比较茅台、五粮液、洋河、泸州老窖、山西汾酒 2020 到 2024 年营收",
+      "family": "many_preview",
+      "split": "held_in"
+    },
+    {
+      "caseId": "pl-006",
+      "pass": false,
+      "reasons": [
+        "no_early_confirm：禁止参数 query_data"
+      ],
+      "stats": {
+        "decisions": 4,
+        "gold_steps": 3,
+        "matched_steps": 3,
+        "step_precision": 0.75
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data",
+        "ask_user",
+        "query_data",
+        "propose_widget"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "工商银行",
+              "建设银行",
+              "农业银行",
+              "中国银行",
+              "交通银行"
+            ],
+            "metric": "revenue",
+            "start": "2020",
+            "end": "2024"
+          }
+        },
+        {
+          "name": "ask_user",
+          "args": {
+            "prompt": "请确认取数计划：对比这 5 家银行 2020–2024 年营业收入（年度）。确认后我将正式取数并生成对比图。",
+            "mode": "confirm"
+          }
+        },
+        {
+          "name": "query_data",
+          "args": {
+            "confirmed": true,
+            "end": "2024",
+            "entities": [
+              "工商银行",
+              "建设银行",
+              "农业银行",
+              "中国银行",
+              "交通银行"
+            ],
+            "metric": "revenue",
+            "start": "2020"
+          }
+        },
+        {
+          "name": "propose_widget",
+          "args": {
+            "datasetId": "research-ds-eval-1",
+            "intent": "compare",
+            "title": "五大行营业收入对比（2020–2024）",
+            "type": "grouped_bar"
+          }
+        }
+      ],
+      "events": {
+        "user_confirm": false
+      },
+      "error": null,
+      "question": "对比工商银行、建设银行、农业银行、中国银行、交通银行 2020 到 2024 年营收",
+      "family": "many_preview",
+      "split": "held_out"
+    },
+    {
+      "caseId": "pl-007",
+      "pass": false,
+      "reasons": [
+        "max_decisions 2，实际 4",
+        "no_early_confirm：禁止参数 query_data"
+      ],
+      "stats": {
+        "decisions": 4,
+        "gold_steps": 1,
+        "matched_steps": 1,
+        "step_precision": 0.25
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data",
+        "ask_user",
+        "query_data",
+        "propose_widget"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "贵州茅台",
+              "五粮液",
+              "洋河股份",
+              "泸州老窖",
+              "山西汾酒"
+            ],
+            "metric": "revenue",
+            "start": "2020",
+            "end": "2024"
+          }
+        },
+        {
+          "name": "ask_user",
+          "args": {
+            "prompt": "本次拟比较 5 家公司 2020–2024 年营业收入（单位：亿元，年度口径）：贵州茅台、五粮液、洋河股份、泸州老窖、山西汾酒。是否确认按此名单与区间取数？",
+            "mode": "confirm"
+          }
+        },
+        {
+          "name": "query_data",
+          "args": {
+            "confirmed": true,
+            "end": "2024",
+            "entities": [
+              "贵州茅台",
+              "五粮液",
+              "洋河股份",
+              "泸州老窖",
+              "山西汾酒"
+            ],
+            "metric": "revenue",
+            "start": "2020"
+          }
+        },
+        {
+          "name": "propose_widget",
+          "args": {
+            "datasetId": "research-ds-eval-1",
+            "title": "五家白酒企业 2020–2024 年营业收入对比",
+            "type": "grouped_bar",
+            "intent": "compare"
+          }
+        }
+      ],
+      "events": {
+        "user_confirm": false
+      },
+      "error": null,
+      "question": "比较茅台、五粮液、洋河、泸州老窖、山西汾酒 2020 到 2024 年营收",
+      "family": "many_preview",
+      "split": "held_in"
+    },
+    {
+      "caseId": "pl-008",
+      "pass": false,
+      "reasons": [
+        "缺少步骤 query_data",
+        "缺少步骤 propose_widget"
+      ],
+      "stats": {
+        "decisions": 2,
+        "gold_steps": 4,
+        "matched_steps": 2,
+        "step_precision": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "resolve_industry_universe",
+        "ask_user"
+      ],
+      "calls": [
+        {
+          "name": "resolve_industry_universe",
+          "args": {
+            "industry": "白酒"
+          }
+        },
+        {
+          "name": "ask_user",
+          "args": {
+            "prompt": "已解析“白酒”行业，默认包含 8 家上市公司。是否按此名单对比毛利率？如需增减公司可告知。",
+            "mode": "confirm"
+          }
+        }
+      ],
+      "events": {
+        "user_confirm": false
+      },
+      "error": null,
+      "question": "白酒行业毛利率对比",
+      "family": "industry",
+      "split": "held_in"
+    },
+    {
+      "caseId": "pl-009",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "decisions": 4,
+        "gold_steps": 4,
+        "matched_steps": 4,
+        "step_precision": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "resolve_industry_universe",
+        "ask_user",
+        "query_data",
+        "propose_widget"
+      ],
+      "calls": [
+        {
+          "name": "resolve_industry_universe",
+          "args": {
+            "industry": "半导体"
+          }
+        },
+        {
+          "name": "ask_user",
+          "args": {
+            "prompt": "我已按「半导体」板块解析出 8 家公司的默认名单（未展示明细以免口播）。请确认：是否按该名单取营收数据做排名？如需调整公司（增删）或收窄年份，请在选项中说明。",
+            "mode": "confirm",
+            "options": [
+              "确认，按默认 8 家名单",
+              "我要增删公司",
+              "我要调整年份范围"
+            ]
+          }
+        },
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "半导体"
+            ],
+            "metric": "revenue",
+            "start": "2021",
+            "end": "2025",
+            "confirmed": true
+          }
+        },
+        {
+          "name": "propose_widget",
+          "args": {
+            "datasetId": "research-ds-eval-1",
+            "type": "bar_chart",
+            "intent": "rank",
+            "title": "半导体板块营收排名（2021–2025）",
+            "params": {
+              "period": "2024",
+              "topN": "10"
+            }
+          }
+        }
+      ],
+      "events": {
+        "user_confirm": false
+      },
+      "error": null,
+      "question": "半导体板块营收排名",
+      "family": "industry",
+      "split": "held_in"
+    },
+    {
+      "caseId": "pl-010",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "decisions": 0,
+        "gold_steps": 0,
+        "matched_steps": 0,
+        "step_precision": 1
+      },
+      "skipped": false,
+      "tool_names": [],
+      "calls": [],
+      "events": {
+        "user_confirm": false
+      },
+      "error": null,
+      "question": "沪深300成分股有哪些",
+      "family": "industry",
+      "split": "held_out"
+    },
+    {
+      "caseId": "pl-011",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "decisions": 2,
+        "gold_steps": 2,
+        "matched_steps": 2,
+        "step_precision": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "refine_dataset",
+        "propose_widget"
+      ],
+      "calls": [
+        {
+          "name": "refine_dataset",
+          "args": {
+            "datasetId": "research-ds-1",
+            "operation": {
+              "type": "remove_entities",
+              "entities": [
+                "森麒麟"
+              ]
+            }
+          }
+        },
+        {
+          "name": "propose_widget",
+          "args": {
+            "datasetId": "research-ds-1-r1",
+            "type": "grouped_bar",
+            "intent": "compare",
+            "title": "赛轮轮胎、玲珑轮胎毛利率对比（2021–2025）"
+          }
+        }
+      ],
+      "events": {
+        "user_confirm": false
+      },
+      "error": null,
+      "question": "去掉森麒麟",
+      "family": "refine_view",
+      "split": "held_in"
+    },
+    {
+      "caseId": "pl-012",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "decisions": 2,
+        "gold_steps": 2,
+        "matched_steps": 2,
+        "step_precision": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "refine_dataset",
+        "propose_widget"
+      ],
+      "calls": [
+        {
+          "name": "refine_dataset",
+          "args": {
+            "datasetId": "research-ds-1",
+            "operation": {
+              "type": "change_period",
+              "start": "2023",
+              "end": "2025"
+            }
+          }
+        },
+        {
+          "name": "propose_widget",
+          "args": {
+            "datasetId": "research-ds-1-r1",
+            "type": "grouped_bar",
+            "intent": "compare",
+            "title": "三家轮胎毛利率（2023–2025）"
+          }
+        }
+      ],
+      "events": {
+        "user_confirm": false
+      },
+      "error": null,
+      "question": "只看 2023 到 2025",
+      "family": "refine_view",
+      "split": "held_in"
+    },
+    {
+      "caseId": "pl-013",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "decisions": 2,
+        "gold_steps": 2,
+        "matched_steps": 2,
+        "step_precision": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data",
+        "propose_widget"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "赛轮轮胎",
+              "玲珑轮胎",
+              "森麒麟"
+            ],
+            "metric": "revenue",
+            "start": "2021",
+            "end": "2025"
+          }
+        },
+        {
+          "name": "propose_widget",
+          "args": {
+            "datasetId": "research-ds-eval-1",
+            "type": "grouped_bar",
+            "intent": "compare",
+            "title": "三家轮胎公司营业收入（2021–2025）"
+          }
+        }
+      ],
+      "events": {
+        "user_confirm": false
+      },
+      "error": null,
+      "question": "改看营收",
+      "family": "refine_view",
+      "split": "held_in"
+    },
+    {
+      "caseId": "pl-014",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "decisions": 1,
+        "gold_steps": 1,
+        "matched_steps": 1,
+        "step_precision": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "propose_widget"
+      ],
+      "calls": [
+        {
+          "name": "propose_widget",
+          "args": {
+            "datasetId": "research-ds-1",
+            "type": "line_chart",
+            "intent": "trend",
+            "title": "三家轮胎毛利率（2021–2025）"
+          }
+        }
+      ],
+      "events": {
+        "user_confirm": false
+      },
+      "error": null,
+      "question": "改成折线图",
+      "family": "refine_view",
+      "split": "held_in"
+    },
+    {
+      "caseId": "pl-015",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "decisions": 1,
+        "gold_steps": 1,
+        "matched_steps": 1,
+        "step_precision": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "update_proposal"
+      ],
+      "calls": [
+        {
+          "name": "update_proposal",
+          "args": {
+            "proposalId": "prop-1",
+            "title": "三家轮胎毛利率（赛轮=蓝，玲珑=橙）"
+          }
+        }
+      ],
+      "events": {
+        "user_confirm": false
+      },
+      "error": null,
+      "question": "把预览里赛轮改成蓝色、玲珑改成橙色",
+      "family": "refine_view",
+      "split": "held_out"
+    },
+    {
+      "caseId": "pl-016",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "decisions": 2,
+        "gold_steps": 2,
+        "matched_steps": 2,
+        "step_precision": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data",
+        "propose_widget"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "招商银行",
+              "平安银行"
+            ],
+            "metric": "net_income",
+            "start": "2020",
+            "end": "2024"
+          }
+        },
+        {
+          "name": "propose_widget",
+          "args": {
+            "datasetId": "research-ds-eval-1",
+            "type": "grouped_bar",
+            "intent": "compare",
+            "title": "招商银行 vs 平安银行 净利润对比（2020–2024）"
+          }
+        }
+      ],
+      "events": {
+        "user_confirm": false
+      },
+      "error": null,
+      "question": "对比招商银行和平安银行 2020 到 2024 年净利润",
+      "family": "adopt_boundary",
+      "split": "held_out"
+    },
+    {
+      "caseId": "pl-017",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "decisions": 1,
+        "gold_steps": 1,
+        "matched_steps": 1,
+        "step_precision": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "create_widget"
+      ],
+      "calls": [
+        {
+          "name": "create_widget",
+          "args": {
+            "type": "grouped_bar",
+            "title": "三家轮胎毛利率",
+            "datasetId": "research-ds-1"
+          }
+        }
+      ],
+      "events": {
+        "user_confirm": false
+      },
+      "error": null,
+      "question": "把刚才的预览加到右侧画布",
+      "family": "adopt_boundary",
+      "split": "held_in"
+    },
+    {
+      "caseId": "pl-018",
+      "pass": false,
+      "reasons": [
+        "缺少步骤 update_widget"
+      ],
+      "stats": {
+        "decisions": 1,
+        "gold_steps": 1,
+        "matched_steps": 0,
+        "step_precision": 0
+      },
+      "skipped": false,
+      "tool_names": [
+        "propose_widget"
+      ],
+      "calls": [
+        {
+          "name": "propose_widget",
+          "args": {
+            "datasetId": "research-ds-1",
+            "type": "bar_chart",
+            "intent": "compare",
+            "title": "三家轮胎毛利率（柱状图）"
+          }
+        }
+      ],
+      "events": {
+        "user_confirm": false
+      },
+      "error": null,
+      "question": "把右侧这张改成柱状图",
+      "family": "adopt_boundary",
+      "split": "held_in"
+    },
+    {
+      "caseId": "pl-019",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "decisions": 1,
+        "gold_steps": 1,
+        "matched_steps": 1,
+        "step_precision": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "get_instrument_quotes"
+      ],
+      "calls": [
+        {
+          "name": "get_instrument_quotes",
+          "args": {
+            "instruments": [
+              {
+                "market": "CN",
+                "symbol": "000858",
+                "exchange": "SZ"
+              }
+            ]
+          }
+        }
+      ],
+      "events": {
+        "user_confirm": false
+      },
+      "error": null,
+      "question": "五粮液现在什么价",
+      "family": "quotes_and_stop",
+      "split": "held_in"
+    },
+    {
+      "caseId": "pl-020",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "decisions": 3,
+        "gold_steps": 3,
+        "matched_steps": 3,
+        "step_precision": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "get_instrument_quotes",
+        "query_data",
+        "propose_widget"
+      ],
+      "calls": [
+        {
+          "name": "get_instrument_quotes",
+          "args": {
+            "instruments": [
+              {
+                "market": "CN",
+                "symbol": "000858",
+                "exchange": "SZ"
+              }
+            ]
+          }
+        },
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "五粮液"
+            ],
+            "metric": "gross_margin",
+            "start": "2021",
+            "end": "2025"
+          }
+        },
+        {
+          "name": "propose_widget",
+          "args": {
+            "datasetId": "research-ds-eval-1",
+            "intent": "trend",
+            "type": "line_chart",
+            "title": "五粮液 近五年毛利率走势（2021-2025）"
+          }
+        }
+      ],
+      "events": {
+        "user_confirm": false
+      },
+      "error": null,
+      "question": "五粮液现在什么价",
+      "family": "quotes_and_stop",
+      "split": "held_out"
+    },
+    {
+      "caseId": "pl-021",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "decisions": 0,
+        "gold_steps": 0,
+        "matched_steps": 0,
+        "step_precision": 1
+      },
+      "skipped": false,
+      "tool_names": [],
+      "calls": [],
+      "events": {
+        "user_confirm": false
+      },
+      "error": null,
+      "question": "ROE 是什么意思",
+      "family": "quotes_and_stop",
+      "split": "held_in"
+    },
+    {
+      "caseId": "pl-022",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "decisions": 0,
+        "gold_steps": 0,
+        "matched_steps": 0,
+        "step_precision": 1
+      },
+      "skipped": false,
+      "tool_names": [],
+      "calls": [],
+      "events": {
+        "user_confirm": false
+      },
+      "error": null,
+      "question": "我只是问问你懂不懂贵州茅台，先别调工具",
+      "family": "quotes_and_stop",
+      "split": "held_out"
+    },
+    {
+      "caseId": "pl-023",
+      "pass": false,
+      "reasons": [
+        "max_decisions 1，实际 3",
+        "no_fake_metric：禁止工具 query_data"
+      ],
+      "stats": {
+        "decisions": 3,
+        "gold_steps": 0,
+        "matched_steps": 0,
+        "step_precision": 0
+      },
+      "skipped": false,
+      "tool_names": [
+        "ask_user",
+        "query_data",
+        "propose_widget"
+      ],
+      "calls": [
+        {
+          "name": "ask_user",
+          "args": {
+            "prompt": "招商银行近五年想看哪个指标？（当前数据源不含\"净息差\"字段）",
+            "mode": "choice",
+            "options": [
+              "ROE 走势",
+              "营收与营收增速",
+              "净利润与净利率",
+              "股价日K线"
+            ]
+          }
+        },
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "招商银行"
+            ],
+            "metric": "roe",
+            "start": "2021",
+            "end": "2025"
+          }
+        },
+        {
+          "name": "propose_widget",
+          "args": {
+            "datasetId": "research-ds-eval-1",
+            "intent": "trend",
+            "type": "line_chart",
+            "title": "招商银行 ROE 走势（近五年）"
+          }
+        }
+      ],
+      "events": {
+        "user_confirm": false
+      },
+      "error": null,
+      "question": "看一下招商银行近五年净息差走势",
+      "family": "quotes_and_stop",
+      "split": "held_in"
+    },
+    {
+      "caseId": "pl-024",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "decisions": 0,
+        "gold_steps": 0,
+        "matched_steps": 0,
+        "step_precision": 1
+      },
+      "skipped": false,
+      "tool_names": [],
+      "calls": [],
+      "events": {
+        "user_confirm": false
+      },
+      "error": null,
+      "question": "把这句话翻译成英文：比亚迪毛利率有所回升",
+      "family": "quotes_and_stop",
+      "split": "held_in"
+    }
+  ]
+}

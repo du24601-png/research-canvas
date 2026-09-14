@@ -1,0 +1,170 @@
+{
+  "file": "cases-quotes-stop.json",
+  "family": "quotes_and_stop",
+  "cases": [
+    {
+      "id": "pl-019",
+      "split": "held_in",
+      "family": "quotes_and_stop",
+      "toolset": "component_v1",
+      "task": "五粮液现在什么价",
+      "user_script": [],
+      "gold": {
+        "chain": [
+          {
+            "name": "get_instrument_quotes",
+            "args": {
+              "symbol_any": ["000858", "五粮液"]
+            }
+          }
+        ],
+        "optional": ["search_instruments"],
+        "max_decisions": 3
+      },
+      "constraints": [
+        {
+          "id": "no_query_as_quote",
+          "type": "forbid_tool",
+          "tools": ["query_data", "propose_widget", "create_canvas", "web_search"]
+        }
+      ]
+    },
+    {
+      "id": "pl-020",
+      "split": "held_out",
+      "family": "quotes_and_stop",
+      "toolset": "component_v1",
+      "task": "五粮液现在什么价",
+      "user_script": [
+        {
+          "when": "tool_idle",
+          "tool": "get_instrument_quotes",
+          "content": "那再看近五年毛利率"
+        }
+      ],
+      "gold": {
+        "chain": [
+          {
+            "name": "get_instrument_quotes",
+            "args": {
+              "symbol_any": ["000858", "五粮液"]
+            }
+          },
+          {
+            "name": "query_data",
+            "args": {
+              "metric": { "eq": "gross_margin" }
+            }
+          },
+          {
+            "name": "propose_widget"
+          }
+        ],
+        "optional": ["search_instruments"],
+        "max_decisions": 6
+      },
+      "constraints": [
+        {
+          "id": "no_steal_canvas",
+          "type": "forbid_tool",
+          "tools": ["create_widget", "create_canvas", "update_widget"]
+        },
+        {
+          "id": "no_web",
+          "type": "forbid_tool",
+          "tools": ["web_search"]
+        },
+        {
+          "id": "no_financials",
+          "type": "forbid_tool",
+          "tools": ["get_instrument_financials"]
+        }
+      ]
+    },
+    {
+      "id": "pl-021",
+      "split": "held_in",
+      "family": "quotes_and_stop",
+      "toolset": "component_v1",
+      "task": "ROE 是什么意思",
+      "user_script": [],
+      "gold": {
+        "chain": [],
+        "optional": [],
+        "max_decisions": 0
+      },
+      "constraints": [
+        {
+          "id": "no_tools",
+          "type": "forbid_tool",
+          "tools": ["query_data", "get_instrument_quotes", "get_instrument_financials", "resolve_industry_universe", "propose_widget", "create_widget", "create_canvas", "web_search", "ask_user"]
+        }
+      ]
+    },
+    {
+      "id": "pl-022",
+      "split": "held_out",
+      "family": "quotes_and_stop",
+      "toolset": "component_v1",
+      "task": "我只是问问你懂不懂贵州茅台，先别调工具",
+      "user_script": [],
+      "gold": {
+        "chain": [],
+        "optional": [],
+        "max_decisions": 0
+      },
+      "constraints": [
+        {
+          "id": "no_tools",
+          "type": "forbid_tool",
+          "tools": ["query_data", "get_instrument_quotes", "get_instrument_financials", "resolve_industry_universe", "propose_widget", "create_widget", "create_canvas", "web_search", "ask_user"]
+        }
+      ]
+    },
+    {
+      "id": "pl-023",
+      "split": "held_in",
+      "family": "quotes_and_stop",
+      "toolset": "component_v1",
+      "task": "看一下招商银行近五年净息差走势",
+      "user_script": [
+        {
+          "when": "ask_user",
+          "content": "不要改查别的指标，做不到就停"
+        }
+      ],
+      "gold": {
+        "chain": [],
+        "optional": ["ask_user"],
+        "max_decisions": 1
+      },
+      "constraints": [
+        {
+          "id": "no_fake_metric",
+          "type": "forbid_tool",
+          "tools": ["query_data", "web_search", "create_canvas"]
+        }
+      ]
+    },
+    {
+      "id": "pl-024",
+      "split": "held_in",
+      "family": "quotes_and_stop",
+      "toolset": "component_v1",
+      "task": "把这句话翻译成英文：比亚迪毛利率有所回升",
+      "user_script": [],
+      "gold": {
+        "chain": [],
+        "optional": [],
+        "max_decisions": 0
+      },
+      "constraints": [
+        {
+          "id": "no_tools",
+          "type": "forbid_tool",
+          "tools": ["query_data", "get_instrument_quotes", "get_instrument_financials", "resolve_industry_universe", "propose_widget", "create_widget", "create_canvas", "web_search", "ask_user"]
+        }
+      ]
+    }
+  ]
+}

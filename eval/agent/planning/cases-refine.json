@@ -1,0 +1,296 @@
+{
+  "file": "cases-refine.json",
+  "family": "refine_view",
+  "cases": [
+    {
+      "id": "pl-011",
+      "split": "held_in",
+      "family": "refine_view",
+      "toolset": "component_v1",
+      "task": "去掉森麒麟",
+      "context": {
+        "artifacts_enabled": false,
+        "datasets": [
+          {
+            "id": "research-ds-1",
+            "metric": "gross_margin",
+            "title": "三家轮胎毛利率",
+            "entityNames": [
+              "赛轮轮胎",
+              "玲珑轮胎",
+              "森麒麟"
+            ],
+            "periodRange": "2021–2025"
+          }
+        ],
+        "proposals": [
+          {
+            "id": "prop-1",
+            "type": "grouped_bar",
+            "title": "三家轮胎毛利率",
+            "datasetId": "research-ds-1"
+          }
+        ],
+        "widgets": []
+      },
+      "user_script": [],
+      "gold": {
+        "chain": [
+          {
+            "name": "refine_dataset",
+            "args": {
+              "operation_type": { "eq": "remove_entities" },
+              "entities": {
+                "covers": [
+                  { "any": ["森麒麟", "002984"] }
+                ]
+              }
+            }
+          },
+          {
+            "name": "propose_widget"
+          }
+        ],
+        "optional": [],
+        "max_decisions": 3
+      },
+      "constraints": [
+        {
+          "id": "no_requery",
+          "type": "forbid_tool",
+          "tools": ["query_data"]
+        },
+        {
+          "id": "no_update_widget",
+          "type": "forbid_tool",
+          "tools": ["update_widget", "create_canvas"]
+        }
+      ]
+    },
+    {
+      "id": "pl-012",
+      "split": "held_in",
+      "family": "refine_view",
+      "toolset": "component_v1",
+      "task": "只看 2023 到 2025",
+      "context": {
+        "artifacts_enabled": false,
+        "datasets": [
+          {
+            "id": "research-ds-1",
+            "metric": "gross_margin",
+            "title": "三家轮胎毛利率",
+            "entityNames": [
+              "赛轮轮胎",
+              "玲珑轮胎",
+              "森麒麟"
+            ],
+            "periodRange": "2021–2025"
+          }
+        ],
+        "proposals": [
+          {
+            "id": "prop-1",
+            "type": "grouped_bar",
+            "title": "三家轮胎毛利率",
+            "datasetId": "research-ds-1"
+          }
+        ],
+        "widgets": []
+      },
+      "user_script": [],
+      "gold": {
+        "chain": [
+          {
+            "name": "refine_dataset",
+            "args": {
+              "operation_type": { "eq": "change_period" },
+              "start": { "eq": "2023" },
+              "end": { "eq": "2025" }
+            }
+          },
+          {
+            "name": "propose_widget"
+          }
+        ],
+        "optional": [],
+        "max_decisions": 3
+      },
+      "constraints": [
+        {
+          "id": "no_requery",
+          "type": "forbid_tool",
+          "tools": ["query_data"]
+        },
+        {
+          "id": "no_update_widget",
+          "type": "forbid_tool",
+          "tools": ["update_widget", "create_canvas"]
+        }
+      ]
+    },
+    {
+      "id": "pl-013",
+      "split": "held_in",
+      "family": "refine_view",
+      "toolset": "component_v1",
+      "task": "改看营收",
+      "context": {
+        "artifacts_enabled": false,
+        "datasets": [
+          {
+            "id": "research-ds-1",
+            "metric": "gross_margin",
+            "title": "三家轮胎毛利率",
+            "entityNames": [
+              "赛轮轮胎",
+              "玲珑轮胎",
+              "森麒麟"
+            ],
+            "periodRange": "2021–2025"
+          }
+        ],
+        "proposals": [
+          {
+            "id": "prop-1",
+            "type": "grouped_bar",
+            "title": "三家轮胎毛利率",
+            "datasetId": "research-ds-1"
+          }
+        ],
+        "widgets": []
+      },
+      "user_script": [],
+      "gold": {
+        "chain": [
+          {
+            "name": "query_data",
+            "args": {
+              "metric": { "eq": "revenue" }
+            }
+          },
+          {
+            "name": "propose_widget"
+          }
+        ],
+        "optional": ["search_instruments"],
+        "max_decisions": 4
+      },
+      "constraints": [
+        {
+          "id": "no_refine_for_metric",
+          "type": "forbid_tool",
+          "tools": ["refine_dataset"]
+        },
+        {
+          "id": "no_steal_canvas",
+          "type": "forbid_tool",
+          "tools": ["create_widget", "create_canvas", "update_widget"]
+        }
+      ]
+    },
+    {
+      "id": "pl-014",
+      "split": "held_in",
+      "family": "refine_view",
+      "toolset": "component_v1",
+      "task": "改成折线图",
+      "context": {
+        "artifacts_enabled": false,
+        "datasets": [
+          {
+            "id": "research-ds-1",
+            "metric": "gross_margin",
+            "title": "三家轮胎毛利率",
+            "entityNames": [
+              "赛轮轮胎",
+              "玲珑轮胎",
+              "森麒麟"
+            ],
+            "periodRange": "2021–2025"
+          }
+        ],
+        "proposals": [
+          {
+            "id": "prop-1",
+            "type": "grouped_bar",
+            "title": "三家轮胎毛利率",
+            "datasetId": "research-ds-1"
+          }
+        ],
+        "widgets": []
+      },
+      "user_script": [],
+      "gold": {
+        "chain": [
+          {
+            "name": "propose_widget"
+          }
+        ],
+        "optional": [],
+        "max_decisions": 2
+      },
+      "constraints": [
+        {
+          "id": "no_requery",
+          "type": "forbid_tool",
+          "tools": ["query_data", "refine_dataset"]
+        },
+        {
+          "id": "no_update_widget",
+          "type": "forbid_tool",
+          "tools": ["update_widget", "create_canvas"]
+        }
+      ]
+    },
+    {
+      "id": "pl-015",
+      "split": "held_out",
+      "family": "refine_view",
+      "toolset": "component_v1",
+      "task": "把预览里赛轮改成蓝色、玲珑改成橙色",
+      "context": {
+        "artifacts_enabled": false,
+        "datasets": [
+          {
+            "id": "research-ds-1",
+            "metric": "gross_margin",
+            "title": "三家轮胎毛利率",
+            "entityNames": [
+              "赛轮轮胎",
+              "玲珑轮胎",
+              "森麒麟"
+            ],
+            "periodRange": "2021–2025"
+          }
+        ],
+        "proposals": [
+          {
+            "id": "prop-1",
+            "type": "grouped_bar",
+            "title": "三家轮胎毛利率",
+            "datasetId": "research-ds-1"
+          }
+        ],
+        "widgets": []
+      },
+      "user_script": [],
+      "gold": {
+        "chain": [
+          {
+            "name": "update_proposal"
+          }
+        ],
+        "optional": [],
+        "max_decisions": 2
+      },
+      "constraints": [
+        {
+          "id": "preview_not_canvas",
+          "type": "forbid_tool",
+          "tools": ["update_widget", "query_data", "create_canvas"]
+        }
+      ]
+    }
+  ]
+}

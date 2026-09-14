@@ -1,0 +1,5263 @@
+{
+  "schema": "opptrix.eval.component.v1",
+  "kind": "official",
+  "track": "agent",
+  "layer": "component",
+  "focus": "tool_calling.tushare_query",
+  "dataset_id": "agent-component-tushare-v1",
+  "at": "2026-09-14T06:58:44.140Z",
+  "duration_ms": 179650,
+  "git": {
+    "commit": "739c6db39705f33a16b7bef01df46590ad2a9fd2",
+    "dirty": true
+  },
+  "sources": {
+    "hashes": {
+      "manifest.json": "e359ceb47bc4610c",
+      "schema.json": "d5f19f371e08928b",
+      "tool-catalog.json": "9644845b34c39686",
+      "prompt.mjs": "dfde2fe8cb5feb47",
+      "judge.mjs": "2202a2ad1c5aca00",
+      "match-args.mjs": "b613e180480931f8",
+      "cases-query-canvas-a.json": "14d9525ebd2afa96",
+      "cases-query-canvas-b.json": "b02121cbd66efc30",
+      "cases-query-canvas-c.json": "f3795559837b715f",
+      "cases-query-canvas-d.json": "f009f4d00dde62ec",
+      "cases-query-canvas-e.json": "822f2050451b2f1b",
+      "cases-query-quotes.json": "b32005005a16051a",
+      "cases-query-quotes-b.json": "2200616ed58f817c",
+      "cases-query-quotes-c.json": "147261c60a3d637f",
+      "cases-query-gates.json": "f36197c8c32c64a0",
+      "cases-query-gates-b.json": "44562ec41dc036f8",
+      "cases-query-gates-c.json": "8fe29e2a3a18ad96",
+      "cases-negative.json": "cbae2adbe82f6e9f",
+      "cases-negative-b.json": "015edf1bbf4acabf"
+    }
+  },
+  "llm": {
+    "model": "deepseek-flash",
+    "temperature": 0,
+    "max_tokens": 1024,
+    "tool_choice": "auto"
+  },
+  "prompt": "你是 Research Canvas 投研助手。只能使用本轮提供的工具，禁止编造财务或行情数字。\n比较、走势、看一下财务指标、K 线：调用 query_data。metric 仅 gross_margin / revenue / revenue_growth / net_income / net_margin / roe / kline。点名不超过 3 家直接取数；超过 3 家不要传 confirmed:true。\n现价、最新价、涨跌：调用 get_instrument_quotes，不要用 query_data。\n单只财务摘要：get_instrument_financials。概况：get_instrument_profile。深度分析单只：get_instrument_snapshot。名称不确定可先 search_instruments。\n行业或板块的指标排名/对比：先 resolve_industry_universe，不要立刻 query_data。\n寒暄、概念解释、翻译、润色、写作、询问产品功能：不要调用任何工具。\n不要调用 create_canvas、create_widget、update_widget。A 股财务和行情禁止 web_search。",
+  "skip": [
+    "qg-005"
+  ],
+  "notes": "",
+  "summary": {
+    "judged": 99,
+    "skipped": 1,
+    "passed": 93,
+    "failed": 6,
+    "pass_rate": 0.9393939393939394,
+    "failure_rate": 0.06060606060606061,
+    "effective_ratio": 0.9393939393939394,
+    "avg_decisions": 0.7272727272727273,
+    "avg_decisions_passed": 0.7096774193548387,
+    "avg_step_precision": 0.9393939393939394,
+    "constraint_hits": {
+      "must_not_call": 4
+    },
+    "by_family": {
+      "tushare_query_canvas": {
+        "judged": 32,
+        "passed": 31,
+        "failed": 1,
+        "skipped": 0
+      },
+      "tushare_query_quotes": {
+        "judged": 13,
+        "passed": 13,
+        "failed": 0,
+        "skipped": 0
+      },
+      "tushare_query_profile": {
+        "judged": 8,
+        "passed": 8,
+        "failed": 0,
+        "skipped": 0
+      },
+      "tushare_query_gate": {
+        "judged": 15,
+        "passed": 10,
+        "failed": 5,
+        "skipped": 1
+      },
+      "no_tool": {
+        "judged": 31,
+        "passed": 31,
+        "failed": 0,
+        "skipped": 0
+      }
+    }
+  },
+  "results": [
+    {
+      "caseId": "qc-001",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "赛轮轮胎",
+              "玲珑轮胎",
+              "森麒麟"
+            ],
+            "metric": "gross_margin",
+            "start": "2021",
+            "end": "2025"
+          }
+        }
+      ],
+      "error": null,
+      "question": "比较赛轮轮胎、玲珑轮胎、森麒麟 2021–2025 年毛利率",
+      "family": "tushare_query_canvas",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.financials",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "gross_margin"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "赛轮轮胎",
+                      "赛轮",
+                      "601058"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "玲珑轮胎",
+                      "玲珑",
+                      "601966"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "森麒麟",
+                      "002984"
+                    ]
+                  }
+                ]
+              },
+              "start": {
+                "eq": "2021"
+              },
+              "end": {
+                "in": [
+                  "2025",
+                  "2026"
+                ]
+              },
+              "confirmed": {
+                "absent_or_false": true
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "get_instrument_financials",
+          "create_widget",
+          "update_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 4
+      }
+    },
+    {
+      "caseId": "qc-002",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "贵州茅台"
+            ],
+            "metric": "roe",
+            "start": "2020",
+            "end": "2025"
+          }
+        }
+      ],
+      "error": null,
+      "question": "看一下贵州茅台的净资产收益率走势",
+      "family": "tushare_query_canvas",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.financials",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "roe"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "贵州茅台",
+                      "茅台",
+                      "600519"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "get_instrument_financials",
+          "create_widget",
+          "update_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qc-003",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "宁德时代",
+              "比亚迪"
+            ],
+            "metric": "gross_margin",
+            "start": "2021",
+            "end": "2025"
+          }
+        }
+      ],
+      "error": null,
+      "question": "对比宁德时代和比亚迪近五年毛利率",
+      "family": "tushare_query_canvas",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.financials",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "gross_margin"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "宁德时代",
+                      "宁德",
+                      "300750"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "比亚迪",
+                      "002594"
+                    ]
+                  }
+                ]
+              },
+              "start": {
+                "in": [
+                  "2021",
+                  "2022"
+                ]
+              },
+              "end": {
+                "in": [
+                  "2025",
+                  "2026"
+                ]
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qc-004",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "贵州茅台",
+              "五粮液"
+            ],
+            "metric": "roe",
+            "start": "2019",
+            "end": "2024"
+          }
+        }
+      ],
+      "error": null,
+      "question": "对比贵州茅台和五粮液2019到2024年净资产收益率",
+      "family": "tushare_query_canvas",
+      "split": "held_out",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.financials",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "roe"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "贵州茅台",
+                      "茅台",
+                      "600519"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "五粮液",
+                      "000858"
+                    ]
+                  }
+                ]
+              },
+              "start": {
+                "eq": "2019"
+              },
+              "end": {
+                "eq": "2024"
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qc-005",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "贵州茅台"
+            ],
+            "metric": "kline",
+            "start": "2025",
+            "end": "2025"
+          }
+        }
+      ],
+      "error": null,
+      "question": "看一下贵州茅台的K线",
+      "family": "tushare_query_canvas",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.kline",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "kline"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "贵州茅台",
+                      "茅台",
+                      "600519"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "get_instrument_quotes",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qc-006",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "贵州茅台"
+            ],
+            "metric": "revenue",
+            "start": "2021",
+            "end": "2025"
+          }
+        }
+      ],
+      "error": null,
+      "question": "看一下贵州茅台近五年营业收入",
+      "family": "tushare_query_canvas",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.financials",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "revenue"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "贵州茅台",
+                      "茅台",
+                      "600519"
+                    ]
+                  }
+                ]
+              },
+              "start": {
+                "in": [
+                  "2021",
+                  "2022"
+                ]
+              },
+              "end": {
+                "in": [
+                  "2025",
+                  "2026"
+                ]
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qc-007",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "贵州茅台"
+            ],
+            "metric": "net_income",
+            "start": "2021",
+            "end": "2025"
+          }
+        }
+      ],
+      "error": null,
+      "question": "茅台最近几年净利润走势",
+      "family": "tushare_query_canvas",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.financials",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "net_income"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "贵州茅台",
+                      "茅台",
+                      "600519"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qc-008",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "600519"
+            ],
+            "metric": "net_income",
+            "start": "2020",
+            "end": "2024"
+          }
+        }
+      ],
+      "error": null,
+      "question": "600519 2020到2024年净利润",
+      "family": "tushare_query_canvas",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.financials",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "net_income"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "600519",
+                      "贵州茅台",
+                      "茅台"
+                    ]
+                  }
+                ]
+              },
+              "start": {
+                "eq": "2020"
+              },
+              "end": {
+                "eq": "2024"
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 2
+      }
+    },
+    {
+      "caseId": "qc-009",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "宁德时代"
+            ],
+            "metric": "gross_margin",
+            "start": "2023",
+            "end": "2025"
+          }
+        }
+      ],
+      "error": null,
+      "question": "宁德时代近三年毛利率",
+      "family": "tushare_query_canvas",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.financials",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "gross_margin"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "宁德时代",
+                      "宁德",
+                      "300750"
+                    ]
+                  }
+                ]
+              },
+              "start": {
+                "in": [
+                  "2023",
+                  "2024"
+                ]
+              },
+              "end": {
+                "in": [
+                  "2025",
+                  "2026"
+                ]
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qc-010",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "贵州茅台",
+              "五粮液"
+            ],
+            "metric": "revenue",
+            "start": "2020",
+            "end": "2024"
+          }
+        }
+      ],
+      "error": null,
+      "question": "贵州茅台和五粮液 2020-2024 营收对比",
+      "family": "tushare_query_canvas",
+      "split": "held_out",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.financials",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "revenue"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "贵州茅台",
+                      "茅台",
+                      "600519"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "五粮液",
+                      "000858"
+                    ]
+                  }
+                ]
+              },
+              "start": {
+                "eq": "2020"
+              },
+              "end": {
+                "eq": "2024"
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qc-011",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "比亚迪"
+            ],
+            "metric": "net_margin",
+            "start": "2020",
+            "end": "2024"
+          }
+        }
+      ],
+      "error": null,
+      "question": "看下比亚迪近几年净利率",
+      "family": "tushare_query_canvas",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.financials",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "net_margin"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "比亚迪",
+                      "002594"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qc-012",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "森麒麟",
+              "赛轮轮胎"
+            ],
+            "metric": "revenue",
+            "start": "2022",
+            "end": "2025"
+          }
+        }
+      ],
+      "error": null,
+      "question": "森麒麟和赛轮轮胎 2022 到 2025 年营收",
+      "family": "tushare_query_canvas",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.financials",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "revenue"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "森麒麟",
+                      "002984"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "赛轮轮胎",
+                      "赛轮",
+                      "601058"
+                    ]
+                  }
+                ]
+              },
+              "start": {
+                "eq": "2022"
+              },
+              "end": {
+                "eq": "2025"
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qc-013",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "美的集团",
+              "格力电器"
+            ],
+            "metric": "revenue",
+            "start": "2020",
+            "end": "2024"
+          }
+        }
+      ],
+      "error": null,
+      "question": "比较美的集团和格力电器 2020 到 2024 年营收",
+      "family": "tushare_query_canvas",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.financials",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "revenue"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "美的集团",
+                      "美的",
+                      "000333"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "格力电器",
+                      "格力",
+                      "000651"
+                    ]
+                  }
+                ]
+              },
+              "start": {
+                "eq": "2020"
+              },
+              "end": {
+                "eq": "2024"
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qc-014",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "海康威视"
+            ],
+            "metric": "roe",
+            "start": "2019",
+            "end": "2024"
+          }
+        }
+      ],
+      "error": null,
+      "question": "看一下海康威视 2019 到 2024 年净资产收益率",
+      "family": "tushare_query_canvas",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.financials",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "roe"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "海康威视",
+                      "海康",
+                      "002415"
+                    ]
+                  }
+                ]
+              },
+              "start": {
+                "eq": "2019"
+              },
+              "end": {
+                "eq": "2024"
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qc-015",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "恒瑞医药",
+              "迈瑞医疗"
+            ],
+            "metric": "gross_margin",
+            "start": "2021",
+            "end": "2025"
+          }
+        }
+      ],
+      "error": null,
+      "question": "对比恒瑞医药和迈瑞医疗 2021-2025 年毛利率",
+      "family": "tushare_query_canvas",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.financials",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "gross_margin"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "恒瑞医药",
+                      "恒瑞",
+                      "600276"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "迈瑞医疗",
+                      "迈瑞",
+                      "300760"
+                    ]
+                  }
+                ]
+              },
+              "start": {
+                "eq": "2021"
+              },
+              "end": {
+                "in": [
+                  "2025",
+                  "2026"
+                ]
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qc-016",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "伊利股份"
+            ],
+            "metric": "net_income",
+            "start": "2020",
+            "end": "2024"
+          }
+        }
+      ],
+      "error": null,
+      "question": "伊利股份 2020 到 2024 年净利润走势",
+      "family": "tushare_query_canvas",
+      "split": "held_out",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.financials",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "net_income"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "伊利股份",
+                      "伊利",
+                      "600887"
+                    ]
+                  }
+                ]
+              },
+              "start": {
+                "eq": "2020"
+              },
+              "end": {
+                "eq": "2024"
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qc-017",
+      "pass": false,
+      "reasons": [
+        "缺少工具 query_data"
+      ],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "search_instruments"
+      ],
+      "calls": [
+        {
+          "name": "search_instruments",
+          "args": {
+            "keyword": "中芯国际"
+          }
+        }
+      ],
+      "error": null,
+      "question": "看一下中芯国际的K线",
+      "family": "tushare_query_canvas",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.kline",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "kline"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "中芯国际",
+                      "中芯",
+                      "688981"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "get_instrument_quotes",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qc-018",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "阳光电源",
+              "通威股份"
+            ],
+            "metric": "revenue",
+            "start": "2022",
+            "end": "2025"
+          }
+        }
+      ],
+      "error": null,
+      "question": "阳光电源和通威股份 2022 到 2025 年营收",
+      "family": "tushare_query_canvas",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.financials",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "revenue"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "阳光电源",
+                      "300274"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "通威股份",
+                      "通威",
+                      "600438"
+                    ]
+                  }
+                ]
+              },
+              "start": {
+                "eq": "2022"
+              },
+              "end": {
+                "eq": "2025"
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qc-019",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "中国神华"
+            ],
+            "metric": "roe",
+            "start": "2018",
+            "end": "2024"
+          }
+        }
+      ],
+      "error": null,
+      "question": "中国神华 2018 到 2024 年净资产收益率",
+      "family": "tushare_query_canvas",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.financials",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "roe"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "中国神华",
+                      "神华",
+                      "601088"
+                    ]
+                  }
+                ]
+              },
+              "start": {
+                "eq": "2018"
+              },
+              "end": {
+                "eq": "2024"
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qc-020",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "海尔智家",
+              "美的集团"
+            ],
+            "metric": "net_margin",
+            "start": "2021",
+            "end": "2024"
+          }
+        }
+      ],
+      "error": null,
+      "question": "比较海尔智家、美的集团 2021 到 2024 年净利率",
+      "family": "tushare_query_canvas",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.financials",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "net_margin"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "海尔智家",
+                      "海尔",
+                      "600690"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "美的集团",
+                      "美的",
+                      "000333"
+                    ]
+                  }
+                ]
+              },
+              "start": {
+                "eq": "2021"
+              },
+              "end": {
+                "eq": "2024"
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qc-021",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "片仔癀"
+            ],
+            "metric": "revenue",
+            "start": "2020",
+            "end": "2024"
+          }
+        }
+      ],
+      "error": null,
+      "question": "片仔癀 2020 到 2024 年营业收入",
+      "family": "tushare_query_canvas",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.financials",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "revenue"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "片仔癀",
+                      "600436"
+                    ]
+                  }
+                ]
+              },
+              "start": {
+                "eq": "2020"
+              },
+              "end": {
+                "eq": "2024"
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qc-022",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "长江电力"
+            ],
+            "metric": "gross_margin",
+            "start": "2019",
+            "end": "2024"
+          }
+        }
+      ],
+      "error": null,
+      "question": "看一下长江电力 2019 到 2024 年毛利率",
+      "family": "tushare_query_canvas",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.financials",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "gross_margin"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "长江电力",
+                      "600900"
+                    ]
+                  }
+                ]
+              },
+              "start": {
+                "eq": "2019"
+              },
+              "end": {
+                "eq": "2024"
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qc-023",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "招商银行",
+              "平安银行"
+            ],
+            "metric": "net_income",
+            "start": "2020",
+            "end": "2024"
+          }
+        }
+      ],
+      "error": null,
+      "question": "对比招商银行和平安银行 2020 到 2024 年净利润",
+      "family": "tushare_query_canvas",
+      "split": "held_out",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.financials",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "net_income"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "招商银行",
+                      "招行",
+                      "600036"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "平安银行",
+                      "000001"
+                    ]
+                  }
+                ]
+              },
+              "start": {
+                "eq": "2020"
+              },
+              "end": {
+                "eq": "2024"
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qc-024",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "三一重工"
+            ],
+            "metric": "revenue",
+            "start": "2020",
+            "end": "2024"
+          }
+        }
+      ],
+      "error": null,
+      "question": "三一重工 2020 到 2024 年营收",
+      "family": "tushare_query_canvas",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.financials",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "revenue"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "三一重工",
+                      "三一",
+                      "600031"
+                    ]
+                  }
+                ]
+              },
+              "start": {
+                "eq": "2020"
+              },
+              "end": {
+                "eq": "2024"
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qc-025",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "立讯精密",
+              "京东方A"
+            ],
+            "metric": "gross_margin",
+            "start": "2021",
+            "end": "2025"
+          }
+        }
+      ],
+      "error": null,
+      "question": "对比立讯精密和京东方A 2021 到 2025 年毛利率",
+      "family": "tushare_query_canvas",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.financials",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "gross_margin"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "立讯精密",
+                      "立讯",
+                      "002475"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "京东方A",
+                      "京东方",
+                      "000725"
+                    ]
+                  }
+                ]
+              },
+              "start": {
+                "eq": "2021"
+              },
+              "end": {
+                "in": [
+                  "2025",
+                  "2026"
+                ]
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qc-026",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "紫金矿业"
+            ],
+            "metric": "roe",
+            "start": "2019",
+            "end": "2024"
+          }
+        }
+      ],
+      "error": null,
+      "question": "看一下紫金矿业 2019 到 2024 年净资产收益率",
+      "family": "tushare_query_canvas",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.financials",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "roe"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "紫金矿业",
+                      "紫金",
+                      "601899"
+                    ]
+                  }
+                ]
+              },
+              "start": {
+                "eq": "2019"
+              },
+              "end": {
+                "eq": "2024"
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qc-027",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "中国中免",
+              "片仔癀"
+            ],
+            "metric": "net_margin",
+            "start": "2021",
+            "end": "2024"
+          }
+        }
+      ],
+      "error": null,
+      "question": "中国中免和片仔癀 2021 到 2024 年净利率",
+      "family": "tushare_query_canvas",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.financials",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "net_margin"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "中国中免",
+                      "中免",
+                      "601888"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "片仔癀",
+                      "600436"
+                    ]
+                  }
+                ]
+              },
+              "start": {
+                "eq": "2021"
+              },
+              "end": {
+                "eq": "2024"
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qc-028",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "002415"
+            ],
+            "metric": "revenue",
+            "start": "2022",
+            "end": "2025"
+          }
+        }
+      ],
+      "error": null,
+      "question": "002415 2022 到 2025 年营收",
+      "family": "tushare_query_canvas",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.financials",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "revenue"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "002415",
+                      "海康威视",
+                      "海康"
+                    ]
+                  }
+                ]
+              },
+              "start": {
+                "eq": "2022"
+              },
+              "end": {
+                "eq": "2025"
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 2
+      }
+    },
+    {
+      "caseId": "qc-029",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "万科A"
+            ],
+            "metric": "kline",
+            "start": "2024",
+            "end": "2025"
+          }
+        }
+      ],
+      "error": null,
+      "question": "看一下万科A的K线",
+      "family": "tushare_query_canvas",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.kline",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "kline"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "万科A",
+                      "万科",
+                      "000002"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "get_instrument_quotes",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qc-030",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "保利发展",
+              "万科A"
+            ],
+            "metric": "revenue",
+            "start": "2020",
+            "end": "2024"
+          }
+        }
+      ],
+      "error": null,
+      "question": "保利发展和万科A 2020 到 2024 年营收对比",
+      "family": "tushare_query_canvas",
+      "split": "held_out",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.financials",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "revenue"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "保利发展",
+                      "保利",
+                      "600048"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "万科A",
+                      "万科",
+                      "000002"
+                    ]
+                  }
+                ]
+              },
+              "start": {
+                "eq": "2020"
+              },
+              "end": {
+                "eq": "2024"
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qc-031",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "东方财富"
+            ],
+            "metric": "revenue",
+            "start": "2021",
+            "end": "2025"
+          }
+        }
+      ],
+      "error": null,
+      "question": "东方财富 2021 到 2025 年营业收入",
+      "family": "tushare_query_canvas",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.financials",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "revenue"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "东方财富",
+                      "300059"
+                    ]
+                  }
+                ]
+              },
+              "start": {
+                "eq": "2021"
+              },
+              "end": {
+                "in": [
+                  "2025",
+                  "2026"
+                ]
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qc-032",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "中国平安",
+              "中国人寿"
+            ],
+            "metric": "roe",
+            "start": "2019",
+            "end": "2023"
+          }
+        }
+      ],
+      "error": null,
+      "question": "比较中国平安和中国人寿 2019 到 2023 年净资产收益率",
+      "family": "tushare_query_canvas",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.financials",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "roe"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "中国平安",
+                      "601318"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "中国人寿",
+                      "人寿",
+                      "601628"
+                    ]
+                  }
+                ]
+              },
+              "start": {
+                "eq": "2019"
+              },
+              "end": {
+                "eq": "2023"
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qq-001",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "get_instrument_quotes"
+      ],
+      "calls": [
+        {
+          "name": "get_instrument_quotes",
+          "args": {
+            "instruments": [
+              {
+                "market": "CN",
+                "symbol": "600519",
+                "exchange": "SH"
+              }
+            ]
+          }
+        }
+      ],
+      "error": null,
+      "question": "茅台现价多少",
+      "family": "tushare_query_quotes",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "instrument_quotes",
+        "expected": [
+          {
+            "name": "get_instrument_quotes",
+            "required": true,
+            "args": {
+              "symbol_any": [
+                "600519",
+                "贵州茅台",
+                "茅台"
+              ]
+            }
+          }
+        ],
+        "forbidden": [
+          "query_data",
+          "propose_widget",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qq-002",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "get_instrument_quotes"
+      ],
+      "calls": [
+        {
+          "name": "get_instrument_quotes",
+          "args": {
+            "instruments": [
+              {
+                "market": "CN",
+                "symbol": "600519",
+                "exchange": "SH"
+              }
+            ]
+          }
+        }
+      ],
+      "error": null,
+      "question": "600519 最新价和涨跌幅",
+      "family": "tushare_query_quotes",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "instrument_quotes",
+        "expected": [
+          {
+            "name": "get_instrument_quotes",
+            "required": true,
+            "args": {
+              "symbol_any": [
+                "600519"
+              ]
+            }
+          }
+        ],
+        "forbidden": [
+          "query_data",
+          "propose_widget",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 2
+      }
+    },
+    {
+      "caseId": "qq-003",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "get_instrument_quotes"
+      ],
+      "calls": [
+        {
+          "name": "get_instrument_quotes",
+          "args": {
+            "instruments": [
+              {
+                "market": "CN",
+                "symbol": "600519",
+                "exchange": "SH"
+              }
+            ]
+          }
+        }
+      ],
+      "error": null,
+      "question": "贵州茅台最新价",
+      "family": "tushare_query_quotes",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "instrument_quotes",
+        "expected": [
+          {
+            "name": "get_instrument_quotes",
+            "required": true,
+            "args": {
+              "symbol_any": [
+                "600519",
+                "贵州茅台",
+                "茅台"
+              ]
+            }
+          }
+        ],
+        "forbidden": [
+          "query_data",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qq-004",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "get_instrument_quotes"
+      ],
+      "calls": [
+        {
+          "name": "get_instrument_quotes",
+          "args": {
+            "instruments": [
+              {
+                "market": "CN",
+                "symbol": "600519",
+                "exchange": "SH"
+              }
+            ]
+          }
+        }
+      ],
+      "error": null,
+      "question": "茅台现在多少钱？今天涨跌多少？",
+      "family": "tushare_query_quotes",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "instrument_quotes",
+        "expected": [
+          {
+            "name": "get_instrument_quotes",
+            "required": true,
+            "args": {
+              "symbol_any": [
+                "600519",
+                "贵州茅台",
+                "茅台"
+              ]
+            }
+          }
+        ],
+        "forbidden": [
+          "query_data",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qq-005",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "get_instrument_quotes"
+      ],
+      "calls": [
+        {
+          "name": "get_instrument_quotes",
+          "args": {
+            "instruments": [
+              {
+                "market": "CN",
+                "symbol": "601012",
+                "exchange": "SH"
+              }
+            ]
+          }
+        }
+      ],
+      "error": null,
+      "question": "帮我找一下隆基绿能现在的价格",
+      "family": "tushare_query_quotes",
+      "split": "held_out",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "instrument_quotes",
+        "expected": [
+          {
+            "name": "get_instrument_quotes",
+            "required": true,
+            "args": {
+              "symbol_any": [
+                "601012",
+                "隆基绿能",
+                "隆基"
+              ]
+            }
+          }
+        ],
+        "forbidden": [
+          "query_data",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qq-006",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "get_instrument_financials"
+      ],
+      "calls": [
+        {
+          "name": "get_instrument_financials",
+          "args": {
+            "symbol": "600519",
+            "market": "CN",
+            "report_type": "all"
+          }
+        }
+      ],
+      "error": null,
+      "question": "给我看一下贵州茅台近几年的财务摘要",
+      "family": "tushare_query_profile",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "instrument_financials",
+        "expected": [
+          {
+            "name": "get_instrument_financials",
+            "required": true,
+            "args": {
+              "symbol_any": [
+                "600519",
+                "贵州茅台",
+                "茅台"
+              ]
+            }
+          }
+        ],
+        "forbidden": [
+          "query_data",
+          "propose_widget",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qq-007",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 2
+      },
+      "skipped": false,
+      "tool_names": [
+        "get_instrument_snapshot",
+        "get_instrument_quotes"
+      ],
+      "calls": [
+        {
+          "name": "get_instrument_snapshot",
+          "args": {
+            "symbol": "600519",
+            "market": "CN"
+          }
+        },
+        {
+          "name": "get_instrument_quotes",
+          "args": {
+            "instruments": [
+              {
+                "market": "CN",
+                "symbol": "600519",
+                "exchange": "SH"
+              }
+            ]
+          }
+        }
+      ],
+      "error": null,
+      "question": "帮我深度分析一下 600519",
+      "family": "tushare_query_profile",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "instrument_snapshot",
+        "expected": [
+          {
+            "name": "get_instrument_snapshot",
+            "required": true,
+            "args": {
+              "symbol_any": [
+                "600519"
+              ]
+            }
+          }
+        ],
+        "forbidden": [
+          "web_search",
+          "create_canvas",
+          "create_widget"
+        ],
+        "max_calls": 4
+      }
+    },
+    {
+      "caseId": "qq-008",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "get_instrument_profile"
+      ],
+      "calls": [
+        {
+          "name": "get_instrument_profile",
+          "args": {
+            "market": "CN",
+            "symbol": "600519"
+          }
+        }
+      ],
+      "error": null,
+      "question": "600519 的主营业务和所属概念",
+      "family": "tushare_query_profile",
+      "split": "held_out",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "instrument_profile",
+        "expected": [
+          {
+            "name": "get_instrument_profile",
+            "required": true,
+            "args": {
+              "symbol_any": [
+                "600519"
+              ]
+            }
+          }
+        ],
+        "forbidden": [
+          "query_data",
+          "web_search",
+          "create_canvas",
+          "create_widget"
+        ],
+        "max_calls": 2
+      }
+    },
+    {
+      "caseId": "qq-009",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "get_instrument_quotes"
+      ],
+      "calls": [
+        {
+          "name": "get_instrument_quotes",
+          "args": {
+            "instruments": [
+              {
+                "market": "CN",
+                "symbol": "000858",
+                "exchange": "SZ"
+              }
+            ]
+          }
+        }
+      ],
+      "error": null,
+      "question": "五粮液现在什么价",
+      "family": "tushare_query_quotes",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "instrument_quotes",
+        "expected": [
+          {
+            "name": "get_instrument_quotes",
+            "required": true,
+            "args": {
+              "symbol_any": [
+                "000858",
+                "五粮液"
+              ]
+            }
+          }
+        ],
+        "forbidden": [
+          "query_data",
+          "propose_widget",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qq-010",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "get_instrument_quotes"
+      ],
+      "calls": [
+        {
+          "name": "get_instrument_quotes",
+          "args": {
+            "instruments": [
+              {
+                "market": "CN",
+                "symbol": "000858",
+                "exchange": "SZ"
+              }
+            ]
+          }
+        }
+      ],
+      "error": null,
+      "question": "000858 最新价",
+      "family": "tushare_query_quotes",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "instrument_quotes",
+        "expected": [
+          {
+            "name": "get_instrument_quotes",
+            "required": true,
+            "args": {
+              "symbol_any": [
+                "000858"
+              ]
+            }
+          }
+        ],
+        "forbidden": [
+          "query_data",
+          "propose_widget",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 2
+      }
+    },
+    {
+      "caseId": "qq-011",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "get_instrument_quotes"
+      ],
+      "calls": [
+        {
+          "name": "get_instrument_quotes",
+          "args": {
+            "instruments": [
+              {
+                "market": "CN",
+                "symbol": "300750",
+                "exchange": "SZ"
+              }
+            ]
+          }
+        }
+      ],
+      "error": null,
+      "question": "宁德时代今天涨跌多少",
+      "family": "tushare_query_quotes",
+      "split": "held_out",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "instrument_quotes",
+        "expected": [
+          {
+            "name": "get_instrument_quotes",
+            "required": true,
+            "args": {
+              "symbol_any": [
+                "300750",
+                "宁德时代",
+                "宁德"
+              ]
+            }
+          }
+        ],
+        "forbidden": [
+          "query_data",
+          "propose_widget",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qq-012",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "get_instrument_quotes"
+      ],
+      "calls": [
+        {
+          "name": "get_instrument_quotes",
+          "args": {
+            "instruments": [
+              {
+                "market": "CN",
+                "symbol": "002594",
+                "exchange": "SZ"
+              },
+              {
+                "market": "HK",
+                "symbol": "01211"
+              }
+            ]
+          }
+        }
+      ],
+      "error": null,
+      "question": "比亚迪现价",
+      "family": "tushare_query_quotes",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "instrument_quotes",
+        "expected": [
+          {
+            "name": "get_instrument_quotes",
+            "required": true,
+            "args": {
+              "symbol_any": [
+                "002594",
+                "比亚迪"
+              ]
+            }
+          }
+        ],
+        "forbidden": [
+          "query_data",
+          "propose_widget",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qq-013",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "get_instrument_quotes"
+      ],
+      "calls": [
+        {
+          "name": "get_instrument_quotes",
+          "args": {
+            "instruments": [
+              {
+                "market": "CN",
+                "symbol": "000333",
+                "exchange": "SZ"
+              }
+            ]
+          }
+        }
+      ],
+      "error": null,
+      "question": "帮我查一下美的集团最新价",
+      "family": "tushare_query_quotes",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "instrument_quotes",
+        "expected": [
+          {
+            "name": "get_instrument_quotes",
+            "required": true,
+            "args": {
+              "symbol_any": [
+                "000333",
+                "美的集团",
+                "美的"
+              ]
+            }
+          }
+        ],
+        "forbidden": [
+          "query_data",
+          "propose_widget",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qq-014",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "get_instrument_quotes"
+      ],
+      "calls": [
+        {
+          "name": "get_instrument_quotes",
+          "args": {
+            "instruments": [
+              {
+                "market": "CN",
+                "symbol": "300750",
+                "exchange": "SZ"
+              }
+            ]
+          }
+        }
+      ],
+      "error": null,
+      "question": "300750 现在多少钱",
+      "family": "tushare_query_quotes",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "instrument_quotes",
+        "expected": [
+          {
+            "name": "get_instrument_quotes",
+            "required": true,
+            "args": {
+              "symbol_any": [
+                "300750"
+              ]
+            }
+          }
+        ],
+        "forbidden": [
+          "query_data",
+          "propose_widget",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 2
+      }
+    },
+    {
+      "caseId": "qq-015",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "get_instrument_quotes"
+      ],
+      "calls": [
+        {
+          "name": "get_instrument_quotes",
+          "args": {
+            "instruments": [
+              {
+                "market": "CN",
+                "symbol": "002415",
+                "exchange": "SZ"
+              }
+            ]
+          }
+        }
+      ],
+      "error": null,
+      "question": "海康威视最新价和涨跌幅",
+      "family": "tushare_query_quotes",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "instrument_quotes",
+        "expected": [
+          {
+            "name": "get_instrument_quotes",
+            "required": true,
+            "args": {
+              "symbol_any": [
+                "002415",
+                "海康威视",
+                "海康"
+              ]
+            }
+          }
+        ],
+        "forbidden": [
+          "query_data",
+          "propose_widget",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qq-021",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "get_instrument_quotes"
+      ],
+      "calls": [
+        {
+          "name": "get_instrument_quotes",
+          "args": {
+            "instruments": [
+              {
+                "market": "CN",
+                "symbol": "688256",
+                "exchange": "SH"
+              }
+            ]
+          }
+        }
+      ],
+      "error": null,
+      "question": "帮我找一下寒武纪现在的价格",
+      "family": "tushare_query_quotes",
+      "split": "held_out",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "instrument_quotes",
+        "expected": [
+          {
+            "name": "get_instrument_quotes",
+            "required": true,
+            "args": {
+              "symbol_any": [
+                "688256",
+                "寒武纪"
+              ]
+            }
+          }
+        ],
+        "forbidden": [
+          "query_data",
+          "propose_widget",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qq-016",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "get_instrument_financials"
+      ],
+      "calls": [
+        {
+          "name": "get_instrument_financials",
+          "args": {
+            "symbol": "000001",
+            "market": "CN",
+            "report_type": "all"
+          }
+        }
+      ],
+      "error": null,
+      "question": "给我平安银行的财务摘要",
+      "family": "tushare_query_profile",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "instrument_financials",
+        "expected": [
+          {
+            "name": "get_instrument_financials",
+            "required": true,
+            "args": {
+              "symbol_any": [
+                "000001",
+                "平安银行"
+              ]
+            }
+          }
+        ],
+        "forbidden": [
+          "query_data",
+          "propose_widget",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qq-017",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 3
+      },
+      "skipped": false,
+      "tool_names": [
+        "get_instrument_snapshot",
+        "get_instrument_profile",
+        "get_instrument_quotes"
+      ],
+      "calls": [
+        {
+          "name": "get_instrument_snapshot",
+          "args": {
+            "symbol": "300750",
+            "market": "CN"
+          }
+        },
+        {
+          "name": "get_instrument_profile",
+          "args": {
+            "symbol": "300750",
+            "market": "CN"
+          }
+        },
+        {
+          "name": "get_instrument_quotes",
+          "args": {
+            "instruments": [
+              {
+                "market": "CN",
+                "symbol": "300750",
+                "exchange": "SZ"
+              }
+            ]
+          }
+        }
+      ],
+      "error": null,
+      "question": "深度分析一下宁德时代",
+      "family": "tushare_query_profile",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "instrument_snapshot",
+        "expected": [
+          {
+            "name": "get_instrument_snapshot",
+            "required": true,
+            "args": {
+              "symbol_any": [
+                "300750",
+                "宁德时代",
+                "宁德"
+              ]
+            }
+          }
+        ],
+        "forbidden": [
+          "web_search",
+          "create_canvas",
+          "create_widget"
+        ],
+        "max_calls": 4
+      }
+    },
+    {
+      "caseId": "qq-018",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "get_instrument_profile"
+      ],
+      "calls": [
+        {
+          "name": "get_instrument_profile",
+          "args": {
+            "symbol": "000333",
+            "market": "CN",
+            "exchange": "SZ"
+          }
+        }
+      ],
+      "error": null,
+      "question": "000333 是做什么的",
+      "family": "tushare_query_profile",
+      "split": "held_out",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "instrument_profile",
+        "expected": [
+          {
+            "name": "get_instrument_profile",
+            "required": true,
+            "args": {
+              "symbol_any": [
+                "000333"
+              ]
+            }
+          }
+        ],
+        "forbidden": [
+          "query_data",
+          "propose_widget",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 2
+      }
+    },
+    {
+      "caseId": "qq-019",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "get_instrument_profile"
+      ],
+      "calls": [
+        {
+          "name": "get_instrument_profile",
+          "args": {
+            "symbol": "601857",
+            "market": "CN"
+          }
+        }
+      ],
+      "error": null,
+      "question": "中国石油的主营业务",
+      "family": "tushare_query_profile",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "instrument_profile",
+        "expected": [
+          {
+            "name": "get_instrument_profile",
+            "required": true,
+            "args": {
+              "symbol_any": [
+                "601857",
+                "中国石油",
+                "中石油"
+              ]
+            }
+          }
+        ],
+        "forbidden": [
+          "query_data",
+          "propose_widget",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qq-020",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 2
+      },
+      "skipped": false,
+      "tool_names": [
+        "get_instrument_financials",
+        "get_instrument_profile"
+      ],
+      "calls": [
+        {
+          "name": "get_instrument_financials",
+          "args": {
+            "code": "002475",
+            "market": "CN",
+            "symbol": "002475",
+            "report_type": "annual"
+          }
+        },
+        {
+          "name": "get_instrument_profile",
+          "args": {
+            "code": "002475",
+            "market": "CN",
+            "symbol": "002475"
+          }
+        }
+      ],
+      "error": null,
+      "question": "立讯精密近几年财务摘要",
+      "family": "tushare_query_profile",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "instrument_financials",
+        "expected": [
+          {
+            "name": "get_instrument_financials",
+            "required": true,
+            "args": {
+              "symbol_any": [
+                "002475",
+                "立讯精密",
+                "立讯"
+              ]
+            }
+          }
+        ],
+        "forbidden": [
+          "query_data",
+          "propose_widget",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qg-001",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "resolve_industry_universe"
+      ],
+      "calls": [
+        {
+          "name": "resolve_industry_universe",
+          "args": {
+            "industry": "电池"
+          }
+        }
+      ],
+      "error": null,
+      "question": "中国电池行业的营收排名",
+      "family": "tushare_query_gate",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "industry_universe",
+        "expected": [
+          {
+            "name": "resolve_industry_universe",
+            "required": true,
+            "args": {
+              "industry": {
+                "contains_any": [
+                  "电池"
+                ]
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "query_data",
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qg-002",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "resolve_industry_universe"
+      ],
+      "calls": [
+        {
+          "name": "resolve_industry_universe",
+          "args": {
+            "industry": "光伏"
+          }
+        }
+      ],
+      "error": null,
+      "question": "光伏板块毛利率对比",
+      "family": "tushare_query_gate",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "industry_universe",
+        "expected": [
+          {
+            "name": "resolve_industry_universe",
+            "required": true,
+            "args": {
+              "industry": {
+                "contains_any": [
+                  "光伏"
+                ]
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "query_data",
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qg-003",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "招商银行",
+              "平安银行",
+              "兴业银行",
+              "民生银行",
+              "浦发银行"
+            ],
+            "metric": "net_margin",
+            "start": "2021",
+            "end": "2025"
+          }
+        }
+      ],
+      "error": null,
+      "question": "对比招商银行、平安银行、兴业银行、民生银行、浦发银行近五年净利率",
+      "family": "tushare_query_gate",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.financials",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "net_margin"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "招商银行",
+                      "600036"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "平安银行",
+                      "000001"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "兴业银行",
+                      "601166"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "民生银行",
+                      "600016"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "浦发银行",
+                      "600000"
+                    ]
+                  }
+                ]
+              },
+              "confirmed": {
+                "absent_or_false": true
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qg-004",
+      "pass": false,
+      "reasons": [
+        "缺少工具 query_data"
+      ],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "ask_user"
+      ],
+      "calls": [
+        {
+          "name": "ask_user",
+          "args": {
+            "prompt": "这是 5 家白酒公司（贵州茅台、五粮液、洋河股份、泸州老窖、山西汾酒）2020–2024 年营收对比取数计划，是否确认？",
+            "mode": "confirm"
+          }
+        }
+      ],
+      "error": null,
+      "question": "比较茅台、五粮液、洋河、泸州老窖、山西汾酒 2020 到 2024 年营收",
+      "family": "tushare_query_gate",
+      "split": "held_out",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.financials",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "revenue"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "贵州茅台",
+                      "茅台",
+                      "600519"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "五粮液",
+                      "000858"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "洋河",
+                      "洋河股份",
+                      "002304"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "泸州老窖",
+                      "000568"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "山西汾酒",
+                      "汾酒",
+                      "600809"
+                    ]
+                  }
+                ]
+              },
+              "start": {
+                "eq": "2020"
+              },
+              "end": {
+                "eq": "2024"
+              },
+              "confirmed": {
+                "absent_or_false": true
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qg-005",
+      "skipped": true,
+      "pass": null,
+      "reasons": [
+        "skipped"
+      ],
+      "tool_names": [],
+      "calls": [],
+      "stats": {
+        "calls": 0
+      },
+      "question": "确认，按这个名单查",
+      "family": "tushare_query_gate",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.financials",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "confirmed": {
+                "eq": true
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "create_widget",
+          "create_canvas",
+          "web_search",
+          "resolve_industry_universe"
+        ],
+        "max_calls": 2
+      }
+    },
+    {
+      "caseId": "qg-006",
+      "pass": false,
+      "reasons": [
+        "max_calls 0，实际 1",
+        "禁止工具 resolve_industry_universe",
+        "must_not_call：出现工具调用"
+      ],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "resolve_industry_universe"
+      ],
+      "calls": [
+        {
+          "name": "resolve_industry_universe",
+          "args": {
+            "industry": "沪深300"
+          }
+        }
+      ],
+      "error": null,
+      "question": "沪深300成分股有哪些",
+      "family": "tushare_query_gate",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_not_call",
+        "tushare_via": "none",
+        "expected": [],
+        "forbidden": [
+          "query_data",
+          "get_instrument_quotes",
+          "get_instrument_financials",
+          "resolve_industry_universe",
+          "propose_widget",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 0
+      }
+    },
+    {
+      "caseId": "qg-007",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "resolve_industry_universe"
+      ],
+      "calls": [
+        {
+          "name": "resolve_industry_universe",
+          "args": {
+            "industry": "白酒"
+          }
+        }
+      ],
+      "error": null,
+      "question": "白酒行业毛利率对比",
+      "family": "tushare_query_gate",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "industry_universe",
+        "expected": [
+          {
+            "name": "resolve_industry_universe",
+            "required": true,
+            "args": {
+              "industry": {
+                "contains_any": [
+                  "白酒"
+                ]
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "query_data",
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qg-008",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "resolve_industry_universe"
+      ],
+      "calls": [
+        {
+          "name": "resolve_industry_universe",
+          "args": {
+            "industry": "半导体"
+          }
+        }
+      ],
+      "error": null,
+      "question": "半导体板块营收排名",
+      "family": "tushare_query_gate",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "industry_universe",
+        "expected": [
+          {
+            "name": "resolve_industry_universe",
+            "required": true,
+            "args": {
+              "industry": {
+                "contains_any": [
+                  "半导体"
+                ]
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "query_data",
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qg-009",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "resolve_industry_universe"
+      ],
+      "calls": [
+        {
+          "name": "resolve_industry_universe",
+          "args": {
+            "industry": "新能源汽车产业链"
+          }
+        }
+      ],
+      "error": null,
+      "question": "新能源汽车产业链利润率对比",
+      "family": "tushare_query_gate",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "industry_universe",
+        "expected": [
+          {
+            "name": "resolve_industry_universe",
+            "required": true,
+            "args": {
+              "industry": {
+                "contains_any": [
+                  "新能源"
+                ]
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "query_data",
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qg-010",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "resolve_industry_universe"
+      ],
+      "calls": [
+        {
+          "name": "resolve_industry_universe",
+          "args": {
+            "industry": "银行"
+          }
+        }
+      ],
+      "error": null,
+      "question": "银行板块 ROE 排名",
+      "family": "tushare_query_gate",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "industry_universe",
+        "expected": [
+          {
+            "name": "resolve_industry_universe",
+            "required": true,
+            "args": {
+              "industry": {
+                "contains_any": [
+                  "银行"
+                ]
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "query_data",
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qg-011",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "美的集团",
+              "格力电器",
+              "海尔智家",
+              "老板电器",
+              "华帝股份"
+            ],
+            "metric": "revenue",
+            "start": "2020",
+            "end": "2024"
+          }
+        }
+      ],
+      "error": null,
+      "question": "比较美的集团、格力电器、海尔智家、老板电器、华帝股份 2020 到 2024 年营收",
+      "family": "tushare_query_gate",
+      "split": "held_out",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.financials",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "revenue"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "美的集团",
+                      "美的",
+                      "000333"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "格力电器",
+                      "格力",
+                      "000651"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "海尔智家",
+                      "海尔",
+                      "600690"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "老板电器",
+                      "老板",
+                      "002508"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "华帝股份",
+                      "华帝",
+                      "002035"
+                    ]
+                  }
+                ]
+              },
+              "start": {
+                "eq": "2020"
+              },
+              "end": {
+                "eq": "2024"
+              },
+              "confirmed": {
+                "absent_or_false": true
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qg-012",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "海康威视",
+              "大华股份",
+              "歌尔股份",
+              "立讯精密",
+              "京东方A"
+            ],
+            "metric": "gross_margin",
+            "start": "2021",
+            "end": "2024"
+          }
+        }
+      ],
+      "error": null,
+      "question": "对比海康威视、大华股份、歌尔股份、立讯精密、京东方A 2021 到 2024 年毛利率",
+      "family": "tushare_query_gate",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.financials",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "gross_margin"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "海康威视",
+                      "海康",
+                      "002415"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "大华股份",
+                      "大华",
+                      "002236"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "歌尔股份",
+                      "歌尔",
+                      "002241"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "立讯精密",
+                      "立讯",
+                      "002475"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "京东方A",
+                      "京东方",
+                      "000725"
+                    ]
+                  }
+                ]
+              },
+              "start": {
+                "eq": "2021"
+              },
+              "end": {
+                "eq": "2024"
+              },
+              "confirmed": {
+                "absent_or_false": true
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "qg-013",
+      "pass": false,
+      "reasons": [
+        "max_calls 0，实际 1",
+        "禁止工具 resolve_industry_universe",
+        "must_not_call：出现工具调用"
+      ],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "resolve_industry_universe"
+      ],
+      "calls": [
+        {
+          "name": "resolve_industry_universe",
+          "args": {
+            "industry": "中证500"
+          }
+        }
+      ],
+      "error": null,
+      "question": "中证500成分股有哪些",
+      "family": "tushare_query_gate",
+      "split": "held_out",
+      "gold": {
+        "call_policy": "must_not_call",
+        "tushare_via": "none",
+        "expected": [],
+        "forbidden": [
+          "query_data",
+          "get_instrument_quotes",
+          "get_instrument_financials",
+          "resolve_industry_universe",
+          "propose_widget",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 0
+      }
+    },
+    {
+      "caseId": "qg-014",
+      "pass": false,
+      "reasons": [
+        "max_calls 0，实际 1",
+        "禁止工具 resolve_industry_universe",
+        "must_not_call：出现工具调用"
+      ],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "resolve_industry_universe"
+      ],
+      "calls": [
+        {
+          "name": "resolve_industry_universe",
+          "args": {
+            "industry": "上证50",
+            "board_key": "SSE50"
+          }
+        }
+      ],
+      "error": null,
+      "question": "上证50成分股列表",
+      "family": "tushare_query_gate",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_not_call",
+        "tushare_via": "none",
+        "expected": [],
+        "forbidden": [
+          "query_data",
+          "get_instrument_quotes",
+          "get_instrument_financials",
+          "resolve_industry_universe",
+          "propose_widget",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 0
+      }
+    },
+    {
+      "caseId": "qg-015",
+      "pass": false,
+      "reasons": [
+        "max_calls 0，实际 1",
+        "禁止工具 resolve_industry_universe",
+        "must_not_call：出现工具调用"
+      ],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "resolve_industry_universe"
+      ],
+      "calls": [
+        {
+          "name": "resolve_industry_universe",
+          "args": {
+            "industry": "创业板指"
+          }
+        }
+      ],
+      "error": null,
+      "question": "创业板指都有哪些股票",
+      "family": "tushare_query_gate",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_not_call",
+        "tushare_via": "none",
+        "expected": [],
+        "forbidden": [
+          "query_data",
+          "get_instrument_quotes",
+          "get_instrument_financials",
+          "resolve_industry_universe",
+          "propose_widget",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 0
+      }
+    },
+    {
+      "caseId": "qg-016",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 1
+      },
+      "skipped": false,
+      "tool_names": [
+        "query_data"
+      ],
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "工商银行",
+              "建设银行",
+              "农业银行",
+              "中国银行",
+              "交通银行"
+            ],
+            "metric": "revenue",
+            "start": "2020",
+            "end": "2024"
+          }
+        }
+      ],
+      "error": null,
+      "question": "对比工商银行、建设银行、农业银行、中国银行、交通银行 2020 到 2024 年营收",
+      "family": "tushare_query_gate",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_call",
+        "tushare_via": "query_data.financials",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": {
+                "eq": "revenue"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "工商银行",
+                      "工行",
+                      "601398"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "建设银行",
+                      "建行",
+                      "601939"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "农业银行",
+                      "农行",
+                      "601288"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "中国银行",
+                      "中行",
+                      "601988"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "交通银行",
+                      "交行",
+                      "601328"
+                    ]
+                  }
+                ]
+              },
+              "start": {
+                "eq": "2020"
+              },
+              "end": {
+                "eq": "2024"
+              },
+              "confirmed": {
+                "absent_or_false": true
+              }
+            }
+          }
+        ],
+        "forbidden": [
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3
+      }
+    },
+    {
+      "caseId": "ng-001",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 0
+      },
+      "skipped": false,
+      "tool_names": [],
+      "calls": [],
+      "error": null,
+      "question": "你好",
+      "family": "no_tool",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_not_call",
+        "tushare_via": "none",
+        "expected": [],
+        "forbidden": [
+          "*"
+        ],
+        "max_calls": 0
+      }
+    },
+    {
+      "caseId": "ng-002",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 0
+      },
+      "skipped": false,
+      "tool_names": [],
+      "calls": [],
+      "error": null,
+      "question": "你能做什么？",
+      "family": "no_tool",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_not_call",
+        "tushare_via": "none",
+        "expected": [],
+        "forbidden": [
+          "*"
+        ],
+        "max_calls": 0
+      }
+    },
+    {
+      "caseId": "ng-003",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 0
+      },
+      "skipped": false,
+      "tool_names": [],
+      "calls": [],
+      "error": null,
+      "question": "ROE 是什么意思？",
+      "family": "no_tool",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_not_call",
+        "tushare_via": "none",
+        "expected": [],
+        "forbidden": [
+          "*"
+        ],
+        "max_calls": 0
+      }
+    },
+    {
+      "caseId": "ng-004",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 0
+      },
+      "skipped": false,
+      "tool_names": [],
+      "calls": [],
+      "error": null,
+      "question": "毛利率怎么计算？",
+      "family": "no_tool",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_not_call",
+        "tushare_via": "none",
+        "expected": [],
+        "forbidden": [
+          "*"
+        ],
+        "max_calls": 0
+      }
+    },
+    {
+      "caseId": "ng-005",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 0
+      },
+      "skipped": false,
+      "tool_names": [],
+      "calls": [],
+      "error": null,
+      "question": "价值投资和趋势投资有什么区别？",
+      "family": "no_tool",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_not_call",
+        "tushare_via": "none",
+        "expected": [],
+        "forbidden": [
+          "*"
+        ],
+        "max_calls": 0
+      }
+    },
+    {
+      "caseId": "ng-006",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 0
+      },
+      "skipped": false,
+      "tool_names": [],
+      "calls": [],
+      "error": null,
+      "question": "谢谢，我先看看",
+      "family": "no_tool",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_not_call",
+        "tushare_via": "none",
+        "expected": [],
+        "forbidden": [
+          "*"
+        ],
+        "max_calls": 0
+      }
+    },
+    {
+      "caseId": "ng-007",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 0
+      },
+      "skipped": false,
+      "tool_names": [],
+      "calls": [],
+      "error": null,
+      "question": "把这句话翻译成英文：贵州茅台近五年毛利率很高",
+      "family": "no_tool",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_not_call",
+        "tushare_via": "none",
+        "expected": [],
+        "forbidden": [
+          "*"
+        ],
+        "max_calls": 0
+      }
+    },
+    {
+      "caseId": "ng-008",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 0
+      },
+      "skipped": false,
+      "tool_names": [],
+      "calls": [],
+      "error": null,
+      "question": "不要查数据，凭印象说说茅台好不好",
+      "family": "no_tool",
+      "split": "held_out",
+      "gold": {
+        "call_policy": "must_not_call",
+        "tushare_via": "none",
+        "expected": [],
+        "forbidden": [
+          "*"
+        ],
+        "max_calls": 0
+      }
+    },
+    {
+      "caseId": "ng-009",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 0
+      },
+      "skipped": false,
+      "tool_names": [],
+      "calls": [],
+      "error": null,
+      "question": "润色这段话：宁德时代2024年毛利率下滑需要关注",
+      "family": "no_tool",
+      "split": "held_out",
+      "gold": {
+        "call_policy": "must_not_call",
+        "tushare_via": "none",
+        "expected": [],
+        "forbidden": [
+          "*"
+        ],
+        "max_calls": 0
+      }
+    },
+    {
+      "caseId": "ng-010",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 0
+      },
+      "skipped": false,
+      "tool_names": [],
+      "calls": [],
+      "error": null,
+      "question": "Tushare 是什么？我要不要自己配 token？",
+      "family": "no_tool",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_not_call",
+        "tushare_via": "none",
+        "expected": [],
+        "forbidden": [
+          "*"
+        ],
+        "max_calls": 0
+      }
+    },
+    {
+      "caseId": "ng-011",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 0
+      },
+      "skipped": false,
+      "tool_names": [],
+      "calls": [],
+      "error": null,
+      "question": "研究画布里点「添加到画布」是什么意思？",
+      "family": "no_tool",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_not_call",
+        "tushare_via": "none",
+        "expected": [],
+        "forbidden": [
+          "*"
+        ],
+        "max_calls": 0
+      }
+    },
+    {
+      "caseId": "ng-012",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 0
+      },
+      "skipped": false,
+      "tool_names": [],
+      "calls": [],
+      "error": null,
+      "question": "帮我写一句投资座右铭，不要查行情也不要改画布",
+      "family": "no_tool",
+      "split": "held_out",
+      "gold": {
+        "call_policy": "must_not_call",
+        "tushare_via": "none",
+        "expected": [],
+        "forbidden": [
+          "*"
+        ],
+        "max_calls": 0
+      }
+    },
+    {
+      "caseId": "ng-013",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 0
+      },
+      "skipped": false,
+      "tool_names": [],
+      "calls": [],
+      "error": null,
+      "question": "早上好",
+      "family": "no_tool",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_not_call",
+        "tushare_via": "none",
+        "expected": [],
+        "forbidden": [
+          "*"
+        ],
+        "max_calls": 0
+      }
+    },
+    {
+      "caseId": "ng-014",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 0
+      },
+      "skipped": false,
+      "tool_names": [],
+      "calls": [],
+      "error": null,
+      "question": "你现在用的是哪个模型",
+      "family": "no_tool",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_not_call",
+        "tushare_via": "none",
+        "expected": [],
+        "forbidden": [
+          "*"
+        ],
+        "max_calls": 0
+      }
+    },
+    {
+      "caseId": "ng-015",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 0
+      },
+      "skipped": false,
+      "tool_names": [],
+      "calls": [],
+      "error": null,
+      "question": "什么是净资产收益率",
+      "family": "no_tool",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_not_call",
+        "tushare_via": "none",
+        "expected": [],
+        "forbidden": [
+          "*"
+        ],
+        "max_calls": 0
+      }
+    },
+    {
+      "caseId": "ng-016",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 0
+      },
+      "skipped": false,
+      "tool_names": [],
+      "calls": [],
+      "error": null,
+      "question": "营收和净利润有什么区别",
+      "family": "no_tool",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_not_call",
+        "tushare_via": "none",
+        "expected": [],
+        "forbidden": [
+          "*"
+        ],
+        "max_calls": 0
+      }
+    },
+    {
+      "caseId": "ng-017",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 0
+      },
+      "skipped": false,
+      "tool_names": [],
+      "calls": [],
+      "error": null,
+      "question": "把这句话改得更书面：比亚迪毛利率有所回升",
+      "family": "no_tool",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_not_call",
+        "tushare_via": "none",
+        "expected": [],
+        "forbidden": [
+          "*"
+        ],
+        "max_calls": 0
+      }
+    },
+    {
+      "caseId": "ng-018",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 0
+      },
+      "skipped": false,
+      "tool_names": [],
+      "calls": [],
+      "error": null,
+      "question": "翻译成英文：海康威视是安防龙头",
+      "family": "no_tool",
+      "split": "held_out",
+      "gold": {
+        "call_policy": "must_not_call",
+        "tushare_via": "none",
+        "expected": [],
+        "forbidden": [
+          "*"
+        ],
+        "max_calls": 0
+      }
+    },
+    {
+      "caseId": "ng-019",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 0
+      },
+      "skipped": false,
+      "tool_names": [],
+      "calls": [],
+      "error": null,
+      "question": "不要查库，讲讲巴菲特的护城河",
+      "family": "no_tool",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_not_call",
+        "tushare_via": "none",
+        "expected": [],
+        "forbidden": [
+          "*"
+        ],
+        "max_calls": 0
+      }
+    },
+    {
+      "caseId": "ng-020",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 0
+      },
+      "skipped": false,
+      "tool_names": [],
+      "calls": [],
+      "error": null,
+      "question": "帮我列一个财报阅读清单，不用具体公司数字",
+      "family": "no_tool",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_not_call",
+        "tushare_via": "none",
+        "expected": [],
+        "forbidden": [
+          "*"
+        ],
+        "max_calls": 0
+      }
+    },
+    {
+      "caseId": "ng-021",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 0
+      },
+      "skipped": false,
+      "tool_names": [],
+      "calls": [],
+      "error": null,
+      "question": "如何理解市盈率",
+      "family": "no_tool",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_not_call",
+        "tushare_via": "none",
+        "expected": [],
+        "forbidden": [
+          "*"
+        ],
+        "max_calls": 0
+      }
+    },
+    {
+      "caseId": "ng-022",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 0
+      },
+      "skipped": false,
+      "tool_names": [],
+      "calls": [],
+      "error": null,
+      "question": "画布上的 Preview 和 Adopt 有什么区别",
+      "family": "no_tool",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_not_call",
+        "tushare_via": "none",
+        "expected": [],
+        "forbidden": [
+          "*"
+        ],
+        "max_calls": 0
+      }
+    },
+    {
+      "caseId": "ng-023",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 0
+      },
+      "skipped": false,
+      "tool_names": [],
+      "calls": [],
+      "error": null,
+      "question": "写一首关于投资纪律的五言诗",
+      "family": "no_tool",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_not_call",
+        "tushare_via": "none",
+        "expected": [],
+        "forbidden": [
+          "*"
+        ],
+        "max_calls": 0
+      }
+    },
+    {
+      "caseId": "ng-024",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 0
+      },
+      "skipped": false,
+      "tool_names": [],
+      "calls": [],
+      "error": null,
+      "question": "1+1 等于几",
+      "family": "no_tool",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_not_call",
+        "tushare_via": "none",
+        "expected": [],
+        "forbidden": [
+          "*"
+        ],
+        "max_calls": 0
+      }
+    },
+    {
+      "caseId": "ng-025",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 0
+      },
+      "skipped": false,
+      "tool_names": [],
+      "calls": [],
+      "error": null,
+      "question": "把「宁德时代近五年毛利率」改成更礼貌的问法，不要真的去查",
+      "family": "no_tool",
+      "split": "held_out",
+      "gold": {
+        "call_policy": "must_not_call",
+        "tushare_via": "none",
+        "expected": [],
+        "forbidden": [
+          "*"
+        ],
+        "max_calls": 0
+      }
+    },
+    {
+      "caseId": "ng-026",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 0
+      },
+      "skipped": false,
+      "tool_names": [],
+      "calls": [],
+      "error": null,
+      "question": "解释什么是 K 线",
+      "family": "no_tool",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_not_call",
+        "tushare_via": "none",
+        "expected": [],
+        "forbidden": [
+          "*"
+        ],
+        "max_calls": 0
+      }
+    },
+    {
+      "caseId": "ng-027",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 0
+      },
+      "skipped": false,
+      "tool_names": [],
+      "calls": [],
+      "error": null,
+      "question": "我只是问问你懂不懂贵州茅台，先别调工具",
+      "family": "no_tool",
+      "split": "held_out",
+      "gold": {
+        "call_policy": "must_not_call",
+        "tushare_via": "none",
+        "expected": [],
+        "forbidden": [
+          "*"
+        ],
+        "max_calls": 0
+      }
+    },
+    {
+      "caseId": "ng-028",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 0
+      },
+      "skipped": false,
+      "tool_names": [],
+      "calls": [],
+      "error": null,
+      "question": "用大白话解释资产负债率",
+      "family": "no_tool",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_not_call",
+        "tushare_via": "none",
+        "expected": [],
+        "forbidden": [
+          "*"
+        ],
+        "max_calls": 0
+      }
+    },
+    {
+      "caseId": "ng-029",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 0
+      },
+      "skipped": false,
+      "tool_names": [],
+      "calls": [],
+      "error": null,
+      "question": "帮我检查这段话有没有错别字：阳光电源2023年出货量增长",
+      "family": "no_tool",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_not_call",
+        "tushare_via": "none",
+        "expected": [],
+        "forbidden": [
+          "*"
+        ],
+        "max_calls": 0
+      }
+    },
+    {
+      "caseId": "ng-030",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 0
+      },
+      "skipped": false,
+      "tool_names": [],
+      "calls": [],
+      "error": null,
+      "question": "今晚有什么电影推荐",
+      "family": "no_tool",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_not_call",
+        "tushare_via": "none",
+        "expected": [],
+        "forbidden": [
+          "*"
+        ],
+        "max_calls": 0
+      }
+    },
+    {
+      "caseId": "ng-031",
+      "pass": true,
+      "reasons": [],
+      "stats": {
+        "calls": 0
+      },
+      "skipped": false,
+      "tool_names": [],
+      "calls": [],
+      "error": null,
+      "question": "请用三句话介绍你自己",
+      "family": "no_tool",
+      "split": "held_in",
+      "gold": {
+        "call_policy": "must_not_call",
+        "tushare_via": "none",
+        "expected": [],
+        "forbidden": [
+          "*"
+        ],
+        "max_calls": 0
+      }
+    }
+  ]
+}

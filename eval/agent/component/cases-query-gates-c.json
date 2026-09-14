@@ -1,0 +1,87 @@
+{
+  "file": "cases-query-gates-c.json",
+  "family": "tushare_query_gate",
+  "cases": [
+    {
+      "id": "qg-013",
+      "split": "held_out",
+      "family": "tushare_query_gate",
+      "question": "中证500成分股有哪些",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_not_call",
+        "expected": [],
+        "forbidden": ["query_data", "get_instrument_quotes", "get_instrument_financials", "resolve_industry_universe", "propose_widget", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 0,
+        "tushare_via": "none",
+        "judge_notes": "清单无指数成分工具，禁止拿 query_data 或行业宇宙充数。"
+      }
+    },
+    {
+      "id": "qg-014",
+      "split": "held_in",
+      "family": "tushare_query_gate",
+      "question": "上证50成分股列表",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_not_call",
+        "expected": [],
+        "forbidden": ["query_data", "get_instrument_quotes", "get_instrument_financials", "resolve_industry_universe", "propose_widget", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 0,
+        "tushare_via": "none",
+        "judge_notes": "无成分股工具则不调查询。"
+      }
+    },
+    {
+      "id": "qg-015",
+      "split": "held_in",
+      "family": "tushare_query_gate",
+      "question": "创业板指都有哪些股票",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_not_call",
+        "expected": [],
+        "forbidden": ["query_data", "get_instrument_quotes", "get_instrument_financials", "resolve_industry_universe", "propose_widget", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 0,
+        "tushare_via": "none",
+        "judge_notes": "指数成分不在本工具清单。"
+      }
+    },
+    {
+      "id": "qg-016",
+      "split": "held_in",
+      "family": "tushare_query_gate",
+      "question": "对比工商银行、建设银行、农业银行、中国银行、交通银行 2020 到 2024 年营收",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": { "eq": "revenue" },
+              "entities": {
+                "covers": [
+                  { "any": ["工商银行", "工行", "601398"] },
+                  { "any": ["建设银行", "建行", "601939"] },
+                  { "any": ["农业银行", "农行", "601288"] },
+                  { "any": ["中国银行", "中行", "601988"] },
+                  { "any": ["交通银行", "交行", "601328"] }
+                ]
+              },
+              "start": { "eq": "2020" },
+              "end": { "eq": "2024" },
+              "confirmed": { "absent_or_false": true }
+            }
+          }
+        ],
+        "optional_before": ["search_instruments"],
+        "forbidden": ["create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "query_data.financials",
+        "judge_notes": "五大行 >3 家。"
+      }
+    }
+  ]
+}

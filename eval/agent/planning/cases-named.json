@@ -1,0 +1,199 @@
+{
+  "file": "cases-named.json",
+  "family": "named_compare",
+  "cases": [
+    {
+      "id": "pl-001",
+      "split": "held_in",
+      "family": "named_compare",
+      "toolset": "component_v1",
+      "task": "比较美的集团和格力电器 2020 到 2024 年营收",
+      "user_script": [],
+      "gold": {
+        "chain": [
+          {
+            "name": "query_data",
+            "args": {
+              "metric": { "eq": "revenue" },
+              "entities": {
+                "covers": [
+                  { "any": ["美的集团", "美的", "000333"] },
+                  { "any": ["格力电器", "格力", "000651"] }
+                ]
+              },
+              "start": { "eq": "2020" },
+              "end": { "eq": "2024" }
+            }
+          },
+          {
+            "name": "propose_widget"
+          }
+        ],
+        "optional": ["search_instruments"],
+        "max_decisions": 4
+      },
+      "constraints": [
+        {
+          "id": "no_steal_canvas",
+          "type": "forbid_tool",
+          "tools": ["create_widget", "create_canvas", "update_widget"]
+        },
+        {
+          "id": "no_web",
+          "type": "forbid_tool",
+          "tools": ["web_search"]
+        },
+        {
+          "id": "no_financials",
+          "type": "forbid_tool",
+          "tools": ["get_instrument_financials"]
+        }
+      ]
+    },
+    {
+      "id": "pl-002",
+      "split": "held_in",
+      "family": "named_compare",
+      "toolset": "component_v1",
+      "task": "看海康威视 2019 到 2024 年净资产收益率",
+      "user_script": [],
+      "gold": {
+        "chain": [
+          {
+            "name": "query_data",
+            "args": {
+              "metric": { "eq": "roe" },
+              "entities": {
+                "covers": [
+                  { "any": ["海康威视", "海康", "002415"] }
+                ]
+              },
+              "start": { "eq": "2019" },
+              "end": { "eq": "2024" }
+            }
+          },
+          {
+            "name": "propose_widget"
+          }
+        ],
+        "optional": ["search_instruments"],
+        "max_decisions": 4
+      },
+      "constraints": [
+        {
+          "id": "no_steal_canvas",
+          "type": "forbid_tool",
+          "tools": ["create_widget", "create_canvas", "update_widget"]
+        },
+        {
+          "id": "no_web",
+          "type": "forbid_tool",
+          "tools": ["web_search"]
+        },
+        {
+          "id": "no_financials",
+          "type": "forbid_tool",
+          "tools": ["get_instrument_financials"]
+        }
+      ]
+    },
+    {
+      "id": "pl-003",
+      "split": "held_in",
+      "family": "named_compare",
+      "toolset": "component_v1",
+      "task": "对比恒瑞医药和迈瑞医疗 2021 到 2025 年毛利率",
+      "user_script": [],
+      "gold": {
+        "chain": [
+          {
+            "name": "query_data",
+            "args": {
+              "metric": { "eq": "gross_margin" },
+              "entities": {
+                "covers": [
+                  { "any": ["恒瑞医药", "恒瑞", "600276"] },
+                  { "any": ["迈瑞医疗", "迈瑞", "300760"] }
+                ]
+              },
+              "start": { "eq": "2021" },
+              "end": { "in": ["2025", "2026"] }
+            }
+          },
+          {
+            "name": "propose_widget"
+          }
+        ],
+        "optional": ["search_instruments"],
+        "max_decisions": 4
+      },
+      "constraints": [
+        {
+          "id": "no_steal_canvas",
+          "type": "forbid_tool",
+          "tools": ["create_widget", "create_canvas", "update_widget"]
+        },
+        {
+          "id": "no_web",
+          "type": "forbid_tool",
+          "tools": ["web_search"]
+        },
+        {
+          "id": "no_financials",
+          "type": "forbid_tool",
+          "tools": ["get_instrument_financials"]
+        }
+      ]
+    },
+    {
+      "id": "pl-004",
+      "split": "held_in",
+      "family": "named_compare",
+      "toolset": "component_v1",
+      "task": "看一下中芯国际的K线",
+      "user_script": [],
+      "gold": {
+        "chain": [
+          {
+            "name": "query_data",
+            "args": {
+              "metric": { "eq": "kline" },
+              "entities": {
+                "covers": [
+                  { "any": ["中芯国际", "中芯", "688981"] }
+                ]
+              }
+            }
+          },
+          {
+            "name": "propose_widget"
+          }
+        ],
+        "optional": ["search_instruments"],
+        "max_decisions": 4
+      },
+      "constraints": [
+        {
+          "id": "no_steal_canvas",
+          "type": "forbid_tool",
+          "tools": ["create_widget", "create_canvas", "update_widget"]
+        },
+        {
+          "id": "no_web",
+          "type": "forbid_tool",
+          "tools": ["web_search"]
+        },
+        {
+          "id": "no_financials",
+          "type": "forbid_tool",
+          "tools": ["get_instrument_financials"]
+        },
+        {
+          "id": "no_quotes_as_kline",
+          "type": "forbid_tool",
+          "tools": ["get_instrument_quotes"]
+        }
+      ]
+    }
+  ]
+}

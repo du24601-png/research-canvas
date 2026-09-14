@@ -293,7 +293,7 @@ export function buildResearchCanvasTools(hub?: ResearchDataHub | null): Research
     {
       name: 'propose_widget',
       category: '研究画布',
-      description: '在对话中提出研究视图预览，不写入右侧画布。用户确认后才会加入画布。优先传 intent（trend/rank/compare），type 可省略（系统按数据形状推荐）。bar_chart 只显示 params.period 一年；grouped_bar 横轴年份、每年并排多根柱。标题用返回的 suggestedTitle。改图种也用本工具，不要 update_widget。',
+      description: '在对话中提出研究视图预览，不写入右侧画布。用户确认后才会加入画布。优先传 intent（trend/rank/compare），type 可省略（系统按数据形状推荐）。bar_chart 只显示 params.period 一年；grouped_bar 横轴年份、每年并排多根柱。标题用返回的 suggestedTitle。未 Adopt 的预览改图种用本工具；右侧已有组件改图种用 update_widget。',
       parameters: S({
         intent: {
           type: 'string',
@@ -410,7 +410,7 @@ export function buildResearchCanvasTools(hub?: ResearchDataHub | null): Research
     {
       name: 'update_widget',
       category: '研究画布',
-      description: '更新右侧研究画布已有组件的类型、标题、数据集或图表样式（图例/颜色/轴标题），不改变用户排版。对话里改图种请用 propose_widget；改颜色/图例/标签用 style；仅当用户明确要求改右侧已有图的数据范围时才改 datasetId。',
+      description: '更新右侧研究画布已有组件的类型、标题、数据集或图表样式（图例/颜色/轴标题），不改变用户排版。用户指右侧已有图改图种/标题时用本工具，不要 propose_widget；改颜色/图例/标签用 style；仅当用户明确要求改右侧已有图的数据范围时才改 datasetId。',
       parameters: S({
         id: { type: 'string', description: '要更新的组件 id' },
         type: {

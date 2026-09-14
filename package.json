@@ -34,14 +34,11 @@
     "audit:ui": "node scripts/audit-client-ui-react.mjs",
     "audit:npm": "npm audit --registry=https://registry.npmjs.org/",
     "check:ui": "node scripts/check-client-ui.mjs",
-    "release:notes": "node scripts/assemble-release-notes.mjs",
     "audit:selfhost-release": "node scripts/audit-selfhost-release.mjs --all",
     "audit:selfhost-npm": "node scripts/audit-selfhost-release.mjs --npm",
     "audit:selfhost-runtime": "node scripts/audit-selfhost-release.mjs --runtime",
     "audit:selfhost-docker": "node scripts/audit-selfhost-release.mjs --docker --skip-build",
     "prepare:pwa-icons": "node scripts/generate-product-icons.mjs && node scripts/prepare-pwa-icons.mjs",
-    "pack:runtime": "node scripts/pack-opptrix-runtime.mjs",
-    "optimize:sponsors": "node scripts/optimize-sponsor-images.mjs",
     "start": "npm run start -w @opptrix/server",
     "serve": "concurrently -k -n api,web -c blue,cyan \"npm run start\" \"npm run preview -w research-canvas-client -- --host 0.0.0.0\"",
     "clean": "find packages apps -name dist -type d -prune -exec rm -rf {} + 2>/dev/null; find packages apps -name tsconfig.tsbuildinfo -delete 2>/dev/null; rm -rf client-ui/dist",
@@ -55,7 +52,11 @@
     "postinstall": "node scripts/scrub-install-deps.mjs",
     "scrub:install-deps": "node scripts/scrub-install-deps.mjs",
     "test:ui": "npm run test -w research-canvas-client",
-    "test:e2e:smoke": "node scripts/e2e-research-board-smoke.mjs"
+    "test:e2e:smoke": "node scripts/e2e-research-board-smoke.mjs",
+    "eval:agent": "node eval/agent/pipeline/run.mjs",
+    "eval:agent:component": "node eval/agent/component/run.mjs",
+    "eval:agent:planning": "node eval/agent/planning/run.mjs",
+    "eval:agent:prompt": "node eval/agent/prompt/run.mjs"
   },
   "engines": {
     "node": ">=24"

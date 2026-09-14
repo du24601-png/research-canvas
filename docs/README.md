@@ -5,6 +5,7 @@
 | 文档 | 说明 |
 |------|------|
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | 分层、调用规则、与代码的差异（写实） |
+| [AGENT-EVAL.md](./AGENT-EVAL.md) | Agent 三层评测（与 `test:gate` 隔离） |
 | [SELF-HOSTING.md](./SELF-HOSTING.md) | Docker / 裸 Node 部署 |
 | [DATA-LAYER.md](./DATA-LAYER.md) | Engine、Provider 落点、缓存 |
 | [AGENT-GUIDE.md](./AGENT-GUIDE.md) | Agent 工具与技能 |

@@ -6,6 +6,7 @@
 | `apps/server/` | Fastify API（唯一应用） |
 | `packages/` | 领域包，见 [packages/README.md](../packages/README.md) |
 | `tests/` | 根级 `node:test`（`.mjs`） |
+| `eval/agent/` | Agent 评测题集、流水线与正式档（见 [AGENT-EVAL.md](./AGENT-EVAL.md)） |
 | `docs/` | 随仓文档（本目录） |
 | `example/` | 可提交的启动 / 配置样例（无密钥） |
 | `examples/` | 扩展示例（如 hello-world `.opx`） |

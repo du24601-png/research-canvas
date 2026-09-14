@@ -1,0 +1,179 @@
+{
+  "file": "cases-many.json",
+  "family": "many_preview",
+  "cases": [
+    {
+      "id": "pl-005",
+      "split": "held_in",
+      "family": "many_preview",
+      "toolset": "component_v1",
+      "task": "比较茅台、五粮液、洋河、泸州老窖、山西汾酒 2020 到 2024 年营收",
+      "user_script": [
+        {
+          "when": "plan_preview",
+          "content": "确认，按这个名单查"
+        }
+      ],
+      "gold": {
+        "chain": [
+          {
+            "name": "query_data",
+            "args": {
+              "metric": { "eq": "revenue" },
+              "confirmed": { "absent_or_false": true }
+            }
+          },
+          {
+            "name": "query_data",
+            "args": {
+              "confirmed": { "eq": true }
+            }
+          },
+          {
+            "name": "propose_widget"
+          }
+        ],
+        "optional": ["search_instruments", "ask_user"],
+        "max_decisions": 5
+      },
+      "constraints": [
+        {
+          "id": "no_steal_canvas",
+          "type": "forbid_tool",
+          "tools": ["create_widget", "create_canvas", "update_widget"]
+        },
+        {
+          "id": "no_web",
+          "type": "forbid_tool",
+          "tools": ["web_search"]
+        },
+        {
+          "id": "no_financials",
+          "type": "forbid_tool",
+          "tools": ["get_instrument_financials"]
+        },
+        {
+          "id": "no_early_confirm",
+          "type": "forbid_args",
+          "name": "query_data",
+          "args": {
+            "confirmed": { "eq": true }
+          },
+          "unless_after": "user_confirm"
+        }
+      ]
+    },
+    {
+      "id": "pl-006",
+      "split": "held_out",
+      "family": "many_preview",
+      "toolset": "component_v1",
+      "task": "对比工商银行、建设银行、农业银行、中国银行、交通银行 2020 到 2024 年营收",
+      "user_script": [
+        {
+          "when": "plan_preview",
+          "content": "确认，按这个名单查"
+        }
+      ],
+      "gold": {
+        "chain": [
+          {
+            "name": "query_data",
+            "args": {
+              "metric": { "eq": "revenue" },
+              "confirmed": { "absent_or_false": true }
+            }
+          },
+          {
+            "name": "query_data",
+            "args": {
+              "confirmed": { "eq": true }
+            }
+          },
+          {
+            "name": "propose_widget"
+          }
+        ],
+        "optional": ["search_instruments", "ask_user"],
+        "max_decisions": 5
+      },
+      "constraints": [
+        {
+          "id": "no_steal_canvas",
+          "type": "forbid_tool",
+          "tools": ["create_widget", "create_canvas", "update_widget"]
+        },
+        {
+          "id": "no_web",
+          "type": "forbid_tool",
+          "tools": ["web_search"]
+        },
+        {
+          "id": "no_financials",
+          "type": "forbid_tool",
+          "tools": ["get_instrument_financials"]
+        },
+        {
+          "id": "no_early_confirm",
+          "type": "forbid_args",
+          "name": "query_data",
+          "args": {
+            "confirmed": { "eq": true }
+          },
+          "unless_after": "user_confirm"
+        }
+      ]
+    },
+    {
+      "id": "pl-007",
+      "split": "held_in",
+      "family": "many_preview",
+      "toolset": "component_v1",
+      "task": "比较茅台、五粮液、洋河、泸州老窖、山西汾酒 2020 到 2024 年营收",
+      "user_script": [
+        {
+          "when": "plan_preview",
+          "content": "先别查，名单不对"
+        }
+      ],
+      "gold": {
+        "chain": [
+          {
+            "name": "query_data",
+            "args": {
+              "confirmed": { "absent_or_false": true }
+            }
+          }
+        ],
+        "optional": ["search_instruments", "ask_user"],
+        "max_decisions": 2
+      },
+      "constraints": [
+        {
+          "id": "no_steal_canvas",
+          "type": "forbid_tool",
+          "tools": ["create_widget", "create_canvas", "update_widget"]
+        },
+        {
+          "id": "no_web",
+          "type": "forbid_tool",
+          "tools": ["web_search"]
+        },
+        {
+          "id": "no_financials",
+          "type": "forbid_tool",
+          "tools": ["get_instrument_financials"]
+        },
+        {
+          "id": "no_early_confirm",
+          "type": "forbid_args",
+          "name": "query_data",
+          "args": {
+            "confirmed": { "eq": true }
+          },
+          "unless_after": "user_confirm"
+        }
+      ]
+    }
+  ]
+}

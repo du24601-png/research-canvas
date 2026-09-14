@@ -1,0 +1,256 @@
+{
+  "id": "component_v1",
+  "note": "组件评测冻结工具清单。正例与反例均注入本清单。参数与 packages/agent 现行 schema 对齐，供判分器与模型共用。",
+  "tushare_backed": [
+    "query_data",
+    "get_instrument_quotes",
+    "get_instrument_financials",
+    "get_instrument_snapshot",
+    "get_instrument_profile",
+    "search_instruments"
+  ],
+  "canvas_mutating": [
+    "propose_widget",
+    "update_proposal",
+    "refine_dataset",
+    "create_widget",
+    "update_widget",
+    "delete_widget"
+  ],
+  "distractors": ["ask_user", "web_search", "create_canvas", "resolve_industry_universe"],
+  "tools": [
+    {
+      "name": "query_data",
+      "description": "按公司与指标查询真实财务或日K，生成数据集。≤3 家直接取数；>3 家须先 plan_preview，确认后再 confirmed:true。K 线 metric=kline。不返回明细数字。比较/看看后再 propose_widget。",
+      "parameters": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["entities", "metric", "start", "end"],
+        "properties": {
+          "entities": { "type": "array", "items": { "type": "string" }, "description": "公司简称、全称或股票代码，最多 20 家" },
+          "metric": { "type": "string", "enum": ["gross_margin", "revenue", "revenue_growth", "net_income", "net_margin", "roe", "kline"] },
+          "start": { "type": "string", "description": "起始年份，如 2021" },
+          "end": { "type": "string", "description": "结束年份，如 2025" },
+          "confirmed": { "type": "boolean", "description": "用户确认取数计划后为 true；首次预览不要传" }
+        }
+      }
+    },
+    {
+      "name": "resolve_industry_universe",
+      "description": "把行业或主题解析为可确认的上市公司名单，不取财务数字。返回后必须 ask_user 确认，再 query_data。禁止口播名单。",
+      "parameters": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["industry"],
+        "properties": {
+          "industry": { "type": "string", "description": "如 电池、光伏、白酒" },
+          "board_key": { "type": "string" },
+          "industry_code": { "type": "string" }
+        }
+      }
+    },
+    {
+      "name": "refine_dataset",
+      "description": "在已有数据集上增删公司或收窄年份，生成派生数据集，不覆盖原集。改指标用 query_data；改图种用 propose_widget。",
+      "parameters": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["datasetId", "operation"],
+        "properties": {
+          "datasetId": { "type": "string" },
+          "operation": {
+            "type": "object",
+            "required": ["type"],
+            "properties": {
+              "type": { "type": "string", "enum": ["remove_entities", "add_entities", "change_period", "aggregate_groups"] },
+              "entities": { "type": "array", "items": { "type": "string" } },
+              "start": { "type": "string" },
+              "end": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "propose_widget",
+      "description": "提出研究视图预览，不写入右侧画布。未 Adopt 的预览改图种用本工具；右侧已有组件改图种用 update_widget。",
+      "parameters": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "intent": { "type": "string", "enum": ["trend", "rank", "compare", "composition", "price"] },
+          "type": { "type": "string", "enum": ["line_chart", "bar_chart", "grouped_bar", "stacked_bar", "stacked_bar_percent", "combo_bar_line", "pie_chart", "donut_chart", "candlestick", "heatmap_table", "table", "sources"] },
+          "title": { "type": "string" },
+          "datasetId": { "type": "string" },
+          "params": { "type": "object", "properties": { "period": { "type": "string" }, "topN": { "type": "string" } } }
+        }
+      }
+    },
+    {
+      "name": "update_proposal",
+      "description": "更新对话中尚未 Adopt 的预览样式或标题，不写右侧画布。",
+      "parameters": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "proposalId": { "type": "string" },
+          "title": { "type": "string" }
+        }
+      }
+    },
+    {
+      "name": "create_widget",
+      "description": "仅当用户明确要求直接加入右侧画布时新增组件。比较/看看应走 propose_widget。",
+      "parameters": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "title"],
+        "properties": {
+          "type": { "type": "string" },
+          "title": { "type": "string" },
+          "datasetId": { "type": "string" }
+        }
+      }
+    },
+    {
+      "name": "update_widget",
+      "description": "更新右侧已有组件的类型、标题或样式。用户指右侧已有图改图种/标题时用本工具，不要 propose_widget。",
+      "parameters": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id"],
+        "properties": {
+          "id": { "type": "string" },
+          "type": { "type": "string" },
+          "title": { "type": "string" },
+          "datasetId": { "type": "string" }
+        }
+      }
+    },
+    {
+      "name": "delete_widget",
+      "description": "按 id 从右侧研究画布移除组件。",
+      "parameters": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id"],
+        "properties": { "id": { "type": "string" } }
+      }
+    },
+    {
+      "name": "search_instruments",
+      "description": "按代码或名称搜索标的。名称不确定时可先搜再取数。",
+      "parameters": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["keyword"],
+        "properties": {
+          "keyword": { "type": "string" },
+          "markets": { "type": "array", "items": { "type": "string" } },
+          "limit": { "type": "number" }
+        }
+      }
+    },
+    {
+      "name": "get_instrument_quotes",
+      "description": "批量最新价、涨跌幅。问现价/涨跌时用，不要用 query_data。",
+      "parameters": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["instruments"],
+        "properties": {
+          "instruments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["market", "symbol"],
+              "properties": {
+                "market": { "type": "string", "description": "CN | US | HK" },
+                "symbol": { "type": "string", "description": "如 600519" },
+                "exchange": { "type": "string", "description": "A 股 SH | SZ | BJ" }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "get_instrument_financials",
+      "description": "单只财务摘要多期事实表。多家比较/走势请用 query_data，不要用本工具代替研究画布。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "string" },
+          "market": { "type": "string" },
+          "symbol": { "type": "string" },
+          "instrument": { "type": "object" },
+          "report_type": { "type": "string", "description": "all | annual | quarter" },
+          "report_date": { "type": "string" }
+        }
+      }
+    },
+    {
+      "name": "get_instrument_snapshot",
+      "description": "单只聚合快照。深度分析单只时可用；比较/走势仍走 query_data。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "string" },
+          "market": { "type": "string" },
+          "symbol": { "type": "string" },
+          "instrument": { "type": "object" }
+        }
+      }
+    },
+    {
+      "name": "get_instrument_profile",
+      "description": "公司概况（主业、行业、概念）。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "string" },
+          "market": { "type": "string" },
+          "symbol": { "type": "string" },
+          "instrument": { "type": "object" }
+        }
+      }
+    },
+    {
+      "name": "ask_user",
+      "description": "向用户提问确认或选择。行业名单确认时用。寒暄与概念题不要调用。",
+      "parameters": {
+        "type": "object",
+        "required": ["prompt"],
+        "properties": {
+          "prompt": { "type": "string" },
+          "mode": { "type": "string", "description": "confirm | choice | text" },
+          "options": { "type": "array" }
+        }
+      }
+    },
+    {
+      "name": "web_search",
+      "description": "公开网页搜索。不是行情、财务、公告主路径。A 股问数禁止首选。",
+      "parameters": {
+        "type": "object",
+        "required": ["query"],
+        "properties": {
+          "query": { "type": "string" },
+          "region": { "type": "string", "enum": ["auto", "cn", "global"] }
+        }
+      }
+    },
+    {
+      "name": "create_canvas",
+      "description": "创建 TSX 制品画布。默认会话未开启报告与脑图；比较财务不要用本工具代替 query_data。",
+      "parameters": {
+        "type": "object",
+        "required": ["title", "source"],
+        "properties": {
+          "title": { "type": "string" },
+          "source": { "type": "string" }
+        }
+      }
+    }
+  ]
+}

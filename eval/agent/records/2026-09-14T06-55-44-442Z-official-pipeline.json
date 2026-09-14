@@ -1,0 +1,316 @@
+{
+  "schema": "opptrix.eval.pipeline.v1",
+  "kind": "official",
+  "track": "agent",
+  "layer": "pipeline",
+  "focus": "agent_eval.three_layer",
+  "at": "2026-09-14T06:55:44.442Z",
+  "duration_ms": 450427,
+  "git": {
+    "commit": "739c6db39705f33a16b7bef01df46590ad2a9fd2",
+    "dirty": true
+  },
+  "llm": {
+    "model": "deepseek-flash",
+    "temperature": 0,
+    "max_tokens": 1024,
+    "tool_choice": "auto"
+  },
+  "notes": "三层全量串行；不合成加权总分；不进入 test:gate。",
+  "layers": {
+    "component": {
+      "layer": "component",
+      "kind": "official",
+      "at": "2026-09-14T06:58:44.140Z",
+      "duration_ms": 179650,
+      "dataset_id": "agent-component-tushare-v1",
+      "summary": {
+        "judged": 99,
+        "skipped": 1,
+        "passed": 93,
+        "failed": 6,
+        "pass_rate": 0.9393939393939394,
+        "failure_rate": 0.06060606060606061,
+        "effective_ratio": 0.9393939393939394,
+        "avg_decisions": 0.7272727272727273,
+        "avg_decisions_passed": 0.7096774193548387,
+        "avg_step_precision": 0.9393939393939394,
+        "constraint_hits": {
+          "must_not_call": 4
+        },
+        "by_family": {
+          "tushare_query_canvas": {
+            "judged": 32,
+            "passed": 31,
+            "failed": 1,
+            "skipped": 0
+          },
+          "tushare_query_quotes": {
+            "judged": 13,
+            "passed": 13,
+            "failed": 0,
+            "skipped": 0
+          },
+          "tushare_query_profile": {
+            "judged": 8,
+            "passed": 8,
+            "failed": 0,
+            "skipped": 0
+          },
+          "tushare_query_gate": {
+            "judged": 15,
+            "passed": 10,
+            "failed": 5,
+            "skipped": 1
+          },
+          "no_tool": {
+            "judged": 31,
+            "passed": 31,
+            "failed": 0,
+            "skipped": 0
+          }
+        }
+      },
+      "archive": "D:\\Opptrix\\eval\\agent\\records\\2026-09-14T06-58-44-140Z-official-component.json"
+    },
+    "planning": {
+      "layer": "planning",
+      "kind": "official",
+      "at": "2026-09-14T07:00:33.705Z",
+      "duration_ms": 109514,
+      "dataset_id": "agent-planning-canvas-v1",
+      "summary": {
+        "judged": 24,
+        "skipped": 0,
+        "passed": 24,
+        "failed": 0,
+        "pass_rate": 1,
+        "failure_rate": 0,
+        "effective_ratio": 1,
+        "avg_decisions": 1.7916666666666667,
+        "avg_decisions_passed": 1.7916666666666667,
+        "avg_step_precision": 0.9166666666666666,
+        "by_family": {
+          "named_compare": {
+            "judged": 4,
+            "passed": 4,
+            "failed": 0,
+            "skipped": 0
+          },
+          "many_preview": {
+            "judged": 3,
+            "passed": 3,
+            "failed": 0,
+            "skipped": 0
+          },
+          "industry": {
+            "judged": 3,
+            "passed": 3,
+            "failed": 0,
+            "skipped": 0
+          },
+          "refine_view": {
+            "judged": 5,
+            "passed": 5,
+            "failed": 0,
+            "skipped": 0
+          },
+          "adopt_boundary": {
+            "judged": 3,
+            "passed": 3,
+            "failed": 0,
+            "skipped": 0
+          },
+          "quotes_and_stop": {
+            "judged": 6,
+            "passed": 6,
+            "failed": 0,
+            "skipped": 0
+          }
+        },
+        "constraint_hits": {}
+      },
+      "archive": "D:\\Opptrix\\eval\\agent\\records\\2026-09-14T07-00-33-705Z-official-planning.json"
+    },
+    "prompt": {
+      "layer": "prompt",
+      "kind": "official",
+      "at": "2026-09-14T07:03:14.835Z",
+      "duration_ms": 161118,
+      "dataset_id": "agent-planning-canvas-v1",
+      "summary": {
+        "judged": 24,
+        "skipped": 0,
+        "passed": 22,
+        "failed": 2,
+        "pass_rate": 0.9166666666666666,
+        "failure_rate": 0.08333333333333333,
+        "effective_ratio": 0.9166666666666666,
+        "avg_decisions": 1.7916666666666667,
+        "avg_decisions_passed": 1.8636363636363635,
+        "avg_step_precision": 0.8701388888888889,
+        "by_family": {
+          "named_compare": {
+            "judged": 4,
+            "passed": 4,
+            "failed": 0,
+            "skipped": 0
+          },
+          "many_preview": {
+            "judged": 3,
+            "passed": 3,
+            "failed": 0,
+            "skipped": 0
+          },
+          "industry": {
+            "judged": 3,
+            "passed": 2,
+            "failed": 1,
+            "skipped": 0
+          },
+          "refine_view": {
+            "judged": 5,
+            "passed": 4,
+            "failed": 1,
+            "skipped": 0
+          },
+          "adopt_boundary": {
+            "judged": 3,
+            "passed": 3,
+            "failed": 0,
+            "skipped": 0
+          },
+          "quotes_and_stop": {
+            "judged": 6,
+            "passed": 6,
+            "failed": 0,
+            "skipped": 0
+          }
+        },
+        "constraint_hits": {}
+      },
+      "archive": "D:\\Opptrix\\eval\\agent\\records\\2026-09-14T07-03-14-835Z-official-prompt.json"
+    }
+  },
+  "compare": {
+    "component": {
+      "hasBaseline": true,
+      "baseline_at": "2026-09-14T04:20:44.545Z",
+      "previous": {
+        "judged": 99,
+        "passed": 94,
+        "failed": 5,
+        "pass_rate": 0.9494949494949495,
+        "failure_rate": 0,
+        "avg_decisions": 0,
+        "avg_decisions_passed": 0,
+        "avg_step_precision": 0,
+        "constraint_hits": {},
+        "duration_ms": 158284
+      },
+      "deltas": {
+        "pass_rate": -0.010101010101010055,
+        "failure_rate": 0.06060606060606061,
+        "avg_decisions": 0.7272727272727273,
+        "avg_decisions_passed": 0.7096774193548387,
+        "avg_step_precision": 0.9393939393939394,
+        "duration_ms": 21366
+      },
+      "newlyFailed": [
+        {
+          "caseId": "qc-017",
+          "question": "看一下中芯国际的K线",
+          "reasons": [
+            "缺少工具 query_data"
+          ]
+        },
+        {
+          "caseId": "qg-004",
+          "question": "比较茅台、五粮液、洋河、泸州老窖、山西汾酒 2020 到 2024 年营收",
+          "reasons": [
+            "缺少工具 query_data"
+          ]
+        }
+      ],
+      "newlyPassed": [
+        {
+          "caseId": "qc-009",
+          "question": "宁德时代近三年毛利率",
+          "reasons": []
+        }
+      ]
+    },
+    "planning": {
+      "hasBaseline": true,
+      "baseline_at": "2026-09-14T05:15:57.092Z",
+      "previous": {
+        "judged": 24,
+        "passed": 24,
+        "failed": 0,
+        "pass_rate": 1,
+        "failure_rate": 0,
+        "avg_decisions": 1.75,
+        "avg_decisions_passed": 1.75,
+        "avg_step_precision": 0.9583333333333334,
+        "constraint_hits": {},
+        "duration_ms": 96263
+      },
+      "deltas": {
+        "pass_rate": 0,
+        "failure_rate": 0,
+        "avg_decisions": 0.04166666666666674,
+        "avg_decisions_passed": 0.04166666666666674,
+        "avg_step_precision": -0.04166666666666674,
+        "duration_ms": 13251
+      },
+      "newlyFailed": [],
+      "newlyPassed": []
+    },
+    "prompt": {
+      "hasBaseline": true,
+      "baseline_at": "2026-09-14T06:04:27.210Z",
+      "previous": {
+        "judged": 24,
+        "passed": 22,
+        "failed": 2,
+        "pass_rate": 0.9166666666666666,
+        "failure_rate": 0.08333333333333333,
+        "avg_decisions": 1.9166666666666667,
+        "avg_decisions_passed": 1.7727272727272727,
+        "avg_step_precision": 0.8845238095238095,
+        "constraint_hits": {},
+        "duration_ms": 149025
+      },
+      "deltas": {
+        "pass_rate": 0,
+        "failure_rate": 0,
+        "avg_decisions": -0.125,
+        "avg_decisions_passed": 0.09090909090909083,
+        "avg_step_precision": -0.014384920634920584,
+        "duration_ms": 12093
+      },
+      "newlyFailed": [
+        {
+          "caseId": "pl-008",
+          "question": "白酒行业毛利率对比",
+          "reasons": [
+            "缺少步骤 query_data",
+            "缺少步骤 propose_widget"
+          ]
+        }
+      ],
+      "newlyPassed": [
+        {
+          "caseId": "pl-020",
+          "question": "五粮液现在什么价",
+          "reasons": []
+        }
+      ]
+    }
+  },
+  "diagnosis": [
+    "只有 component 掉 → 第一轮工具幻觉；多轮夹具可能把错掩盖掉",
+    "产品北星是 prompt 层（真实 system prompt）。component 是领先指标。planning 是量具健康度。",
+    "三层测的不是同一件事，禁止合成加权总分，也不进入 test:gate。"
+  ]
+}

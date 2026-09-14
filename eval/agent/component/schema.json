@@ -1,0 +1,68 @@
+{
+  "$id": "eval/agent/component/schema.json",
+  "title": "Agent component eval case",
+  "type": "object",
+  "required": ["id", "split", "family", "question", "toolset", "gold"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z]{2}-[0-9]{3}$" },
+    "split": { "enum": ["held_in", "held_out"] },
+    "family": {
+      "enum": [
+        "tushare_query_canvas",
+        "tushare_query_quotes",
+        "tushare_query_profile",
+        "tushare_query_gate",
+        "no_tool"
+      ]
+    },
+    "question": { "type": "string", "minLength": 1 },
+    "toolset": { "const": "component_v1" },
+    "turn_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "artifacts_enabled": { "type": "boolean" },
+        "dataset_ids": { "type": "array", "items": { "type": "string" } },
+        "widget_ids": { "type": "array", "items": { "type": "string" } },
+        "user_confirmed_plan": { "type": "boolean" }
+      }
+    },
+    "gold": {
+      "type": "object",
+      "required": ["call_policy", "expected", "forbidden", "tushare_via"],
+      "additionalProperties": false,
+      "properties": {
+        "call_policy": { "enum": ["must_call", "must_not_call"] },
+        "expected": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": { "type": "string" },
+              "required": { "type": "boolean" },
+              "args": { "type": "object" }
+            }
+          }
+        },
+        "optional_before": { "type": "array", "items": { "type": "string" } },
+        "forbidden": { "type": "array", "items": { "type": "string" } },
+        "max_calls": { "type": "integer", "minimum": 0 },
+        "tushare_via": {
+          "enum": [
+            "none",
+            "query_data.financials",
+            "query_data.kline",
+            "instrument_quotes",
+            "instrument_financials",
+            "instrument_snapshot",
+            "instrument_profile",
+            "industry_universe"
+          ]
+        },
+        "judge_notes": { "type": "string" }
+      }
+    }
+  }
+}

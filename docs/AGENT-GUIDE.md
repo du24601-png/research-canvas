@@ -28,3 +28,4 @@
 
 - 工具与 pack：[`packages/README.md`](../packages/README.md)
 - 协议：`packages/shared` 的 `research-canvas-protocol`
+- 评测：[`docs/AGENT-EVAL.md`](../docs/AGENT-EVAL.md)（与 `test:gate` 隔离）

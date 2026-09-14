@@ -23,6 +23,14 @@ npm run test:e2e:smoke  # 浏览器主路径烟测；需本机 :8711 + :5173，�
 
 Windows 上全量 `test:ci` 仍可能有环境相关失败；以 Linux CI 的 `test:gate` + `test:ui` 为准。已知能力矩阵用例见 `AGENTS.md`。
 
+Agent 决策质量是另一条轨道，**不进 PR 门禁**，不要与 `test:gate` 加权。改提示词 / 工具 / 评测夹具后：
+
+```bash
+npm run eval:agent    # 三层全量 + 对照上次正式档；有失败题也 exit 0
+```
+
+口径与正式分数见 [docs/AGENT-EVAL.md](docs/AGENT-EVAL.md)。需要已配置模型。
+
 主路径烟测不进每次 PR（需本机模型与财报源）。本地验收：
 
 ```bash
@@ -35,6 +43,7 @@ npm run test:e2e:smoke
 ## 约定
 
 - 先读 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 与 [`AGENTS.md`](AGENTS.md)。
+- Agent 评测见 [docs/AGENT-EVAL.md](docs/AGENT-EVAL.md)，不要与 `test:gate` 混分。
 - 新增功能 / 改 API / Schema / Provider 前先说明方案再写码。
 - 不要把密钥写入代码、日志或文档。
 - UI 文案面向投资者，不要裸用内部术语。

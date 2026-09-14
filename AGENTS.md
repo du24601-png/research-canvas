@@ -75,6 +75,12 @@ node --test tests/research-canvas-tools.test.mjs tests/research-query-data.test.
 npm run test:ci          # 全量 node 测试（较慢）
 ```
 
+Agent 评测（**不进** `test:gate`；改提示词/工具/夹具后跑）：
+
+```bash
+npm run eval:agent       # 见 docs/AGENT-EVAL.md
+```
+
 本地运行：`npm run start -w @opptrix/server`（:8711）+ `WEB_HTTPS=0 npm run dev`（:5173）。交付形态为 Docker Compose 自托管 / 裸 Node + 反向代理（见 `Dockerfile`、`docker-compose.yml`）；不做 Electron 打包。
 
 ## 已知技术债（改到相关区域时注意）

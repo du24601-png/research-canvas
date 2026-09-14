@@ -1,0 +1,179 @@
+{
+  "file": "cases-query-quotes.json",
+  "family": "tushare_query_quotes",
+  "cases": [
+    {
+      "id": "qq-001",
+      "split": "held_in",
+      "family": "tushare_query_quotes",
+      "question": "茅台现价多少",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "get_instrument_quotes",
+            "required": true,
+            "args": { "symbol_any": ["600519", "贵州茅台", "茅台"] }
+          }
+        ],
+        "optional_before": ["search_instruments"],
+        "forbidden": ["query_data", "propose_widget", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "instrument_quotes",
+        "judge_notes": "现价走 quotes，禁止 query_data。"
+      }
+    },
+    {
+      "id": "qq-002",
+      "split": "held_in",
+      "family": "tushare_query_quotes",
+      "question": "600519 最新价和涨跌幅",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "get_instrument_quotes",
+            "required": true,
+            "args": { "symbol_any": ["600519"] }
+          }
+        ],
+        "forbidden": ["query_data", "propose_widget", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 2,
+        "tushare_via": "instrument_quotes",
+        "judge_notes": "已给代码，应直接 quotes。"
+      }
+    },
+    {
+      "id": "qq-003",
+      "split": "held_in",
+      "family": "tushare_query_quotes",
+      "question": "贵州茅台最新价",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "get_instrument_quotes",
+            "required": true,
+            "args": { "symbol_any": ["600519", "贵州茅台", "茅台"] }
+          }
+        ],
+        "optional_before": ["search_instruments"],
+        "forbidden": ["query_data", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "instrument_quotes",
+        "judge_notes": "最新价 ≠ 财务 query_data。"
+      }
+    },
+    {
+      "id": "qq-004",
+      "split": "held_in",
+      "family": "tushare_query_quotes",
+      "question": "茅台现在多少钱？今天涨跌多少？",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "get_instrument_quotes",
+            "required": true,
+            "args": { "symbol_any": ["600519", "贵州茅台", "茅台"] }
+          }
+        ],
+        "optional_before": ["search_instruments"],
+        "forbidden": ["query_data", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "instrument_quotes",
+        "judge_notes": "旧 Harness 行情题，改为本产品 quotes 工具。"
+      }
+    },
+    {
+      "id": "qq-005",
+      "split": "held_out",
+      "family": "tushare_query_quotes",
+      "question": "帮我找一下隆基绿能现在的价格",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "get_instrument_quotes",
+            "required": true,
+            "args": { "symbol_any": ["601012", "隆基绿能", "隆基"] }
+          }
+        ],
+        "optional_before": ["search_instruments"],
+        "forbidden": ["query_data", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "instrument_quotes",
+        "judge_notes": "允许先 search_instruments 再 quotes。"
+      }
+    },
+    {
+      "id": "qq-006",
+      "split": "held_in",
+      "family": "tushare_query_profile",
+      "question": "给我看一下贵州茅台近几年的财务摘要",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "get_instrument_financials",
+            "required": true,
+            "args": { "symbol_any": ["600519", "贵州茅台", "茅台"] }
+          }
+        ],
+        "optional_before": ["search_instruments"],
+        "forbidden": ["query_data", "propose_widget", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "instrument_financials",
+        "judge_notes": "「财务摘要」走单只 get_instrument_financials，不是 query_data 比较路径。"
+      }
+    },
+    {
+      "id": "qq-007",
+      "split": "held_in",
+      "family": "tushare_query_profile",
+      "question": "帮我深度分析一下 600519",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "get_instrument_snapshot",
+            "required": true,
+            "args": { "symbol_any": ["600519"] }
+          }
+        ],
+        "forbidden": ["web_search", "create_canvas", "create_widget"],
+        "max_calls": 4,
+        "tushare_via": "instrument_snapshot",
+        "judge_notes": "深度分析单只 → snapshot。随后可补 financials，但禁止只用 web_search。"
+      }
+    },
+    {
+      "id": "qq-008",
+      "split": "held_out",
+      "family": "tushare_query_profile",
+      "question": "600519 的主营业务和所属概念",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "get_instrument_profile",
+            "required": true,
+            "args": { "symbol_any": ["600519"] }
+          }
+        ],
+        "forbidden": ["query_data", "web_search", "create_canvas", "create_widget"],
+        "max_calls": 2,
+        "tushare_via": "instrument_profile",
+        "judge_notes": "概况走 profile，不是财务 query_data。"
+      }
+    }
+  ]
+}

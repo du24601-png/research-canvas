@@ -23,7 +23,7 @@ OpenBB：只作 Provider 架构设计参考。不复制其代码，不引入其 
 
 ### 当前交接（2026-09-10）
 
-**Phase 4B 已完成。下一会话先读 [`HANDOFF.md`](./HANDOFF.md)。**
+**Phase 4B 已完成。下一会话先读 [`HANDOFF.md`](./HANDOFF.md)。** Agent 评测轨道（与产品 CI 隔离）见 HANDOFF「Agent 评测轨道」与 [`docs/AGENT-EVAL.md`](../docs/AGENT-EVAL.md)。
 
 已落地：Slim Shell → Static Canvas → Agent 控画布 → 真实 Dataset → Chat Preview + Adopt → Dataset Refinement & Lineage。
 

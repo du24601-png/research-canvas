@@ -1,0 +1,130 @@
+{
+  "file": "cases-query-canvas-e.json",
+  "family": "tushare_query_canvas",
+  "cases": [
+    {
+      "id": "qc-029",
+      "split": "held_in",
+      "family": "tushare_query_canvas",
+      "question": "看一下万科A的K线",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": { "eq": "kline" },
+              "entities": {
+                "covers": [
+                  { "any": ["万科A", "万科", "000002"] }
+                ]
+              }
+            }
+          }
+        ],
+        "optional_before": ["search_instruments"],
+        "forbidden": ["get_instrument_quotes", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "query_data.kline",
+        "judge_notes": "地产 K 线。"
+      }
+    },
+    {
+      "id": "qc-030",
+      "split": "held_out",
+      "family": "tushare_query_canvas",
+      "question": "保利发展和万科A 2020 到 2024 年营收对比",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": { "eq": "revenue" },
+              "entities": {
+                "covers": [
+                  { "any": ["保利发展", "保利", "600048"] },
+                  { "any": ["万科A", "万科", "000002"] }
+                ]
+              },
+              "start": { "eq": "2020" },
+              "end": { "eq": "2024" }
+            }
+          }
+        ],
+        "optional_before": ["search_instruments"],
+        "forbidden": ["get_instrument_financials", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "query_data.financials",
+        "judge_notes": "两家房企营收。"
+      }
+    },
+    {
+      "id": "qc-031",
+      "split": "held_in",
+      "family": "tushare_query_canvas",
+      "question": "东方财富 2021 到 2025 年营业收入",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": { "eq": "revenue" },
+              "entities": {
+                "covers": [
+                  { "any": ["东方财富", "300059"] }
+                ]
+              },
+              "start": { "eq": "2021" },
+              "end": { "in": ["2025", "2026"] }
+            }
+          }
+        ],
+        "optional_before": ["search_instruments"],
+        "forbidden": ["get_instrument_financials", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "query_data.financials",
+        "judge_notes": "互联网券商营收。"
+      }
+    },
+    {
+      "id": "qc-032",
+      "split": "held_in",
+      "family": "tushare_query_canvas",
+      "question": "比较中国平安和中国人寿 2019 到 2023 年净资产收益率",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": { "eq": "roe" },
+              "entities": {
+                "covers": [
+                  { "any": ["中国平安", "601318"] },
+                  { "any": ["中国人寿", "人寿", "601628"] }
+                ]
+              },
+              "start": { "eq": "2019" },
+              "end": { "eq": "2023" }
+            }
+          }
+        ],
+        "optional_before": ["search_instruments"],
+        "forbidden": ["get_instrument_financials", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "query_data.financials",
+        "judge_notes": "保险 ROE，平安不要判成平安银行。"
+      }
+    }
+  ]
+}

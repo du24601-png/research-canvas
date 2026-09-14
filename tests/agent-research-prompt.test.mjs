@@ -17,6 +17,9 @@ import {
   buildUserInteractionPlaybook,
   buildArtifactsPlaybook,
   buildCollaborationSubagentPlaybook,
+  buildResearchCanvasPlaybook,
+  buildIndustryAnalysisPlaybook,
+  buildStandardInstrumentApiPlaybook,
 } from '../packages/shared/dist/agent-prompt-guide.js'
 import {
   buildTurnTailPrompt,
@@ -165,6 +168,41 @@ test('L2/L3 output playbooks omit canvas delivery when artifacts unavailable', (
     assert.doesNotMatch(text, /直接 create_canvas/)
     assert.doesNotMatch(text, /直接 create_mindmap/)
   }
+})
+
+test('canvas playbook splits preview vs adopted chart-type edits', () => {
+  const text = buildResearchCanvasPlaybook()
+  assert.match(text, /未 Adopt.*propose_widget/)
+  assert.match(text, /右侧已有组件.*update_widget/)
+  assert.doesNotMatch(text, /只改图种或标题（如改成柱状图[\s\S]*不要 update_widget/)
+})
+
+test('canvas playbook fail-closes unsupported query_data metrics', () => {
+  const text = buildResearchCanvasPlaybook()
+  assert.match(text, /metric 仅限 gross_margin \/ revenue \/ revenue_growth \/ net_income \/ net_margin \/ roe \/ kline/)
+  assert.match(text, /净息差/)
+  assert.match(text, /做不到/)
+  assert.match(text, /禁止用净利率|不要用净利率/)
+  assert.doesNotMatch(text, /毛利率、ROE、净资产收益率、净息差、研发投入/)
+})
+
+test('named-company spot price skips search and snapshot', () => {
+  const canvas = buildResearchCanvasPlaybook()
+  const api = buildStandardInstrumentApiPlaybook()
+  const text = `${canvas}\n${api}`
+  assert.match(text, /已点名公司/)
+  assert.match(text, /get_instrument_quotes/)
+  assert.match(text, /不要.*search_instruments|禁止.*search_instruments/)
+  assert.match(text, /snapshot|快照/)
+  assert.match(canvas, /报完现价即停|等用户下一句/)
+})
+
+test('index constituents must not be faked with universe or web_search', () => {
+  const text = `${buildResearchCanvasPlaybook()}\n${buildIndustryAnalysisPlaybook()}`
+  assert.match(text, /get_index_constituents/)
+  assert.match(text, /resolve_industry_universe/)
+  assert.match(text, /web_search/)
+  assert.match(text, /成分股/)
 })
 
 test('research completeness loop avoids ritual activate_tool_pack', () => {

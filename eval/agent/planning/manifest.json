@@ -1,0 +1,34 @@
+{
+  "id": "agent-planning-canvas-v1",
+  "track": "agent",
+  "layer": "planning",
+  "focus": "decision_chain.research_canvas",
+  "as_of": "2026-09-14",
+  "description": "规划评测：整段决策链是否符合研究画布主路径。夹具执行工具，不打 Tushare。硬约束违背即失败。",
+  "tool_catalog": "../component/tool-catalog.json",
+  "schema": "./schema.json",
+  "default_toolset": "component_v1",
+  "cases": [
+    "./cases-named.json",
+    "./cases-many.json",
+    "./cases-industry.json",
+    "./cases-refine.json",
+    "./cases-adopt.json",
+    "./cases-quotes-stop.json"
+  ],
+  "counts": {
+    "named_compare": 4,
+    "many_preview": 3,
+    "industry": 3,
+    "refine_view": 5,
+    "adopt_boundary": 3,
+    "quotes_and_stop": 6,
+    "total": 24
+  },
+  "scoring": {
+    "product_ci": false,
+    "mix_with_product_tests": false,
+    "judge": "./judge.mjs",
+    "notes": "指标：失败频率、有效占比、平均决策次数。不得与 test:gate 加权。"
+  }
+}

@@ -1,0 +1,162 @@
+{
+  "file": "cases-query-gates-b.json",
+  "family": "tushare_query_gate",
+  "cases": [
+    {
+      "id": "qg-007",
+      "split": "held_in",
+      "family": "tushare_query_gate",
+      "question": "白酒行业毛利率对比",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "resolve_industry_universe",
+            "required": true,
+            "args": { "industry": { "contains_any": ["白酒"] } }
+          }
+        ],
+        "forbidden": ["query_data", "get_instrument_financials", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "industry_universe",
+        "judge_notes": "行业对比先解析名单。"
+      }
+    },
+    {
+      "id": "qg-008",
+      "split": "held_in",
+      "family": "tushare_query_gate",
+      "question": "半导体板块营收排名",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "resolve_industry_universe",
+            "required": true,
+            "args": { "industry": { "contains_any": ["半导体"] } }
+          }
+        ],
+        "forbidden": ["query_data", "get_instrument_financials", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "industry_universe",
+        "judge_notes": "板块排名先 universe。"
+      }
+    },
+    {
+      "id": "qg-009",
+      "split": "held_in",
+      "family": "tushare_query_gate",
+      "question": "新能源汽车产业链利润率对比",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "resolve_industry_universe",
+            "required": true,
+            "args": { "industry": { "contains_any": ["新能源"] } }
+          }
+        ],
+        "forbidden": ["query_data", "get_instrument_financials", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "industry_universe",
+        "judge_notes": "产业链未确认样本前禁止 query_data。"
+      }
+    },
+    {
+      "id": "qg-010",
+      "split": "held_in",
+      "family": "tushare_query_gate",
+      "question": "银行板块 ROE 排名",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "resolve_industry_universe",
+            "required": true,
+            "args": { "industry": { "contains_any": ["银行"] } }
+          }
+        ],
+        "forbidden": ["query_data", "get_instrument_financials", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "industry_universe",
+        "judge_notes": "先解析宇宙。"
+      }
+    },
+    {
+      "id": "qg-011",
+      "split": "held_out",
+      "family": "tushare_query_gate",
+      "question": "比较美的集团、格力电器、海尔智家、老板电器、华帝股份 2020 到 2024 年营收",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": { "eq": "revenue" },
+              "entities": {
+                "covers": [
+                  { "any": ["美的集团", "美的", "000333"] },
+                  { "any": ["格力电器", "格力", "000651"] },
+                  { "any": ["海尔智家", "海尔", "600690"] },
+                  { "any": ["老板电器", "老板", "002508"] },
+                  { "any": ["华帝股份", "华帝", "002035"] }
+                ]
+              },
+              "start": { "eq": "2020" },
+              "end": { "eq": "2024" },
+              "confirmed": { "absent_or_false": true }
+            }
+          }
+        ],
+        "optional_before": ["search_instruments"],
+        "forbidden": ["create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "query_data.financials",
+        "judge_notes": "五家 >3，禁止 confirmed:true。"
+      }
+    },
+    {
+      "id": "qg-012",
+      "split": "held_in",
+      "family": "tushare_query_gate",
+      "question": "对比海康威视、大华股份、歌尔股份、立讯精密、京东方A 2021 到 2024 年毛利率",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": { "eq": "gross_margin" },
+              "entities": {
+                "covers": [
+                  { "any": ["海康威视", "海康", "002415"] },
+                  { "any": ["大华股份", "大华", "002236"] },
+                  { "any": ["歌尔股份", "歌尔", "002241"] },
+                  { "any": ["立讯精密", "立讯", "002475"] },
+                  { "any": ["京东方A", "京东方", "000725"] }
+                ]
+              },
+              "start": { "eq": "2021" },
+              "end": { "eq": "2024" },
+              "confirmed": { "absent_or_false": true }
+            }
+          }
+        ],
+        "optional_before": ["search_instruments"],
+        "forbidden": ["create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "query_data.financials",
+        "judge_notes": "五家电子，首次 plan_preview。"
+      }
+    }
+  ]
+}

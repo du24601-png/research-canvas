@@ -1,0 +1,180 @@
+{
+  "file": "cases-query-quotes-b.json",
+  "family": "tushare_query_quotes",
+  "cases": [
+    {
+      "id": "qq-009",
+      "split": "held_in",
+      "family": "tushare_query_quotes",
+      "question": "五粮液现在什么价",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "get_instrument_quotes",
+            "required": true,
+            "args": { "symbol_any": ["000858", "五粮液"] }
+          }
+        ],
+        "optional_before": ["search_instruments"],
+        "forbidden": ["query_data", "propose_widget", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "instrument_quotes",
+        "judge_notes": "现价走 quotes。"
+      }
+    },
+    {
+      "id": "qq-010",
+      "split": "held_in",
+      "family": "tushare_query_quotes",
+      "question": "000858 最新价",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "get_instrument_quotes",
+            "required": true,
+            "args": { "symbol_any": ["000858"] }
+          }
+        ],
+        "forbidden": ["query_data", "propose_widget", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 2,
+        "tushare_via": "instrument_quotes",
+        "judge_notes": "已给代码。"
+      }
+    },
+    {
+      "id": "qq-011",
+      "split": "held_out",
+      "family": "tushare_query_quotes",
+      "question": "宁德时代今天涨跌多少",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "get_instrument_quotes",
+            "required": true,
+            "args": { "symbol_any": ["300750", "宁德时代", "宁德"] }
+          }
+        ],
+        "optional_before": ["search_instruments"],
+        "forbidden": ["query_data", "propose_widget", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "instrument_quotes",
+        "judge_notes": "涨跌走 quotes。"
+      }
+    },
+    {
+      "id": "qq-012",
+      "split": "held_in",
+      "family": "tushare_query_quotes",
+      "question": "比亚迪现价",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "get_instrument_quotes",
+            "required": true,
+            "args": { "symbol_any": ["002594", "比亚迪"] }
+          }
+        ],
+        "optional_before": ["search_instruments"],
+        "forbidden": ["query_data", "propose_widget", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "instrument_quotes",
+        "judge_notes": "现价。"
+      }
+    },
+    {
+      "id": "qq-013",
+      "split": "held_in",
+      "family": "tushare_query_quotes",
+      "question": "帮我查一下美的集团最新价",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "get_instrument_quotes",
+            "required": true,
+            "args": { "symbol_any": ["000333", "美的集团", "美的"] }
+          }
+        ],
+        "optional_before": ["search_instruments"],
+        "forbidden": ["query_data", "propose_widget", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "instrument_quotes",
+        "judge_notes": "最新价。"
+      }
+    },
+    {
+      "id": "qq-014",
+      "split": "held_in",
+      "family": "tushare_query_quotes",
+      "question": "300750 现在多少钱",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "get_instrument_quotes",
+            "required": true,
+            "args": { "symbol_any": ["300750"] }
+          }
+        ],
+        "forbidden": ["query_data", "propose_widget", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 2,
+        "tushare_via": "instrument_quotes",
+        "judge_notes": "代码现价。"
+      }
+    },
+    {
+      "id": "qq-015",
+      "split": "held_in",
+      "family": "tushare_query_quotes",
+      "question": "海康威视最新价和涨跌幅",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "get_instrument_quotes",
+            "required": true,
+            "args": { "symbol_any": ["002415", "海康威视", "海康"] }
+          }
+        ],
+        "optional_before": ["search_instruments"],
+        "forbidden": ["query_data", "propose_widget", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "instrument_quotes",
+        "judge_notes": "价与涨跌。"
+      }
+    },
+    {
+      "id": "qq-021",
+      "split": "held_out",
+      "family": "tushare_query_quotes",
+      "question": "帮我找一下寒武纪现在的价格",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "get_instrument_quotes",
+            "required": true,
+            "args": { "symbol_any": ["688256", "寒武纪"] }
+          }
+        ],
+        "optional_before": ["search_instruments"],
+        "forbidden": ["query_data", "propose_widget", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "instrument_quotes",
+        "judge_notes": "允许先 search。"
+      }
+    }
+  ]
+}

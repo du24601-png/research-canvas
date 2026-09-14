@@ -1,0 +1,292 @@
+{
+  "file": "cases-negative-b.json",
+  "family": "no_tool",
+  "note": "反例与正例共用 component_v1。标准答案不得调用任何查询或改画布工具。",
+  "cases": [
+    {
+      "id": "ng-013",
+      "split": "held_in",
+      "family": "no_tool",
+      "question": "早上好",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_not_call",
+        "expected": [],
+        "forbidden": ["*"],
+        "max_calls": 0,
+        "tushare_via": "none",
+        "judge_notes": "寒暄。"
+      }
+    },
+    {
+      "id": "ng-014",
+      "split": "held_in",
+      "family": "no_tool",
+      "question": "你现在用的是哪个模型",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_not_call",
+        "expected": [],
+        "forbidden": ["*"],
+        "max_calls": 0,
+        "tushare_via": "none",
+        "judge_notes": "元问题，不取数。"
+      }
+    },
+    {
+      "id": "ng-015",
+      "split": "held_in",
+      "family": "no_tool",
+      "question": "什么是净资产收益率",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_not_call",
+        "expected": [],
+        "forbidden": ["*"],
+        "max_calls": 0,
+        "tushare_via": "none",
+        "judge_notes": "概念题。"
+      }
+    },
+    {
+      "id": "ng-016",
+      "split": "held_in",
+      "family": "no_tool",
+      "question": "营收和净利润有什么区别",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_not_call",
+        "expected": [],
+        "forbidden": ["*"],
+        "max_calls": 0,
+        "tushare_via": "none",
+        "judge_notes": "概念对比。"
+      }
+    },
+    {
+      "id": "ng-017",
+      "split": "held_in",
+      "family": "no_tool",
+      "question": "把这句话改得更书面：比亚迪毛利率有所回升",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_not_call",
+        "expected": [],
+        "forbidden": ["*"],
+        "max_calls": 0,
+        "tushare_via": "none",
+        "judge_notes": "润色陷阱。"
+      }
+    },
+    {
+      "id": "ng-018",
+      "split": "held_out",
+      "family": "no_tool",
+      "question": "翻译成英文：海康威视是安防龙头",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_not_call",
+        "expected": [],
+        "forbidden": ["*"],
+        "max_calls": 0,
+        "tushare_via": "none",
+        "judge_notes": "翻译陷阱。"
+      }
+    },
+    {
+      "id": "ng-019",
+      "split": "held_in",
+      "family": "no_tool",
+      "question": "不要查库，讲讲巴菲特的护城河",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_not_call",
+        "expected": [],
+        "forbidden": ["*"],
+        "max_calls": 0,
+        "tushare_via": "none",
+        "judge_notes": "明确禁止查询。"
+      }
+    },
+    {
+      "id": "ng-020",
+      "split": "held_in",
+      "family": "no_tool",
+      "question": "帮我列一个财报阅读清单，不用具体公司数字",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_not_call",
+        "expected": [],
+        "forbidden": ["*"],
+        "max_calls": 0,
+        "tushare_via": "none",
+        "judge_notes": "方法论。"
+      }
+    },
+    {
+      "id": "ng-021",
+      "split": "held_in",
+      "family": "no_tool",
+      "question": "如何理解市盈率",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_not_call",
+        "expected": [],
+        "forbidden": ["*"],
+        "max_calls": 0,
+        "tushare_via": "none",
+        "judge_notes": "估值概念。"
+      }
+    },
+    {
+      "id": "ng-022",
+      "split": "held_in",
+      "family": "no_tool",
+      "question": "画布上的 Preview 和 Adopt 有什么区别",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_not_call",
+        "expected": [],
+        "forbidden": ["*"],
+        "max_calls": 0,
+        "tushare_via": "none",
+        "judge_notes": "产品交互说明。"
+      }
+    },
+    {
+      "id": "ng-023",
+      "split": "held_in",
+      "family": "no_tool",
+      "question": "写一首关于投资纪律的五言诗",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_not_call",
+        "expected": [],
+        "forbidden": ["*"],
+        "max_calls": 0,
+        "tushare_via": "none",
+        "judge_notes": "写作。"
+      }
+    },
+    {
+      "id": "ng-024",
+      "split": "held_in",
+      "family": "no_tool",
+      "question": "1+1 等于几",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_not_call",
+        "expected": [],
+        "forbidden": ["*"],
+        "max_calls": 0,
+        "tushare_via": "none",
+        "judge_notes": "算术。"
+      }
+    },
+    {
+      "id": "ng-025",
+      "split": "held_out",
+      "family": "no_tool",
+      "question": "把「宁德时代近五年毛利率」改成更礼貌的问法，不要真的去查",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_not_call",
+        "expected": [],
+        "forbidden": ["*"],
+        "max_calls": 0,
+        "tushare_via": "none",
+        "judge_notes": "改写问句，禁止查询。"
+      }
+    },
+    {
+      "id": "ng-026",
+      "split": "held_in",
+      "family": "no_tool",
+      "question": "解释什么是 K 线",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_not_call",
+        "expected": [],
+        "forbidden": ["*"],
+        "max_calls": 0,
+        "tushare_via": "none",
+        "judge_notes": "概念，不是查某只 K 线。"
+      }
+    },
+    {
+      "id": "ng-027",
+      "split": "held_out",
+      "family": "no_tool",
+      "question": "我只是问问你懂不懂贵州茅台，先别调工具",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_not_call",
+        "expected": [],
+        "forbidden": ["*"],
+        "max_calls": 0,
+        "tushare_via": "none",
+        "judge_notes": "用户禁止调工具。"
+      }
+    },
+    {
+      "id": "ng-028",
+      "split": "held_in",
+      "family": "no_tool",
+      "question": "用大白话解释资产负债率",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_not_call",
+        "expected": [],
+        "forbidden": ["*"],
+        "max_calls": 0,
+        "tushare_via": "none",
+        "judge_notes": "概念。"
+      }
+    },
+    {
+      "id": "ng-029",
+      "split": "held_in",
+      "family": "no_tool",
+      "question": "帮我检查这段话有没有错别字：阳光电源2023年出货量增长",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_not_call",
+        "expected": [],
+        "forbidden": ["*"],
+        "max_calls": 0,
+        "tushare_via": "none",
+        "judge_notes": "校对。"
+      }
+    },
+    {
+      "id": "ng-030",
+      "split": "held_in",
+      "family": "no_tool",
+      "question": "今晚有什么电影推荐",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_not_call",
+        "expected": [],
+        "forbidden": ["*"],
+        "max_calls": 0,
+        "tushare_via": "none",
+        "judge_notes": "无关闲聊。"
+      }
+    },
+    {
+      "id": "ng-031",
+      "split": "held_in",
+      "family": "no_tool",
+      "question": "请用三句话介绍你自己",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_not_call",
+        "expected": [],
+        "forbidden": ["*"],
+        "max_calls": 0,
+        "tushare_via": "none",
+        "judge_notes": "自我介绍。"
+      }
+    }
+  ]
+}

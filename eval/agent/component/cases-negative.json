@@ -1,0 +1,187 @@
+{
+  "file": "cases-negative.json",
+  "family": "no_tool",
+  "note": "反例与正例共用 component_v1 工具清单。标准答案：不得调用任何查询或改画布工具。调用即工具幻觉。ask_user / web_search 同样判失败。",
+  "cases": [
+    {
+      "id": "ng-001",
+      "split": "held_in",
+      "family": "no_tool",
+      "question": "你好",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_not_call",
+        "expected": [],
+        "forbidden": ["*"],
+        "max_calls": 0,
+        "tushare_via": "none",
+        "judge_notes": "寒暄。"
+      }
+    },
+    {
+      "id": "ng-002",
+      "split": "held_in",
+      "family": "no_tool",
+      "question": "你能做什么？",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_not_call",
+        "expected": [],
+        "forbidden": ["*"],
+        "max_calls": 0,
+        "tushare_via": "none",
+        "judge_notes": "能力说明，不取数、不改画布。"
+      }
+    },
+    {
+      "id": "ng-003",
+      "split": "held_in",
+      "family": "no_tool",
+      "question": "ROE 是什么意思？",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_not_call",
+        "expected": [],
+        "forbidden": ["*"],
+        "max_calls": 0,
+        "tushare_via": "none",
+        "judge_notes": "概念题。禁止因出现 ROE 就 query_data。"
+      }
+    },
+    {
+      "id": "ng-004",
+      "split": "held_in",
+      "family": "no_tool",
+      "question": "毛利率怎么计算？",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_not_call",
+        "expected": [],
+        "forbidden": ["*"],
+        "max_calls": 0,
+        "tushare_via": "none",
+        "judge_notes": "公式题，不是查某家公司。"
+      }
+    },
+    {
+      "id": "ng-005",
+      "split": "held_in",
+      "family": "no_tool",
+      "question": "价值投资和趋势投资有什么区别？",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_not_call",
+        "expected": [],
+        "forbidden": ["*"],
+        "max_calls": 0,
+        "tushare_via": "none",
+        "judge_notes": "方法论文，无标的。"
+      }
+    },
+    {
+      "id": "ng-006",
+      "split": "held_in",
+      "family": "no_tool",
+      "question": "谢谢，我先看看",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_not_call",
+        "expected": [],
+        "forbidden": ["*"],
+        "max_calls": 0,
+        "tushare_via": "none",
+        "judge_notes": "结束语。"
+      }
+    },
+    {
+      "id": "ng-007",
+      "split": "held_in",
+      "family": "no_tool",
+      "question": "把这句话翻译成英文：贵州茅台近五年毛利率很高",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_not_call",
+        "expected": [],
+        "forbidden": ["*"],
+        "max_calls": 0,
+        "tushare_via": "none",
+        "judge_notes": "陷阱：含公司与指标，任务是翻译。"
+      }
+    },
+    {
+      "id": "ng-008",
+      "split": "held_out",
+      "family": "no_tool",
+      "question": "不要查数据，凭印象说说茅台好不好",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_not_call",
+        "expected": [],
+        "forbidden": ["*"],
+        "max_calls": 0,
+        "tushare_via": "none",
+        "judge_notes": "用户明确禁止查询。应拒绝编数字，也不得调用 Tushare 路径工具。"
+      }
+    },
+    {
+      "id": "ng-009",
+      "split": "held_out",
+      "family": "no_tool",
+      "question": "润色这段话：宁德时代2024年毛利率下滑需要关注",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_not_call",
+        "expected": [],
+        "forbidden": ["*"],
+        "max_calls": 0,
+        "tushare_via": "none",
+        "judge_notes": "文案润色。禁止为「核实数字」去 query_data。"
+      }
+    },
+    {
+      "id": "ng-010",
+      "split": "held_in",
+      "family": "no_tool",
+      "question": "Tushare 是什么？我要不要自己配 token？",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_not_call",
+        "expected": [],
+        "forbidden": ["*"],
+        "max_calls": 0,
+        "tushare_via": "none",
+        "judge_notes": "产品/配置说明，禁止借机查行情。"
+      }
+    },
+    {
+      "id": "ng-011",
+      "split": "held_in",
+      "family": "no_tool",
+      "question": "研究画布里点「添加到画布」是什么意思？",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_not_call",
+        "expected": [],
+        "forbidden": ["*"],
+        "max_calls": 0,
+        "tushare_via": "none",
+        "judge_notes": "解释 Adopt，禁止 create_widget / propose_widget。"
+      }
+    },
+    {
+      "id": "ng-012",
+      "split": "held_out",
+      "family": "no_tool",
+      "question": "帮我写一句投资座右铭，不要查行情也不要改画布",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_not_call",
+        "expected": [],
+        "forbidden": ["*"],
+        "max_calls": 0,
+        "tushare_via": "none",
+        "judge_notes": "写作任务。用户已禁止查询和改画布。"
+      }
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "$id": "eval/agent/planning/schema.json",
+  "title": "Agent planning eval case",
+  "type": "object",
+  "required": ["id", "split", "family", "task", "toolset", "gold", "constraints"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "pattern": "^pl-[0-9]{3}$" },
+    "split": { "enum": ["held_in", "held_out"] },
+    "family": {
+      "enum": [
+        "named_compare",
+        "many_preview",
+        "industry",
+        "refine_view",
+        "adopt_boundary",
+        "quotes_and_stop"
+      ]
+    },
+    "task": { "type": "string", "minLength": 1 },
+    "toolset": { "const": "component_v1" },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "artifacts_enabled": { "type": "boolean" },
+        "datasets": { "type": "array" },
+        "proposals": { "type": "array" },
+        "widgets": { "type": "array" }
+      }
+    },
+    "user_script": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["when", "content"],
+        "properties": {
+          "when": { "enum": ["plan_preview", "ask_user", "tool_idle"] },
+          "tool": { "type": "string" },
+          "content": { "type": "string" }
+        }
+      }
+    },
+    "gold": {
+      "type": "object",
+      "required": ["chain", "max_decisions"],
+      "additionalProperties": false,
+      "properties": {
+        "chain": { "type": "array" },
+        "optional": { "type": "array", "items": { "type": "string" } },
+        "max_decisions": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "constraints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "type"],
+        "properties": {
+          "id": { "type": "string" },
+          "type": { "enum": ["forbid_tool", "forbid_args", "forbid_tool_until"] },
+          "tools": { "type": "array", "items": { "type": "string" } },
+          "name": { "type": "string" },
+          "args": { "type": "object" },
+          "until": { "type": "string" },
+          "unless_after": { "type": "string" }
+        }
+      }
+    }
+  }
+}

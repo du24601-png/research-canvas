@@ -1,0 +1,160 @@
+{
+  "file": "cases-industry.json",
+  "family": "industry",
+  "cases": [
+    {
+      "id": "pl-008",
+      "split": "held_in",
+      "family": "industry",
+      "toolset": "component_v1",
+      "task": "白酒行业毛利率对比",
+      "user_script": [
+        {
+          "when": "ask_user",
+          "content": "按默认 8 家确认"
+        },
+        {
+          "when": "plan_preview",
+          "content": "确认，按这个名单查"
+        }
+      ],
+      "gold": {
+        "chain": [
+          {
+            "name": "resolve_industry_universe",
+            "args": {
+              "industry": { "contains_any": ["白酒"] }
+            }
+          },
+          {
+            "name": "ask_user"
+          },
+          {
+            "name": "query_data",
+            "args": {
+              "metric": { "eq": "gross_margin" },
+              "entities": { "covers": [
+                  { "any": ["贵州茅台", "五粮液", "洋河股份", "泸州老窖", "山西汾酒", "古井贡酒", "今世缘", "迎驾贡酒"] }
+                ] }
+            }
+          },
+          {
+            "name": "propose_widget"
+          }
+        ],
+        "optional": [],
+        "max_decisions": 7
+      },
+      "constraints": [
+        {
+          "id": "no_steal_canvas",
+          "type": "forbid_tool",
+          "tools": ["create_widget", "create_canvas", "update_widget"]
+        },
+        {
+          "id": "no_web",
+          "type": "forbid_tool",
+          "tools": ["web_search"]
+        },
+        {
+          "id": "no_financials",
+          "type": "forbid_tool",
+          "tools": ["get_instrument_financials"]
+        },
+        {
+          "id": "universe_first",
+          "type": "forbid_tool_until",
+          "tools": ["query_data"],
+          "until": "resolve_industry_universe"
+        }
+      ]
+    },
+    {
+      "id": "pl-009",
+      "split": "held_in",
+      "family": "industry",
+      "toolset": "component_v1",
+      "task": "半导体板块营收排名",
+      "user_script": [
+        {
+          "when": "ask_user",
+          "content": "按默认 8 家确认"
+        },
+        {
+          "when": "plan_preview",
+          "content": "确认，按这个名单查"
+        }
+      ],
+      "gold": {
+        "chain": [
+          {
+            "name": "resolve_industry_universe",
+            "args": {
+              "industry": { "contains_any": ["半导体"] }
+            }
+          },
+          {
+            "name": "ask_user"
+          },
+          {
+            "name": "query_data",
+            "args": {
+              "metric": { "eq": "revenue" },
+              "entities": { "covers": [
+                  { "any": ["中芯国际", "韦尔股份", "北方华创", "海光信息", "兆易创新", "士兰微", "澜起科技", "中微公司"] }
+                ] }
+            }
+          },
+          {
+            "name": "propose_widget"
+          }
+        ],
+        "optional": [],
+        "max_decisions": 7
+      },
+      "constraints": [
+        {
+          "id": "no_steal_canvas",
+          "type": "forbid_tool",
+          "tools": ["create_widget", "create_canvas", "update_widget"]
+        },
+        {
+          "id": "no_web",
+          "type": "forbid_tool",
+          "tools": ["web_search"]
+        },
+        {
+          "id": "no_financials",
+          "type": "forbid_tool",
+          "tools": ["get_instrument_financials"]
+        },
+        {
+          "id": "universe_first",
+          "type": "forbid_tool_until",
+          "tools": ["query_data"],
+          "until": "resolve_industry_universe"
+        }
+      ]
+    },
+    {
+      "id": "pl-010",
+      "split": "held_out",
+      "family": "industry",
+      "toolset": "component_v1",
+      "task": "沪深300成分股有哪些",
+      "user_script": [],
+      "gold": {
+        "chain": [],
+        "optional": [],
+        "max_decisions": 0
+      },
+      "constraints": [
+        {
+          "id": "no_index_fetch",
+          "type": "forbid_tool",
+          "tools": ["query_data", "resolve_industry_universe", "get_instrument_quotes", "propose_widget", "web_search", "create_canvas"]
+        }
+      ]
+    }
+  ]
+}

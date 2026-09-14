@@ -468,7 +468,7 @@ npm run build -w opptrix-client
 
 K 线路径：`query_data(metric=kline)` → `queryInstrumentData(ref, 'kline', { period: 'daily', startDate, endDate, count: klineBarBudget(start,end) })`（约 250 根/年，上限 2500）→ ECharts candlestick（A 股涨红跌绿）。persist v2 的 `ohlc` 可选，旧财务 Dataset 仍合法。
 
-改图种（改成饼图 / 圆环 / 堆积柱 / K线）走 `propose_widget`，不要 `update_widget`。
+改图种：未 Adopt 的预览走 `propose_widget` / `update_proposal`；右侧已有组件走 `update_widget`。
 
 ---
 
@@ -496,3 +496,17 @@ Widget 持久化 `view?: { intent, period?, topN? }`；切换视图 = 同 datase
 **行业指标横向对比（2026-09-12）**：`resolve_industry_universe` → 用户确认样本 → `query_data` → Preview。标题禁止在样本未覆盖全行业时写「行业排名」。
 
 仍未做：Inspector / Notes / Multi-select / Excel Export。不要顺手做 AKShare、全局视觉重构。
+
+---
+
+## Agent 评测轨道（2026-09-14）
+
+与 `test:gate` / 浏览器 Golden Path **分开**。不进产品 CI，不加权进产品验收。
+
+- 文档：[docs/AGENT-EVAL.md](../docs/AGENT-EVAL.md)；PRD §18。
+- 命令：`npm run eval:agent`（component → planning → 生产 prompt；约 7–8 分钟）。
+- 正式档：`eval/agent/records/`。最新全量流水线：组件 93/99、规划 24/24、生产提示词 22/24（`deepseek-flash`）。
+- 北星是生产提示词层。规划 24/24 是夹具校准后的量具健康度，不是产品突然满分。
+- 未 Adopt 改图种/样式走 `propose_widget` / `update_proposal`；右侧已有组件走 `update_widget`。
+
+下一刀优先：成分股问句的工具幻觉、生产稿上行业确认后停手、改预览颜色的方差。真 Tushare 数值层尚未建。

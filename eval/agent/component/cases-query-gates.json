@@ -1,0 +1,169 @@
+{
+  "file": "cases-query-gates.json",
+  "family": "tushare_query_gate",
+  "cases": [
+    {
+      "id": "qg-001",
+      "split": "held_in",
+      "family": "tushare_query_gate",
+      "question": "中国电池行业的营收排名",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "resolve_industry_universe",
+            "required": true,
+            "args": { "industry": { "contains_any": ["电池"] } }
+          }
+        ],
+        "forbidden": ["query_data", "get_instrument_financials", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "industry_universe",
+        "judge_notes": "未确认样本前禁止 query_data。可随后 ask_user，但本步不得取数。"
+      }
+    },
+    {
+      "id": "qg-002",
+      "split": "held_in",
+      "family": "tushare_query_gate",
+      "question": "光伏板块毛利率对比",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "resolve_industry_universe",
+            "required": true,
+            "args": { "industry": { "contains_any": ["光伏"] } }
+          }
+        ],
+        "forbidden": ["query_data", "get_instrument_financials", "create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "industry_universe",
+        "judge_notes": "板块对比先解析宇宙，禁止凭印象填公司再 query_data。"
+      }
+    },
+    {
+      "id": "qg-003",
+      "split": "held_in",
+      "family": "tushare_query_gate",
+      "question": "对比招商银行、平安银行、兴业银行、民生银行、浦发银行近五年净利率",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": { "eq": "net_margin" },
+              "entities": {
+                "covers": [
+                  { "any": ["招商银行", "600036"] },
+                  { "any": ["平安银行", "000001"] },
+                  { "any": ["兴业银行", "601166"] },
+                  { "any": ["民生银行", "600016"] },
+                  { "any": ["浦发银行", "600000"] }
+                ]
+              },
+              "confirmed": { "absent_or_false": true }
+            }
+          }
+        ],
+        "optional_before": ["search_instruments"],
+        "forbidden": ["create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "query_data.financials",
+        "judge_notes": "5 家 >3，首次只允许 plan_preview，禁止 confirmed:true。"
+      }
+    },
+    {
+      "id": "qg-004",
+      "split": "held_out",
+      "family": "tushare_query_gate",
+      "question": "比较茅台、五粮液、洋河、泸州老窖、山西汾酒 2020 到 2024 年营收",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": { "eq": "revenue" },
+              "entities": {
+                "covers": [
+                  { "any": ["贵州茅台", "茅台", "600519"] },
+                  { "any": ["五粮液", "000858"] },
+                  { "any": ["洋河", "洋河股份", "002304"] },
+                  { "any": ["泸州老窖", "000568"] },
+                  { "any": ["山西汾酒", "汾酒", "600809"] }
+                ]
+              },
+              "start": { "eq": "2020" },
+              "end": { "eq": "2024" },
+              "confirmed": { "absent_or_false": true }
+            }
+          }
+        ],
+        "optional_before": ["search_instruments"],
+        "forbidden": ["create_widget", "create_canvas", "web_search"],
+        "max_calls": 3,
+        "tushare_via": "query_data.financials",
+        "judge_notes": "五家白酒，首次不得 confirmed。"
+      }
+    },
+    {
+      "id": "qg-005",
+      "split": "held_in",
+      "family": "tushare_query_gate",
+      "question": "确认，按这个名单查",
+      "toolset": "component_v1",
+      "turn_context": {
+        "artifacts_enabled": false,
+        "user_confirmed_plan": true,
+        "dataset_ids": [],
+        "widget_ids": []
+      },
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": { "confirmed": { "eq": true } }
+          }
+        ],
+        "forbidden": ["create_widget", "create_canvas", "web_search", "resolve_industry_universe"],
+        "max_calls": 2,
+        "tushare_via": "query_data.financials",
+        "judge_notes": "用户已确认计划，本轮必须 confirmed:true 才真正打 Tushare。评测 runner 需把上一轮 plan_preview 的 entities/metric/年份注入上下文。"
+      }
+    },
+    {
+      "id": "qg-006",
+      "split": "held_in",
+      "family": "tushare_query_gate",
+      "question": "沪深300成分股有哪些",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_not_call",
+        "expected": [],
+        "forbidden": [
+          "query_data",
+          "get_instrument_quotes",
+          "get_instrument_financials",
+          "resolve_industry_universe",
+          "propose_widget",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 0,
+        "tushare_via": "none",
+        "judge_notes": "本工具清单无指数成分工具。正确行为是说明无法查成分股，禁止拿 query_data 或 web_search 充数。"
+      }
+    }
+  ]
+}

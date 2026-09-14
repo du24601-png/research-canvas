@@ -1,0 +1,229 @@
+{
+  "file": "cases-query-canvas-b.json",
+  "family": "tushare_query_canvas",
+  "cases": [
+    {
+      "id": "qc-007",
+      "split": "held_in",
+      "family": "tushare_query_canvas",
+      "question": "茅台最近几年净利润走势",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": { "eq": "net_income" },
+              "entities": {
+                "covers": [
+                  { "any": ["贵州茅台", "茅台", "600519"] }
+                ]
+              }
+            }
+          }
+        ],
+        "optional_before": [
+          "search_instruments"
+        ],
+        "forbidden": [
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3,
+        "tushare_via": "query_data.financials",
+        "judge_notes": "净利润 = net_income，禁止用 net_margin。"
+      }
+    },
+    {
+      "id": "qc-008",
+      "split": "held_in",
+      "family": "tushare_query_canvas",
+      "question": "600519 2020到2024年净利润",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": { "eq": "net_income" },
+              "entities": {
+                "covers": [
+                  { "any": ["600519", "贵州茅台", "茅台"] }
+                ]
+              },
+              "start": { "eq": "2020" },
+              "end": { "eq": "2024" }
+            }
+          }
+        ],
+        "forbidden": [
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 2,
+        "tushare_via": "query_data.financials",
+        "judge_notes": "已给代码，不必先 search。"
+      }
+    },
+    {
+      "id": "qc-009",
+      "split": "held_in",
+      "family": "tushare_query_canvas",
+      "question": "宁德时代近三年毛利率",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": { "eq": "gross_margin" },
+              "entities": {
+                "covers": [
+                  { "any": ["宁德时代", "宁德", "300750"] }
+                ]
+              },
+              "start": { "in": ["2023", "2024"] },
+              "end": { "in": ["2025", "2026"] }
+            }
+          }
+        ],
+        "optional_before": [
+          "search_instruments"
+        ],
+        "forbidden": [
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3,
+        "tushare_via": "query_data.financials",
+        "judge_notes": "近三年：start∈{2023,2024}。"
+      }
+    },
+    {
+      "id": "qc-010",
+      "split": "held_out",
+      "family": "tushare_query_canvas",
+      "question": "贵州茅台和五粮液 2020-2024 营收对比",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": { "eq": "revenue" },
+              "entities": {
+                "covers": [
+                  { "any": ["贵州茅台", "茅台", "600519"] },
+                  { "any": ["五粮液", "000858"] }
+                ]
+              },
+              "start": { "eq": "2020" },
+              "end": { "eq": "2024" }
+            }
+          }
+        ],
+        "optional_before": [
+          "search_instruments"
+        ],
+        "forbidden": [
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3,
+        "tushare_via": "query_data.financials",
+        "judge_notes": "两家营收对比仍走 query_data，禁止两次单只 financials。"
+      }
+    },
+    {
+      "id": "qc-011",
+      "split": "held_in",
+      "family": "tushare_query_canvas",
+      "question": "看下比亚迪近几年净利率",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": { "eq": "net_margin" },
+              "entities": {
+                "covers": [
+                  { "any": ["比亚迪", "002594"] }
+                ]
+              }
+            }
+          }
+        ],
+        "optional_before": [
+          "search_instruments"
+        ],
+        "forbidden": [
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3,
+        "tushare_via": "query_data.financials",
+        "judge_notes": "净利率 = net_margin，不是 net_income。"
+      }
+    },
+    {
+      "id": "qc-012",
+      "split": "held_in",
+      "family": "tushare_query_canvas",
+      "question": "森麒麟和赛轮轮胎 2022 到 2025 年营收",
+      "toolset": "component_v1",
+      "gold": {
+        "call_policy": "must_call",
+        "expected": [
+          {
+            "name": "query_data",
+            "required": true,
+            "args": {
+              "metric": { "eq": "revenue" },
+              "entities": {
+                "covers": [
+                  { "any": ["森麒麟", "002984"] },
+                  { "any": ["赛轮轮胎", "赛轮", "601058"] }
+                ]
+              },
+              "start": { "eq": "2022" },
+              "end": { "eq": "2025" }
+            }
+          }
+        ],
+        "optional_before": [
+          "search_instruments"
+        ],
+        "forbidden": [
+          "get_instrument_financials",
+          "create_widget",
+          "create_canvas",
+          "web_search"
+        ],
+        "max_calls": 3,
+        "tushare_via": "query_data.financials",
+        "judge_notes": "两家点名 ≤3，首次即可取数，不要传 confirmed:true。"
+      }
+    }
+  ]
+}
