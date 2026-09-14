@@ -24,14 +24,10 @@
 
 ## 先看产品
 
-<p align="center">
-  <a href="docs/media/research-canvas-demo.mp4?raw=1">
-    <img src="docs/images/cover-16x9.png" alt="播放 Research Canvas 完整产品演示" width="900" />
-  </a>
-</p>
+https://github.com/user-attachments/assets/35fb7c88-4888-4c2c-9f5c-b07a81c675ab
 
 <p align="center">
-  <strong>▶ 点击封面播放完整演示（03:31）</strong><br/>
+  <strong>完整产品演示（03:31）</strong><br/>
   自然语言提问 → 数据预览 → 添加到画布 → 点击数字查看来源
 </p>
 
