@@ -5,64 +5,65 @@
 <h1 align="center">Research Canvas</h1>
 
 <p align="center">
-  <strong>把研究问题直接变成可验证的数据看板</strong><br/>
-  AI 投研 Agent · 交互式数据画布 · 自托管
+  <strong>把研究问题变成每个数字都能追溯来源的数据看板</strong><br/>
+  AI 投研 Agent · 交互式数据画布 · Preview → Adopt · 自托管
 </p>
 
 <p align="center">
-  <a href="#核心体验">核心体验</a> ·
-  <a href="#为什么这样设计">产品决策</a> ·
-  <a href="#ai-native-架构">AI Native</a> ·
-  <a href="#本地运行">本地运行</a> ·
-  <a href="docs/SELF-HOSTING.md">部署</a>
+  <a href="#产品工作流">产品工作流</a> ·
+  <a href="#三个核心差异">核心差异</a> ·
+  <a href="#ai-native-产品架构">产品架构</a> ·
+  <a href="#评测体系">评测体系</a> ·
+  <a href="#快速开始">快速开始</a> ·
+  <a href="docs/SELF-HOSTING.md">自托管</a>
 </p>
+
+> **当前状态：** 可自托管的产品演示版本。主路径已跑通公司财务比较、多轮调整、Preview → Adopt 和数值溯源；完整行业工作流等能力仍在建设中。
 
 ---
 
-## 一句话说明
+## 先看产品
 
-Research Canvas 面向需要快速完成公司财务比较的研究者。用户用自然语言提出问题，系统取回真实数据、生成图表预览；用户确认后，图表才进入右侧画布。
+<p align="center">
+  <a href="docs/media/research-canvas-demo.mp4?raw=1">
+    <img src="docs/images/cover-16x9.png" alt="播放 Research Canvas 完整产品演示" width="900" />
+  </a>
+</p>
+
+<p align="center">
+  <strong>▶ 点击封面播放完整演示（03:31）</strong><br/>
+  自然语言提问 → 数据预览 → 添加到画布 → 点击数字查看来源
+</p>
+
+## 为什么需要 Research Canvas
+
+研究者真正需要的是观察数据、比较差异并形成判断，但传统流程往往把大量时间消耗在搜索、导出、清洗和制图上。
+
+通用 AI 助手虽然可以快速回答问题，却很难同时保证三件事：数字来自真实数据、每个数字都能核验、AI 不会擅自改变用户的研究成果。
+
+Research Canvas 聚焦一个明确任务：
+
+> 将上市公司标准财务指标的横向与时间序列比较，转化为可验证、可调整、可复用的研究画布。
+
+它不做选股推荐，不替用户形成投资结论。
+
+## 三个核心差异
 
 | 真实数据 | 用户控制 | 数字可追溯 |
 |---|---|---|
-| 模型不编财务数字 | Preview 后由用户 Adopt | 点击数值查看公司、指标、报告期与来源 |
+| 财务数字由代码向数据源查询和计算，模型不手编数字 | 图表先在聊天区 Preview，只有用户 Adopt 后才进入画布 | 点击图表或表格中的数值，可查看公司、指标、报告期、来源与获取时间 |
 
-<p align="center">
-  <img src="docs/images/cover-16x9.png" alt="Research Canvas 研究看板" width="900" />
-</p>
+1. **模型做选择，代码做计算：** 模型理解研究意图并推荐视图；确定性代码负责取数、计算和完整性校验。
+2. **Preview → Adopt：** AI 可以提出图表，但不能替用户修改研究画布。
+3. **数值 → Dataset → 来源：** 数据变化生成新 Dataset，视图变化复用原 Dataset，研究过程可以回看和复现。
 
-## 为什么做
-
-研究者真正想做的是观察数据、比较差异、形成判断。传统流程中，大量时间消耗在数据准备上。
+## 产品工作流
 
 ```mermaid
 flowchart LR
-  Q1[研究问题] --> S1[搜索公司与指标]
-  S1 --> X1[导出数据]
-  X1 --> C1[清洗整理]
-  C1 --> V1[制作图表]
-  V1 --> A1[开始分析]
-
-  Q2[研究问题] --> P2[生成 Preview]
-  P2 --> H2[用户确认]
-  H2 --> A2[开始分析]
-```
-
-第一阶段只解决一个任务：
-
-> 上市公司标准财务指标的横向与时间序列比较。
-
-不做选股推荐，不替用户形成投资结论。
-
-## 核心体验
-
-以“对比贵州茅台和五粮液 2019–2024 年净资产收益率”为例：
-
-```mermaid
-flowchart LR
-  U[自然语言提问] --> I[识别公司、指标、期间]
+  U[自然语言提问] --> I[识别公司、指标与期间]
   I --> Q[查询真实数据]
-  Q --> D[生成 Dataset]
+  Q --> D[(Immutable Dataset)]
   D --> P[聊天区 Preview]
   P --> C{用户确认?}
   C -->|添加到画布| W[Research Canvas]
@@ -70,155 +71,111 @@ flowchart LR
   W --> S[点击数字查看来源]
 ```
 
-[可编辑流程图源文件](docs/diagrams/research-canvas-core-flow.drawio)
+[打开可编辑的产品工作流源文件](docs/diagrams/research-canvas-core-flow.drawio)
 
 | 1. 先预览 | 2. 再组织 | 3. 随时核验 |
 |---|---|---|
-| <img src="docs/images/preview.png" alt="聊天区图表预览" width="280" /> | <img src="docs/images/canvas.png" alt="演示模式下的研究画布" width="280" /> | <img src="docs/images/source.png" alt="点击数字查看来源" width="280" /> |
-| 数据范围、图形与完整性先在聊天区确认 | 一个会话对应一块活看板，可拖动、缩放、切换视图 | 查看公司、指标、报告期、来源和获取时间 |
+| <img src="docs/images/preview.png" alt="聊天区图表预览" width="280" /> | <img src="docs/images/canvas.png" alt="研究画布" width="280" /> | <img src="docs/images/source.png" alt="点击数字查看来源" width="280" /> |
+| 确认数据范围、图形和完整性 | 拖动、缩放并切换视图 | 查看公司、指标、报告期和来源 |
 
-### 多轮调整
+### 多轮调整不会破坏原始研究
 
-| 用户说 | 系统做 |
+| 用户指令 | 系统行为 |
 |---|---|
-| “去掉五粮液” | 派生新 Dataset，原数据不被覆盖 |
+| “去掉五粮液” | 派生新 Dataset，保留原数据 |
 | “只看 2022–2024” | 本地收窄期间，不重复请求已有数据 |
 | “改成排名” | 复用同一 Dataset，只改变视图 |
 | “再看 ROE” | 发起新查询，生成新 Dataset |
-| “把右边这张图改掉” | 只在用户明确指向已有图时更新画布 |
+| “把右边这张图改掉” | 仅在用户明确指向已有图时更新画布 |
 
-## 为什么这样设计
+## 关键产品决策
 
-| 产品问题 | 选择 | 代价 |
+| 产品问题 | 当前选择 | 主动承担的代价 |
 |---|---|---|
-| AI 是否直接修改画布 | Preview → Adopt | 多一次确认，换来可控性 |
-| 什么任务需要先确认 | ≤3 家明确公司直接查；大样本或行业任务先确认 | 复杂任务更慢，但范围更清楚 |
-| 修改图表是否重新取数 | 数据与视图分离 | 需要维护 Dataset 与 Widget 两套对象 |
-| 数据范围变化怎么保存 | 生成新 Dataset 并记录父子关系 | 存储更多版本，保留可复现性 |
-| 真实数据失败怎么办 | 明确失败，不回退 Mock | 少一个“看起来成功”的结果 |
-| 是否同时做研报、脑图、网页 | 默认关闭，用户按需开启 | 功能入口更克制，主路径更稳定 |
+| AI 是否直接修改画布 | Preview → Adopt | 多一次确认，换取清晰控制权 |
+| 修改图表是否重新取数 | 数据与视图分离 | 同时维护 Dataset 与 Widget |
+| 数据范围变化如何保存 | 派生新 Dataset 并记录父子关系 | 增加存储，保留可复现性 |
+| 真实数据失败怎么办 | Fail closed，不回退 Mock | 宁可明确失败，也不展示假成功 |
+| 是否同时做研报、脑图和网页 | 默认关闭，用户按需开启 | 功能入口更克制，研究主路径更稳定 |
 
-产品北极星：
+> 产品北极星：让用户更快进入判断，而不是让 AI 替用户判断。
 
-> 让用户更快进入判断，而不是让 AI 替用户判断。
-
-## AI Native 架构
-
-模型负责理解和选择，代码负责数据和计算，用户负责最终采纳。
+## AI Native 产品架构
 
 ```mermaid
 flowchart LR
-  U[用户] --> L[LLM<br/>理解意图与选择工具]
-
-  subgraph T[研究工具]
-    Q[query_data<br/>获取数据]
-    R[refine_dataset<br/>派生数据]
-    P[propose_widget<br/>提出视图]
-  end
-
-  subgraph C[确定性代码]
-    E[查询引擎]
-    G[Provider Registry]
-    D[(Immutable Dataset)]
-  end
-
-  L --> Q
-  L --> R
-  L --> P
-  Q --> E
-  E --> G
-  G --> D
-  R --> D
-  D --> P
-  P --> V[Chat Preview]
-  V --> H{用户 Adopt}
-  H --> W[Research Canvas]
+  U[用户<br/>提问与最终确认] --> L[LLM<br/>理解意图、选择工具]
+  L --> T[研究工具<br/>查询 · 派生 · 视图提议]
+  T --> E[确定性代码<br/>取数 · 计算 · 校验]
+  E --> D[(Immutable Dataset)]
+  D --> P[Chat Preview]
+  P -->|用户 Adopt| C[Research Canvas]
+  C --> S[公司 · 指标 · 报告期 · 来源]
 ```
 
-[可编辑架构图源文件](docs/diagrams/research-canvas-ai-native.drawio)
+[打开可编辑的产品架构源文件](docs/diagrams/research-canvas-ai-native.drawio)
 
-| 主体 | 决定什么 | 不做什么 |
+| 主体 | 负责 | 明确不负责 |
 |---|---|---|
-| LLM | 查什么、如何理解上下文、推荐哪种视图 | 不生成或计算财务数字 |
-| 确定性代码 | 取数、标准化、计算、完整性校验、渲染 | 不替用户决定研究结论 |
-| 用户 | 是否采纳、如何组织、最终交付什么 | 不需要手工拼装底层查询 |
+| LLM | 理解上下文、决定查什么、推荐哪种视图 | 不生成或计算财务数字 |
+| 确定性代码 | 取数、标准化、计算、完整性校验和渲染 | 不替用户形成投资结论 |
+| 用户 | 决定是否采纳、如何组织、最终交付什么 | 不需要手工拼装底层查询 |
 
-### 数据流
+## 评测体系
 
-```text
-UI → Agent Tools → Research Hub → Market Data Engine → Provider
-                                      ↓
-                              Immutable Dataset
-                                      ↓
-                              Preview → Adopt
-```
-
-完整分层见 [架构文档](docs/ARCHITECTURE.md)。
-
-## 可信机制
+Research Canvas 不用一个模糊的“AI 得分”代替质量判断。工程可靠性与 Agent 行为分轨验证，并明确区分已经运行的结果、评测框架和尚未建设的能力。
 
 ```mermaid
-flowchart LR
-  V[图表中的数字] --> P[Dataset 数据点]
-  P --> M[公司 · 指标 · 报告期]
-  M --> S[来源 · 获取时间]
+flowchart TB
+  R[一次产品变更] --> G[工程门禁]
+  R --> A[Agent 评测]
+
+  G --> G1[工具与协议测试]
+  G --> G2[UI 与交互测试]
+  G --> G3[浏览器 Golden Path]
+  G1 --> GR[工程门禁结论]
+  G2 --> GR
+  G3 --> GR
+
+  A --> A1[组件层<br/>93 / 99]
+  A1 --> A2[规划层<br/>24 / 24]
+  A2 --> A3[生产提示词层<br/>22 / 24 · 北星]
+
+  GR --> D{是否可交付?}
+  A3 --> D
+  D -->|通过| P[进入发布候选]
+  D -->|未通过| F[定位失败并返工]
 ```
 
-| 风险 | 系统规则 |
+[打开可编辑的评测体系源文件](docs/diagrams/research-canvas-evaluation-system.drawio)
+
+- Agent 评测与产品工程门禁相互独立，不加权合成一个总分。
+- 生产提示词层是当前 Agent 轨道的北星；规划层满分表示量具已校准，不代表产品整体满分。
+- 图中结果来自特定版本和夹具，不是长期 KPI；真实数据数值层评测仍未建设，因此不宣称数据源本身“零错误”。
+
+完整评测说明见 [Agent Eval](docs/AGENT-EVAL.md)。
+
+## 当前能力与边界
+
+| 已完成 | 尚未进入当前范围 |
 |---|---|
-| 缺失值被误当成 0 | `null ≠ 0`，界面显示“—” |
-| 模型编造数字 | 数字必须来自 Provider 返回结果 |
-| 多轮修改覆盖原数据 | 数据语义变化生成新 Dataset |
-| AI 越权修改画布 | `propose_widget` 只生成 Preview |
-| 真实接口失败后展示假数据 | Fail closed，不静默使用 Mock |
-| 数据范围过大或含义模糊 | 先展示计划，用户确认后查询 |
+| 公司财务比较与时间序列 | 完整行业指标工作流 |
+| 多轮调整与视图切换 | Inspector / Notes / Multi-select |
+| 图表和表格的单点数值溯源 | Excel Export |
+| 演示、图片导出和本机只读快照 | 公网 SaaS 分享服务 |
+| A 股、美股、港股等统一查询层 | 投资建议或自动交易 |
 
-### 评测方向
+当前支持折线、柱状、排名、热力表、堆积、柱线、饼图、K 线和表格；实际数据能力取决于配置的数据源及其覆盖范围。
 
-| 任务质量 | 数据可信 | 产品体验 | 系统质量 |
-|---|---|---|---|
-| 任务完成率 | 数字证据覆盖率 | Preview 采纳率 | 延迟与失败率 |
-| 工具选择正确率 | 确定性重算一致率 | 澄清与误拒率 | 数据源可用率 |
+## 快速开始
 
-这些是评测框架，不是尚未测量的成绩。阶段验收和已记录的测试结果见 [HANDOFF](Research%20Canvas/HANDOFF.md#验收4b浏览器-golden-path2026-09-10)。
-
-## 产品能力
-
-| 能力 | 当前状态 |
-|---|---|
-| 对话式研究 | 流式中文交互；按任务调用数据与画布工具 |
-| Research Canvas | 一个会话一块看板；支持拖动、缩放、整理布局 |
-| 图表 | 折线、柱状、排名、热力表、堆积、柱线、饼图、K 线、表格 |
-| 数据调整 | 增减公司、收窄期间、切换指标、复用视图 |
-| 数字溯源 | 图表点、柱、表格单元格均可查看来源 |
-| 交付 | 演示模式、16:9 / 9:16 图片、本机只读快照 |
-| 多市场 | A 股、美股、港股等，经统一查询层接入 |
-| 报告与脑图 | 默认关闭；在输入框“+”菜单按需开启 |
-| 部署 | Docker Compose 或裸 Node 自托管 |
-
-## 版本演进
-
-| 阶段 | 解决的问题 |
-|---|---|
-| Phase 1–2 | 收敛工作区，建立静态 Canvas |
-| Phase 3 | Agent 可以操作结构化 Widget |
-| Phase 4A | 接入真实财务数据 |
-| Phase 4A.1 | 建立 Preview → Adopt 控制边界 |
-| Phase 4B | Dataset 不可变与多轮派生 |
-| Phase 4C | 交互性能、视图推荐、流式体验与品牌收敛 |
-| C 端 P0–P4 | 会话看板、单元格溯源、分级确认、演示导出、只读快照 |
-
-当前交付范围与未开始事项以 [HANDOFF](Research%20Canvas/HANDOFF.md) 为准。
-
-## 本地运行
-
-### 环境
+### 环境要求
 
 - Node.js 24+
-- 大模型 API Key：OpenAI 兼容接口或本地推理
-- 财务数据源凭证：在应用“设置 → 数据源”配置
+- OpenAI 兼容的大模型接口或本地推理服务
+- 在应用“设置 → 数据源”中配置财务数据源凭证
 
-### 启动
+### 本地开发
 
 ```bash
 cp .env.example .env
@@ -226,7 +183,7 @@ npm install
 npm run build:packages
 ```
 
-开发模式：
+分别启动服务端和前端：
 
 ```bash
 # 终端 1
@@ -244,56 +201,26 @@ WEB_HTTPS=0 npm run dev
 
 预览生成后点击“添加到画布”，再点击折线上的年份查看来源。
 
-### 自动演示
-
-```bash
-npx playwright install chromium
-npm run test:e2e:smoke
-```
-
-脚本会执行 90 秒主路径，并更新 `docs/images/` 中的预览、画布、溯源和 16:9 封面。
-
-## 自托管
+### Docker 自托管
 
 ```bash
 cp compose.env.example compose.env
 docker compose up -d --build
 ```
 
-默认入口：`https://<主机>:8712`。
-
-| 方式 | 适合场景 | 限制 |
-|---|---|---|
-| 只读看板 | 发送给访客查看 | 只在当前部署有效，不消耗模型或数据配额 |
-| 演示用户 | 现场体验完整流程 | 每次提问消耗模型和数据源配额 |
-| 本地开发 | 产品迭代与调试 | 默认不对公网开放 |
-
-公网开放前必须完成账户认领并配置演示用户。完整步骤见 [自托管文档](docs/SELF-HOSTING.md)。
-
-## 当前边界
-
-| 已完成 | 尚未进入当前范围 |
-|---|---|
-| 公司财务比较与时间序列 | 完整 Inspector / Notes |
-| 多轮调整与视图切换 | Multi-select |
-| 演示、图片导出、本机快照 | Excel Export |
-| 标准行情与财务数据 | 完整行业指标工作流 |
-
-- “发布”是当前部署上的只读快照，不是公网 SaaS 分享服务。
-- 数据能力取决于配置的数据源与其覆盖范围。
-- Research Canvas 用于数据查询与研究整理，不提供证券投资建议或自动交易。
+默认入口：`https://<主机>:8712`。公网开放前需完成账户认领并配置演示用户，详见 [自托管文档](docs/SELF-HOSTING.md)。
 
 ## 项目文档
 
 | 文档 | 内容 |
 |---|---|
-| [HANDOFF](Research%20Canvas/HANDOFF.md) | 当前阶段、验收记录、已知问题 |
-| [PRD](Research%20Canvas/PRD.md) | 产品目标、用户故事、MVP 边界 |
-| [ARCHITECTURE](docs/ARCHITECTURE.md) | 当前系统分层与真实代码落点 |
-| [DATA-LAYER](docs/DATA-LAYER.md) | 数据驱动、缓存与 Provider 结构 |
+| [HANDOFF](Research%20Canvas/HANDOFF.md) | 当前阶段、验收记录和已知问题 |
+| [PRD](Research%20Canvas/PRD.md) | 产品目标、用户故事和 MVP 边界 |
+| [ARCHITECTURE](docs/ARCHITECTURE.md) | 系统分层与真实代码落点 |
+| [AGENT-EVAL](docs/AGENT-EVAL.md) | Agent 评测分层、夹具和结果解释 |
+| [DATA-LAYER](docs/DATA-LAYER.md) | 数据驱动、缓存与数据源结构 |
 | [AGENT-GUIDE](docs/AGENT-GUIDE.md) | Agent 工具、能力包与使用边界 |
 | [SELF-HOSTING](docs/SELF-HOSTING.md) | Docker、云服务器和安全配置 |
-| [REPO-LAYOUT](docs/REPO-LAYOUT.md) | 仓库目录地图 |
 | [CONTRIBUTING](CONTRIBUTING.md) | 开发与贡献方式 |
 
 ## License
