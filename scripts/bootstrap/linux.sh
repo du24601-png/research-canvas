@@ -2,7 +2,7 @@
 # Opptrix Linux bootstrap — install Docker (if needed), Opptrix-managed Node, and `opptrix` CLI.
 #
 # Official path (servers):
-#   curl -fsSL https://raw.githubusercontent.com/Travisun/Opptrix/main/scripts/bootstrap/linux.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/du24601-png/research-canvas/main/scripts/bootstrap/linux.sh | bash
 #   # or from a clone:
 #   ./scripts/bootstrap/linux.sh
 #
@@ -10,7 +10,7 @@
 #   OPPTRIX_BUILD_MIRROR=cn|foreign|auto   (default: auto)
 #   OPPTRIX_REPO_DIR=~/Opptrix             clone / use this directory
 #   OPPTRIX_GIT_URL=…                      国外默认 GitHub（可覆盖）
-#   OPPTRIX_GIT_URL_CN=…                   国内默认 Gitee（可覆盖）
+#   OPPTRIX_GIT_URL_CN=…                   国内默认（暂无 Gitee，与 GitHub 相同）
 #   OPPTRIX_GIT_URL_OVERRIDE=…             强制单一 clone URL（不分国内/国外）
 #   OPPTRIX_NODE_VERSION=24.11.1           managed Node pin (see scripts/lib/ci-pins.env)
 #   OPPTRIX_SKIP_DOCKER=1                  do not install Docker
@@ -26,8 +26,8 @@ set -euo pipefail
 
 OPPTRIX_NODE_VERSION="${OPPTRIX_NODE_VERSION:-24.11.1}"
 OPPTRIX_REPO_DIR="${OPPTRIX_REPO_DIR:-$HOME/Opptrix}"
-OPPTRIX_GIT_URL="${OPPTRIX_GIT_URL:-https://github.com/Travisun/Opptrix.git}"
-OPPTRIX_GIT_URL_CN="${OPPTRIX_GIT_URL_CN:-https://gitee.com/Travisun/Opptrix.git}"
+OPPTRIX_GIT_URL="${OPPTRIX_GIT_URL:-https://github.com/du24601-png/research-canvas.git}"
+OPPTRIX_GIT_URL_CN="${OPPTRIX_GIT_URL_CN:-https://github.com/du24601-png/research-canvas.git}"
 RUNTIME_ROOT="${OPPTRIX_RUNTIME_ROOT:-$HOME/.opptrix/runtime}"
 MANAGED_NODE_DIR="$RUNTIME_ROOT/node"
 BIN_DIR="${OPPTRIX_BIN_DIR:-$HOME/.local/bin}"

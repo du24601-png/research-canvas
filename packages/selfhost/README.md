@@ -8,10 +8,10 @@
 | **全局命令** | `research-canvas`（兼容 `opptrix`） |
 | npm 包 | [`@opptrix/selfhost`](https://www.npmjs.com/package/@opptrix/selfhost) |
 | 产品 | Research Canvas |
-| 源码 | [GitHub](https://github.com/Travisun/Opptrix) · [Gitee](https://gitee.com/Travisun/Opptrix) |
+| 源码 | [GitHub](https://github.com/du24601-png/research-canvas) |
 | 进阶文档 | 见仓库内自托管说明（若文档目录未随仓发布，以本页与 `compose.env.example` 为准） |
 
-适合关键词检索：*Research Canvas 自托管*、*Research Canvas Docker 部署*、*本地部署投研*、*Docker Compose 安装*、*国内镜像 Gitee 部署*。
+适合关键词检索：*Research Canvas 自托管*、*Research Canvas Docker 部署*、*本地部署投研*、*Docker Compose 安装*。
 
 ---
 
@@ -90,8 +90,8 @@ npx @opptrix/selfhost up
 ### 方式 3：Linux 从零机器（还没有 Docker / Node）
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Travisun/Opptrix/main/scripts/bootstrap/linux.sh | bash
-# 若 GitHub raw 慢：git clone https://gitee.com/Travisun/Opptrix.git && cd <仓库目录> && ./scripts/bootstrap/linux.sh
+curl -fsSL https://raw.githubusercontent.com/du24601-png/research-canvas/main/scripts/bootstrap/linux.sh | bash
+# 若 GitHub raw 慢：git clone https://github.com/du24601-png/research-canvas.git && cd <仓库目录> && ./scripts/bootstrap/linux.sh
 ```
 
 **效果：** 脚本尽量自动安装 Docker、托管 Node，并装好 `opptrix`；之后日常仍用本 CLI 管理实例。
@@ -213,7 +213,7 @@ npm update -g @opptrix/selfhost             # 仅升级 CLI 包（selfhost-v*）
 
 **效果：** 应用与 CLI 分轨升级/回退；**沿用**原 `compose.env`、挂载 override、数据卷 `opptrix-home`（用户数据在 `/opptrix/private`，不在 runtime 包内）。审计日志：`<部署目录>/.opptrix/update-audit.jsonl`。
 
-**热更新 vs `opptrix update`：** 产品内「系统更新」在**不换镜像**的前提下，把新运行时解压进 system 槽位并切换 `boot`（协议见 [SYSTEM-UPDATE.md](https://github.com/Travisun/Opptrix/blob/main/docs/SYSTEM-UPDATE.md)）。当提示需要刷新**底座 / 运行环境 / Node** 时，请用本 CLI 的 **`opptrix update`**：它重建容器、换镜像，但默认保留命名卷与 operator 挂载。启动时若镜像种子版本高于当前 boot，会**冲掉**旧热更新 pending，以镜像 `/app` 晋升为 pending 并在底座满足 `minBaseImage` 时 `activate` → **first-boot 库迁移与 postActivate 钩子**。只有 `opptrix down --volumes` 才会删卷。
+**热更新 vs `opptrix update`：** 产品内「系统更新」在**不换镜像**的前提下，把新运行时解压进 system 槽位并切换 `boot`（协议见 [SYSTEM-UPDATE.md](https://github.com/du24601-png/research-canvas/blob/main/docs/SYSTEM-UPDATE.md)）。当提示需要刷新**底座 / 运行环境 / Node** 时，请用本 CLI 的 **`opptrix update`**：它重建容器、换镜像，但默认保留命名卷与 operator 挂载。启动时若镜像种子版本高于当前 boot，会**冲掉**旧热更新 pending，以镜像 `/app` 晋升为 pending 并在底座满足 `minBaseImage` 时 `activate` → **first-boot 库迁移与 postActivate 钩子**。只有 `opptrix down --volumes` 才会删卷。
 
 ---
 
@@ -344,7 +344,7 @@ opptrix up --skip-models    # 建议先跳过模型，确认能打开页面
 | （旧版）运行时槽位 | 卷 `opptrix-system`（`/system`） | 同上 |
 | 访问地址 | https://\<IP\>:8712（自签名 HTTPS，默认映射公网可访）；HTTP 默认关闭 | — |
 
-默认开箱：`https://公网IP:8712`（自签名）。若前面另有 Nginx 终结 TLS，可将 upstream 指到 `https://127.0.0.1:8712`，或设 `OPPTRIX_ENABLE_HTTP=1` 后使用明文 8711。完整说明见 [SELF-HOSTING.md](https://github.com/Travisun/Opptrix/blob/main/docs/SELF-HOSTING.md)。
+默认开箱：`https://公网IP:8712`（自签名）。若前面另有 Nginx 终结 TLS，可将 upstream 指到 `https://127.0.0.1:8712`，或设 `OPPTRIX_ENABLE_HTTP=1` 后使用明文 8711。完整说明见 [SELF-HOSTING.md](https://github.com/du24601-png/research-canvas/blob/main/docs/SELF-HOSTING.md)。
 
 ---
 
@@ -394,7 +394,7 @@ npm uninstall -g @opptrix/selfhost
 ## 给贡献者：在仓库里开发本 CLI
 
 ```bash
-git clone https://github.com/Travisun/Opptrix.git
+git clone https://github.com/du24601-png/research-canvas.git
 cd <仓库目录>
 npm ci
 npm run build -w @opptrix/selfhost
@@ -407,7 +407,7 @@ npm link -w @opptrix/selfhost
 
 ## 许可证
 
-[Apache-2.0](https://github.com/Travisun/Opptrix/blob/main/LICENSE)
+[Apache-2.0](https://github.com/du24601-png/research-canvas/blob/main/LICENSE)
 
 ---
 

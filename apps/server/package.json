@@ -3,16 +3,16 @@
   "version": "0.4.0",
   "private": true,
   "description": "Research Canvas 本地 API 服务（Fastify + Agent 投研引擎）",
-  "homepage": "https://github.com/Travisun/Opptrix",
+  "homepage": "https://github.com/du24601-png/research-canvas",
   "license": "Apache-2.0",
   "author": "Research Canvas",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Travisun/Opptrix.git",
+    "url": "git+https://github.com/du24601-png/research-canvas.git",
     "directory": "apps/server"
   },
   "bugs": {
-    "url": "https://github.com/Travisun/Opptrix/issues"
+    "url": "https://github.com/du24601-png/research-canvas/issues"
   },
   "type": "module",
   "scripts": {

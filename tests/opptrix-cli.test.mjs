@@ -93,16 +93,15 @@ test('resolveMirrorProfile auto detects via locale / force flags', () => {
   assert.equal(explicit.auto, false)
 })
 
-test('resolveGitCloneUrls: cn→Gitee first, foreign→GitHub first', () => {
+test('resolveGitCloneUrls: GitHub until a CN Gitee mirror exists', () => {
+  const expected = 'https://github.com/du24601-png/research-canvas.git'
   const cn = resolveGitCloneUrls('cn', {})
+  assert.deepEqual(cn, [expected])
   assert.equal(cn[0], GIT_CLONE_DEFAULTS.cn)
-  assert.equal(cn[1], GIT_CLONE_DEFAULTS.foreign)
-  assert.match(cn[0], /gitee\.com/)
 
   const foreign = resolveGitCloneUrls('foreign', {})
+  assert.deepEqual(foreign, [expected])
   assert.equal(foreign[0], GIT_CLONE_DEFAULTS.foreign)
-  assert.equal(foreign[1], GIT_CLONE_DEFAULTS.cn)
-  assert.match(foreign[0], /github\.com/)
 
   const forced = resolveGitCloneUrls('cn', { OPPTRIX_GIT_URL_OVERRIDE: 'https://example.com/x.git' })
   assert.deepEqual(forced, ['https://example.com/x.git'])

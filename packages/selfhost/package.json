@@ -5,14 +5,14 @@
   "type": "module",
   "license": "Apache-2.0",
   "author": "Research Canvas",
-  "homepage": "https://github.com/Travisun/Opptrix",
+  "homepage": "https://github.com/du24601-png/research-canvas",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Travisun/Opptrix.git",
+    "url": "git+https://github.com/du24601-png/research-canvas.git",
     "directory": "packages/selfhost"
   },
   "bugs": {
-    "url": "https://github.com/Travisun/Opptrix/issues"
+    "url": "https://github.com/du24601-png/research-canvas/issues"
   },
   "keywords": [
     "research-canvas",

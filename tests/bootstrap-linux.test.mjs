@@ -22,7 +22,7 @@ test('bootstrap/linux.sh exists and is executable-ish', () => {
   assert.match(src, /registry-mirrors/)
   assert.match(src, /仅支持 Linux/)
   assert.match(src, /macOS \/ Windows/)
-  assert.match(src, /gitee\.com\/Travisun\/Opptrix/)
+  assert.match(src, /github\.com\/du24601-png\/research-canvas/)
 })
 
 test('ci-pins.env matches bootstrap Node pin and ubuntu LTS runner', () => {

@@ -51,10 +51,10 @@ export const CN_GHCR_MIRROR_HOSTS = Object.freeze([
 
 /** Default git remotes for source clone (Docker build context). */
 export const GIT_CLONE_DEFAULTS = Object.freeze({
-  /** 国内默认：Gitee */
-  cn: 'https://gitee.com/Travisun/Opptrix.git',
+  /** 国内：暂无 Gitee 镜像，与国外同用 GitHub */
+  cn: 'https://github.com/du24601-png/research-canvas.git',
   /** 国外默认：GitHub */
-  foreign: 'https://github.com/Travisun/Opptrix.git',
+  foreign: 'https://github.com/du24601-png/research-canvas.git',
 })
 
 /**

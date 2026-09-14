@@ -86,8 +86,8 @@ export function runtimeArchBinSha256Filename(version, archKey) {
   return `opptrix-runtime-${archKey}-v${v}.sha256`
 }
 
-export const DEFAULT_GITHUB_REPO = 'Travisun/Opptrix'
-export const DEFAULT_GITEE_REPO = 'Travisun/Opptrix'
+export const DEFAULT_GITHUB_REPO = 'du24601-png/research-canvas'
+export const DEFAULT_GITEE_REPO = 'du24601-png/research-canvas'
 
 /**
  * @param {string} version

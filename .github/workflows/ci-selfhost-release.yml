@@ -1,54 +1,8 @@
 name: CI selfhost release
 
+# Auto-run off: pack-opptrix-runtime.mjs / CDN scripts were removed.
+# Keep workflow_dispatch until remaining jobs are split from the old pack path.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'packages/selfhost/**'
-      - 'Dockerfile'
-      - 'docker-compose.yml'
-      - 'compose.env.example'
-      - 'scripts/pack-opptrix-runtime.mjs'
-      - 'scripts/sync-hot-to-r2.mjs'
-      - 'scripts/runtime-update-cli.mjs'
-      - 'scripts/audit-selfhost-release.mjs'
-      - 'scripts/ci-runtime-pack-arm64-docker.sh'
-      - 'scripts/lib/ci-pins.env'
-      - 'scripts/lib/hot-cdn.mjs'
-      - 'scripts/lib/release-notes.mjs'
-      - 'scripts/lib/selfhost-release-checks.mjs'
-      - 'scripts/docker-entrypoint.sh'
-      - 'scripts/system-boot.mjs'
-      - 'scripts/smoke-selfhost-lifecycle.mjs'
-      - 'scripts/lib/selfhost-lifecycle.mjs'
-      - '.github/workflows/publish-selfhost.yml'
-      - '.github/workflows/publish-selfhost-image.yml'
-      - '.github/workflows/publish-runtime-assets.yml'
-      - '.github/workflows/ci-selfhost-release.yml'
-  pull_request:
-    branches: [main]
-    paths:
-      - 'packages/selfhost/**'
-      - 'Dockerfile'
-      - 'docker-compose.yml'
-      - 'compose.env.example'
-      - 'scripts/pack-opptrix-runtime.mjs'
-      - 'scripts/sync-hot-to-r2.mjs'
-      - 'scripts/runtime-update-cli.mjs'
-      - 'scripts/audit-selfhost-release.mjs'
-      - 'scripts/ci-runtime-pack-arm64-docker.sh'
-      - 'scripts/lib/ci-pins.env'
-      - 'scripts/lib/hot-cdn.mjs'
-      - 'scripts/lib/release-notes.mjs'
-      - 'scripts/lib/selfhost-release-checks.mjs'
-      - 'scripts/docker-entrypoint.sh'
-      - 'scripts/system-boot.mjs'
-      - 'scripts/smoke-selfhost-lifecycle.mjs'
-      - 'scripts/lib/selfhost-lifecycle.mjs'
-      - '.github/workflows/publish-selfhost.yml'
-      - '.github/workflows/publish-selfhost-image.yml'
-      - '.github/workflows/publish-runtime-assets.yml'
-      - '.github/workflows/ci-selfhost-release.yml'
   workflow_dispatch:
     inputs:
       run_docker_build:
