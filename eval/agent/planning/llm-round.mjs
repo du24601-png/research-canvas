@@ -30,5 +30,6 @@ export async function completePlanningRound(opts) {
     message: { role: 'assistant', content: msg.content ?? null, tool_calls: calls.length ? calls : undefined },
     calls,
     usage: data?.usage ?? null,
+    finishReason: data?.choices?.[0]?.finish_reason ?? null,
   }
 }

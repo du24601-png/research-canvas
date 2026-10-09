@@ -79,15 +79,18 @@ export async function runPlanningCase(opts) {
   const calls = []
   const maxRounds = opts.maxRounds ?? DEFAULT_MAX_ROUNDS
   let finalText = ''
+  let truncated = false
   for (let round = 0; round < maxRounds; round += 1) {
     const turn = await opts.complete({ messages, tools: opts.tools, evalCase })
     const rawCalls = Array.isArray(turn?.calls) ? turn.calls : []
     if (!rawCalls.length) {
+      // 输出被 max_tokens 截断时工具调用 JSON 可能残缺、解析为空：如实标记，不当作模型「无话可说」
+      truncated = turn?.finishReason === 'length'
       finalText = String(turn?.message?.content ?? '')
       if (!injectIdleUser(evalCase, state, messages, turn?.message)) break
       continue
     }
     applyRoundCalls(turn, evalCase, state, messages, calls, opts.stubTool)
   }
-  return { calls, messages, finalText, events: { user_confirm: state.userConfirm === true } }
+  return { calls, messages, finalText, truncated, events: { user_confirm: state.userConfirm === true } }
 }

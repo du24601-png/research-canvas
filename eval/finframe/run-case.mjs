@@ -69,7 +69,9 @@ export async function runFinframeCase(evalCase, opts) {
   const started = Date.now()
   const store = seedStore(evalCase)
   const usage = { prompt_tokens: 0, completion_tokens: 0, cache_hit_tokens: 0, rounds: 0 }
-  const { trace, error } = await traceCase(evalCase, opts, store, usage)
+  const traced = await traceCase(evalCase, opts, store, usage)
+  const { trace } = traced
+  const error = traced.error ?? (trace.truncated ? '模型输出被 max_tokens 截断（评测运行器限制），不计为 Agent 主动停答' : null)
   const chain = judgePlanningCase(evalCase, trace)
   const datasets = [...store.datasets.values()]
   const texts = assistantTexts(trace.messages ?? [], trace.finalText)

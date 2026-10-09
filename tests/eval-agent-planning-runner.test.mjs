@@ -198,3 +198,12 @@ test('loadPlanningCases returns 24 planning cases', async () => {
   assert.ok(cases.some((c) => c.id === 'pl-001'))
   assert.ok(cases.some((c) => c.id === 'pl-024'))
 })
+
+test('runPlanningCase marks a max_tokens cut-off instead of a silent empty answer', async () => {
+  const evalCase = { id: 'trunc', task: '比较茅台和五粮液净利率', gold: { chain: [] }, constraints: [] }
+  const complete = async () => ({ message: { role: 'assistant', content: '' }, calls: [], finishReason: 'length' })
+  const trace = await runPlanningCase({ evalCase, complete })
+  assert.equal(trace.truncated, true)
+  const normal = await runPlanningCase({ evalCase, complete: async () => ({ message: { role: 'assistant', content: '好的' }, calls: [], finishReason: 'stop' }) })
+  assert.equal(normal.truncated, false)
+})
