@@ -2,6 +2,7 @@ import {
   datasetShape,
   derivedDatasetTitle,
   inferViewIntent,
+  entityTrendLabels,
   isKlineMetricId,
   klineBarBudget,
   periodsBetween,
@@ -464,6 +465,8 @@ export function describeDatasetForModel(dataset: ResearchDataset): Record<string
       name: entity.name,
       ticker: entity.ticker,
     })),
+    // M2-E2：代码算出的走势标签（不含数值）；正文描述涨跌、高低点只能照此
+    ...(isKlineMetricId(dataset.metric) ? {} : { trends: entityTrendLabels(dataset), trend_note: '描述走势、最高/最低年份只能依据 trends，不要凭印象；trends 里没有的判断不要写' }),
     intent,
     view: {
       recommended: picked.type,
