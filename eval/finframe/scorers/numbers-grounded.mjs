@@ -6,7 +6,7 @@
  */
 const NUM_RE = /-?\d+(?:,\d{3})*(?:\.\d+)?/g
 const COUNT_SUFFIX = /^\s*(?:家|个|只|年|项|步|张|期|条|种|次|位|季|月|日|号|大|类|组|列|行)/
-const ORDINAL_PREFIX = /(?:第|近|前|后|最近|Top|TOP|top|T\+?)\s*$/
+const ORDINAL_PREFIX = /(?:第|近|前|后|最近|每|Top|TOP|top|T\+?)\s*$/
 
 function stripNonClaims(text) {
   return String(text ?? '')
