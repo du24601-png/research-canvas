@@ -11,6 +11,9 @@ const ORDINAL_PREFIX = /(?:第|近|前|后|最近|Top|TOP|top|T\+?)\s*$/
 function stripNonClaims(text) {
   return String(text ?? '')
     .replace(/research-ds-[\w-]+|prop-[\w-]+|w-[\w-]+/g, ' ')
+    .replace(/(?:19|20)\d{2}\s*[/.-]\s*\d{1,2}(?!\d)(?:\s*[/.-]\s*\d{1,2}(?!\d))?/g, ' ')
+    .replace(/(?:19|20)\d{2}\s*年\s*\d{1,2}\s*月(?:\s*\d{1,2}\s*日)?/g, ' ')
+    .replace(/\d{1,2}\s*月(?:\s*\d{1,2}\s*日)?/g, ' ')
     .replace(/[A-Za-z_]+\d+[\w-]*/g, ' ')
     .replace(/^\s*(?:\d+[.)、]|[-*]\s)/gm, ' ')
 }

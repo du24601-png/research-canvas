@@ -14,6 +14,8 @@ const v = ds.data[0].value
 test('extractClaimNumbers skips years, codes, counts, ids and list markers', () => {
   const nums = extractClaimNumbers('1. 茅台（600519）2021–2023 年共 3 年，research-ds-ff-1，第 2 名，净利率 12.5%')
   assert.deepEqual(nums.map((n) => n.raw), ['12.5'])
+  assert.deepEqual(extractClaimNumbers('截至 2026/9/14，2026 年 9 月尚未披露，2025-12-31 年报').map((n) => n.raw), [])
+  assert.deepEqual(extractClaimNumbers('2021-2025 年，2024 年 37.5%，2023年 12 月 8%').map((n) => n.raw), ['37.5', '8'])
 })
 
 test('numbers_grounded accepts dataset values at written precision, rejects others', () => {
