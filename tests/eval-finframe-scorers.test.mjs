@@ -29,7 +29,10 @@ test('source_period requires structural sources plus period and source in reply'
   const calls = [{ name: 'propose_widget', args: { datasetId: ds.id } }]
   const evalCase = { expect: 'answer' }
   assert.equal(scoreSourcePeriod({ evalCase, calls, texts: ['2021–2023 年净利率，来源见卡片'], datasets: [ds] }).pass, true)
-  assert.equal(scoreSourcePeriod({ evalCase, calls, texts: ['2021–2023 年净利率'], datasets: [ds] }).pass, false)
+  const noSource = scoreSourcePeriod({ evalCase, calls, texts: ['2021–2023 年净利率'], datasets: [ds] })
+  assert.equal(noSource.pass, true, 'source_in_reply is informational only')
+  assert.equal(noSource.checks.source_in_reply, false)
+  assert.equal(scoreSourcePeriod({ evalCase, calls, texts: ['净利率见图'], datasets: [ds] }).pass, false)
   assert.equal(scoreSourcePeriod({ evalCase: { expect: 'refuse' }, calls, texts: [], datasets: [ds] }).applicable, false)
 })
 

@@ -3,6 +3,8 @@
  * - 结构：每个 propose_widget 指向一个存在的 Dataset，且其每个非空数据点都有带 period 的来源。
  * - 正文：回复里说明了数据期间（年份 / 财年 / 报告期）和来源出处（来源 / 数据源 / 查看来源）。
  * 只对 expect 为 answer / answer_with_gap 的题生效。
+ * 正文来源（source_in_reply）仅作参考，不计入 pass：来源由 UI 证据面板承担，
+ * M4 会改为 UI 层检查（2026-10-09 决定）。
  */
 const PERIOD_RE = /(?:19|20)\d{2}\s*(?:年|财年|FY|[-–—~至到])|报告期|财年|年报|FY\s?\d{2,4}|近[一二三四五六七八九十\d]+年/
 const SOURCE_RE = /来源|数据源|出处|溯源/
@@ -43,7 +45,7 @@ export function scoreSourcePeriod({ evalCase, calls, texts, datasets }) {
   const reasons = [
     ...structuralReasons(calls, datasets),
     ...(checks.period_in_reply ? [] : ['回复未说明数据期间/报告期']),
-    ...(checks.source_in_reply ? [] : ['回复未说明数据来源']),
   ]
-  return { scorer: 'source_period', applicable: true, pass: reasons.length === 0, checks, reasons }
+  const informational = checks.source_in_reply ? [] : ['（参考）回复未说明数据来源']
+  return { scorer: 'source_period', applicable: true, pass: reasons.length === 0, checks, informational: ['source_in_reply'], reasons: [...reasons, ...informational] }
 }
