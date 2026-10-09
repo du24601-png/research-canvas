@@ -1,0 +1,790 @@
+{
+  "file": "seed-v1.json",
+  "dataset_id": "finframe-seed-v1",
+  "fixture_version": "finframe-synth-v1",
+  "as_of": "2026-10-09",
+  "notes": "12 题种子集。题面取自 refactor/phase-0-1 (9a3d5f9) canvas-v2 30 题与简报 Demo A/B/C、S1/S2；只复制题面。数值夹具为合成值，非真实财报。",
+  "cases": [
+    {
+      "split": "seed",
+      "toolset": "component_v1",
+      "user_script": [],
+      "constraints": [
+        {
+          "id": "no_web",
+          "type": "forbid_tool",
+          "tools": [
+            "web_search"
+          ]
+        },
+        {
+          "id": "no_steal_canvas",
+          "type": "forbid_tool",
+          "tools": [
+            "create_widget",
+            "update_widget",
+            "delete_widget",
+            "create_canvas"
+          ]
+        }
+      ],
+      "difficulty": "medium",
+      "source_ref": "brief Demo A step 1",
+      "id": "ff-001",
+      "slice": "basic_compare",
+      "expect": "answer",
+      "task": "对比贵州茅台和五粮液最近五个已披露完整财年的净利率与 ROE。",
+      "gold": {
+        "chain": [
+          {
+            "name": "query_data",
+            "args": {
+              "metric": {
+                "in": [
+                  "net_margin",
+                  "roe"
+                ]
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "贵州茅台",
+                      "茅台",
+                      "600519"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "五粮液",
+                      "000858"
+                    ]
+                  }
+                ]
+              },
+              "start": {
+                "eq": "2021"
+              },
+              "end": {
+                "eq": "2025"
+              }
+            }
+          },
+          {
+            "name": "query_data",
+            "args": {
+              "metric": {
+                "in": [
+                  "net_margin",
+                  "roe"
+                ]
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "贵州茅台",
+                      "茅台",
+                      "600519"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "五粮液",
+                      "000858"
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "name": "propose_widget"
+          }
+        ],
+        "max_decisions": 6
+      }
+    },
+    {
+      "split": "seed",
+      "toolset": "component_v1",
+      "user_script": [],
+      "constraints": [
+        {
+          "id": "no_web",
+          "type": "forbid_tool",
+          "tools": [
+            "web_search"
+          ]
+        },
+        {
+          "id": "no_steal_canvas",
+          "type": "forbid_tool",
+          "tools": [
+            "create_widget",
+            "update_widget",
+            "delete_widget",
+            "create_canvas"
+          ]
+        }
+      ],
+      "difficulty": "easy",
+      "source_ref": "phase-0 cv-003",
+      "id": "ff-002",
+      "slice": "basic_compare",
+      "expect": "answer",
+      "task": "贵州茅台、五粮液、泸州老窖 2019 到 2024 年净利率",
+      "gold": {
+        "chain": [
+          {
+            "name": "query_data",
+            "args": {
+              "metric": {
+                "eq": "net_margin"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "贵州茅台",
+                      "茅台",
+                      "600519"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "五粮液",
+                      "000858"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "泸州老窖",
+                      "000568"
+                    ]
+                  }
+                ]
+              },
+              "start": {
+                "eq": "2019"
+              },
+              "end": {
+                "eq": "2024"
+              }
+            }
+          },
+          {
+            "name": "propose_widget"
+          }
+        ],
+        "max_decisions": 4
+      }
+    },
+    {
+      "split": "seed",
+      "toolset": "component_v1",
+      "user_script": [],
+      "constraints": [
+        {
+          "id": "no_web",
+          "type": "forbid_tool",
+          "tools": [
+            "web_search"
+          ]
+        },
+        {
+          "id": "no_steal_canvas",
+          "type": "forbid_tool",
+          "tools": [
+            "create_widget",
+            "update_widget",
+            "delete_widget",
+            "create_canvas"
+          ]
+        }
+      ],
+      "difficulty": "easy",
+      "source_ref": "phase-0 cv-002",
+      "id": "ff-003",
+      "slice": "basic_compare",
+      "expect": "answer",
+      "task": "招商银行和平安银行近五年 ROE 对比",
+      "gold": {
+        "chain": [
+          {
+            "name": "query_data",
+            "args": {
+              "metric": {
+                "eq": "roe"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "招商银行",
+                      "招行",
+                      "600036"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "平安银行",
+                      "000001"
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "name": "propose_widget"
+          }
+        ],
+        "max_decisions": 4
+      }
+    },
+    {
+      "split": "seed",
+      "toolset": "component_v1",
+      "user_script": [],
+      "constraints": [
+        {
+          "id": "no_web",
+          "type": "forbid_tool",
+          "tools": [
+            "web_search"
+          ]
+        },
+        {
+          "id": "no_steal_canvas",
+          "type": "forbid_tool",
+          "tools": [
+            "create_widget",
+            "update_widget",
+            "delete_widget",
+            "create_canvas"
+          ]
+        }
+      ],
+      "difficulty": "hard",
+      "source_ref": "brief S1 (§2.2)",
+      "id": "ff-004",
+      "slice": "decompose_evidence",
+      "expect": "answer",
+      "task": "对比贵州茅台和五粮液的近五年净利率和 ROE，找出变化明显的年份。再解释哪些结论有数据支持，并给我打开来源核对。",
+      "gold": {
+        "chain": [
+          {
+            "name": "query_data",
+            "args": {
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "贵州茅台",
+                      "茅台",
+                      "600519"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "五粮液",
+                      "000858"
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "name": "propose_widget"
+          }
+        ],
+        "max_decisions": 6
+      }
+    },
+    {
+      "split": "seed",
+      "toolset": "component_v1",
+      "user_script": [],
+      "constraints": [
+        {
+          "id": "no_web",
+          "type": "forbid_tool",
+          "tools": [
+            "web_search"
+          ]
+        },
+        {
+          "id": "no_steal_canvas",
+          "type": "forbid_tool",
+          "tools": [
+            "create_widget",
+            "update_widget",
+            "delete_widget",
+            "create_canvas"
+          ]
+        }
+      ],
+      "difficulty": "hard",
+      "source_ref": "phase-0 cv-009 / brief S2",
+      "id": "ff-005",
+      "slice": "decompose_evidence",
+      "expect": "answer",
+      "task": "海天味业 2020 到 2024 年 ROE 为什么下滑？是净利率、资产周转还是杠杆的贡献？",
+      "gold": {
+        "chain": [
+          {
+            "name": "query_data",
+            "args": {
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "海天味业",
+                      "海天",
+                      "603288"
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "name": "propose_widget"
+          }
+        ],
+        "max_decisions": 6
+      }
+    },
+    {
+      "split": "seed",
+      "toolset": "component_v1",
+      "user_script": [
+        {
+          "when": "tool_idle",
+          "tool": "propose_widget",
+          "content": "只看近三年，为什么净利率变化比另一家更明显？"
+        }
+      ],
+      "constraints": [
+        {
+          "id": "no_web",
+          "type": "forbid_tool",
+          "tools": [
+            "web_search"
+          ]
+        },
+        {
+          "id": "no_steal_canvas",
+          "type": "forbid_tool",
+          "tools": [
+            "create_widget",
+            "update_widget",
+            "delete_widget",
+            "create_canvas"
+          ]
+        }
+      ],
+      "difficulty": "hard",
+      "source_ref": "brief Demo B",
+      "id": "ff-006",
+      "slice": "multi_turn",
+      "expect": "answer",
+      "max_rounds": 12,
+      "task": "对比贵州茅台和五粮液 2021 到 2025 年净利率",
+      "gold": {
+        "chain": [
+          {
+            "name": "query_data",
+            "args": {
+              "metric": {
+                "eq": "net_margin"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "贵州茅台",
+                      "茅台",
+                      "600519"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "五粮液",
+                      "000858"
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "name": "propose_widget"
+          },
+          {
+            "name": "refine_dataset",
+            "args": {
+              "operation_type": {
+                "eq": "change_period"
+              },
+              "start": {
+                "eq": "2023"
+              },
+              "end": {
+                "eq": "2025"
+              }
+            }
+          },
+          {
+            "name": "propose_widget"
+          }
+        ],
+        "max_decisions": 8
+      }
+    },
+    {
+      "split": "seed",
+      "toolset": "component_v1",
+      "user_script": [],
+      "constraints": [
+        {
+          "id": "no_web",
+          "type": "forbid_tool",
+          "tools": [
+            "web_search"
+          ]
+        },
+        {
+          "id": "no_steal_canvas",
+          "type": "forbid_tool",
+          "tools": [
+            "create_widget",
+            "update_widget",
+            "delete_widget",
+            "create_canvas"
+          ]
+        },
+        {
+          "id": "no_requery",
+          "type": "forbid_tool",
+          "tools": [
+            "query_data"
+          ]
+        }
+      ],
+      "difficulty": "medium",
+      "source_ref": "phase-0 cv-022",
+      "id": "ff-007",
+      "slice": "multi_turn",
+      "expect": "answer",
+      "task": "只看 2022 年以后",
+      "context": {
+        "datasets": [
+          {
+            "id": "research-ds-1",
+            "metric": "gross_margin",
+            "title": "宁德时代、比亚迪 毛利率",
+            "entityNames": [
+              "宁德时代",
+              "比亚迪"
+            ],
+            "periodRange": "2020–2024",
+            "seed": {
+              "entities": [
+                "宁德时代",
+                "比亚迪"
+              ],
+              "metric": "gross_margin",
+              "start": "2020",
+              "end": "2024"
+            }
+          }
+        ],
+        "proposals": [
+          {
+            "id": "prop-1",
+            "type": "grouped_bar",
+            "title": "宁德时代、比亚迪 毛利率",
+            "datasetId": "research-ds-1"
+          }
+        ],
+        "widgets": []
+      },
+      "gold": {
+        "chain": [
+          {
+            "name": "refine_dataset",
+            "args": {
+              "operation_type": {
+                "eq": "change_period"
+              },
+              "start": {
+                "eq": "2022"
+              }
+            }
+          },
+          {
+            "name": "propose_widget"
+          }
+        ],
+        "max_decisions": 3
+      }
+    },
+    {
+      "split": "seed",
+      "toolset": "component_v1",
+      "user_script": [],
+      "constraints": [
+        {
+          "id": "no_web",
+          "type": "forbid_tool",
+          "tools": [
+            "web_search"
+          ]
+        },
+        {
+          "id": "no_steal_canvas",
+          "type": "forbid_tool",
+          "tools": [
+            "create_widget",
+            "update_widget",
+            "delete_widget",
+            "create_canvas"
+          ]
+        },
+        {
+          "id": "no_requery",
+          "type": "forbid_tool",
+          "tools": [
+            "query_data"
+          ]
+        }
+      ],
+      "difficulty": "medium",
+      "source_ref": "brief §4.3「不要这家公司」",
+      "id": "ff-008",
+      "slice": "multi_turn",
+      "expect": "answer",
+      "task": "不要泸州老窖了，只留另外两家",
+      "context": {
+        "datasets": [
+          {
+            "id": "research-ds-1",
+            "metric": "net_margin",
+            "title": "三家白酒 净利率",
+            "entityNames": [
+              "贵州茅台",
+              "五粮液",
+              "泸州老窖"
+            ],
+            "periodRange": "2021–2025",
+            "seed": {
+              "entities": [
+                "贵州茅台",
+                "五粮液",
+                "泸州老窖"
+              ],
+              "metric": "net_margin",
+              "start": "2021",
+              "end": "2025"
+            }
+          }
+        ],
+        "proposals": [
+          {
+            "id": "prop-1",
+            "type": "line",
+            "title": "三家白酒 净利率",
+            "datasetId": "research-ds-1"
+          }
+        ],
+        "widgets": []
+      },
+      "gold": {
+        "chain": [
+          {
+            "name": "refine_dataset",
+            "args": {
+              "operation_type": {
+                "eq": "remove_entities"
+              }
+            }
+          },
+          {
+            "name": "propose_widget"
+          }
+        ],
+        "max_decisions": 3
+      }
+    },
+    {
+      "split": "seed",
+      "toolset": "component_v1",
+      "user_script": [],
+      "constraints": [
+        {
+          "id": "no_web",
+          "type": "forbid_tool",
+          "tools": [
+            "web_search"
+          ]
+        },
+        {
+          "id": "no_steal_canvas",
+          "type": "forbid_tool",
+          "tools": [
+            "create_widget",
+            "update_widget",
+            "delete_widget",
+            "create_canvas"
+          ]
+        }
+      ],
+      "difficulty": "medium",
+      "source_ref": "brief Demo C（歧义简称）",
+      "id": "ff-009",
+      "slice": "ambiguity_missing",
+      "expect": "clarify",
+      "task": "看一下中芯近五年的毛利率",
+      "gold": {
+        "chain": [],
+        "max_decisions": 3
+      }
+    },
+    {
+      "split": "seed",
+      "toolset": "component_v1",
+      "user_script": [],
+      "constraints": [
+        {
+          "id": "no_web",
+          "type": "forbid_tool",
+          "tools": [
+            "web_search"
+          ]
+        },
+        {
+          "id": "no_steal_canvas",
+          "type": "forbid_tool",
+          "tools": [
+            "create_widget",
+            "update_widget",
+            "delete_widget",
+            "create_canvas"
+          ]
+        }
+      ],
+      "difficulty": "medium",
+      "source_ref": "phase-0 cv-029 / Demo C（缺数）",
+      "id": "ff-010",
+      "slice": "ambiguity_missing",
+      "expect": "answer_with_gap",
+      "task": "比较中芯国际和华虹公司 2020 到 2024 年毛利率",
+      "gold": {
+        "chain": [
+          {
+            "name": "query_data",
+            "args": {
+              "metric": {
+                "eq": "gross_margin"
+              },
+              "entities": {
+                "covers": [
+                  {
+                    "any": [
+                      "中芯国际",
+                      "688981"
+                    ]
+                  },
+                  {
+                    "any": [
+                      "华虹公司",
+                      "华虹",
+                      "688347"
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "name": "propose_widget"
+          }
+        ],
+        "max_decisions": 4
+      }
+    },
+    {
+      "split": "seed",
+      "toolset": "component_v1",
+      "user_script": [],
+      "constraints": [
+        {
+          "id": "no_web",
+          "type": "forbid_tool",
+          "tools": [
+            "web_search"
+          ]
+        },
+        {
+          "id": "no_steal_canvas",
+          "type": "forbid_tool",
+          "tools": [
+            "create_widget",
+            "update_widget",
+            "delete_widget",
+            "create_canvas"
+          ]
+        }
+      ],
+      "difficulty": "medium",
+      "source_ref": "phase-0 cv-030 / Demo C（时点）",
+      "id": "ff-011",
+      "slice": "ambiguity_missing",
+      "expect": "refuse",
+      "max_calls": 3,
+      "task": "看贵州茅台 2026 年全年营收",
+      "gold": {
+        "chain": [],
+        "max_decisions": 3
+      }
+    },
+    {
+      "split": "seed",
+      "toolset": "component_v1",
+      "user_script": [],
+      "constraints": [
+        {
+          "id": "no_web",
+          "type": "forbid_tool",
+          "tools": [
+            "web_search"
+          ]
+        },
+        {
+          "id": "no_steal_canvas",
+          "type": "forbid_tool",
+          "tools": [
+            "create_widget",
+            "update_widget",
+            "delete_widget",
+            "create_canvas"
+          ]
+        }
+      ],
+      "difficulty": "medium",
+      "source_ref": "phase-0 cv-006 / Demo C（美港股不可用）",
+      "id": "ff-012",
+      "slice": "tool_degrade",
+      "expect": "refuse",
+      "max_calls": 4,
+      "task": "比较苹果和腾讯控股 2020 到 2024 年营收",
+      "gold": {
+        "chain": [],
+        "max_decisions": 4
+      }
+    }
+  ]
+}

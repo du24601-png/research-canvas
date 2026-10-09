@@ -14,7 +14,7 @@ export async function completePlanningRound(opts) {
       tools: opts.tools,
       tool_choice: 'auto',
       temperature: 0,
-      max_tokens: 1024,
+      max_tokens: opts.maxTokens ?? 1024,
     }),
     signal: AbortSignal.timeout(opts.timeoutMs ?? 60_000),
   })
@@ -29,5 +29,6 @@ export async function completePlanningRound(opts) {
   return {
     message: { role: 'assistant', content: msg.content ?? null, tool_calls: calls.length ? calls : undefined },
     calls,
+    usage: data?.usage ?? null,
   }
 }

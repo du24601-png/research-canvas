@@ -50,7 +50,7 @@ function injectIdleUser(evalCase, state, messages, message) {
   return true
 }
 
-function applyRoundCalls(turn, evalCase, state, messages, calls) {
+function applyRoundCalls(turn, evalCase, state, messages, calls, stub = stubTool) {
   const rawCalls = Array.isArray(turn?.calls) ? turn.calls : []
   const openai = rawCalls.map((raw, i) => toOpenAiCall(raw, i))
   messages.push({
@@ -62,7 +62,7 @@ function applyRoundCalls(turn, evalCase, state, messages, calls) {
     const call = normalizeCalls([raw])[0]
     if (!call) continue
     calls.push(call)
-    const body = stubTool(call, evalCase, state)
+    const body = stub(call, evalCase, state)
     state.lastTool = call.name
     state.calledTools?.add?.(call.name)
     if (call.name === 'ask_user' && body.selected_ids?.[0] === 'confirm') {
@@ -78,14 +78,16 @@ export async function runPlanningCase(opts) {
   const state = initFixtureState(evalCase)
   const calls = []
   const maxRounds = opts.maxRounds ?? DEFAULT_MAX_ROUNDS
+  let finalText = ''
   for (let round = 0; round < maxRounds; round += 1) {
     const turn = await opts.complete({ messages, tools: opts.tools, evalCase })
     const rawCalls = Array.isArray(turn?.calls) ? turn.calls : []
     if (!rawCalls.length) {
+      finalText = String(turn?.message?.content ?? '')
       if (!injectIdleUser(evalCase, state, messages, turn?.message)) break
       continue
     }
-    applyRoundCalls(turn, evalCase, state, messages, calls)
+    applyRoundCalls(turn, evalCase, state, messages, calls, opts.stubTool)
   }
-  return { calls, messages, events: { user_confirm: state.userConfirm === true } }
+  return { calls, messages, finalText, events: { user_confirm: state.userConfirm === true } }
 }

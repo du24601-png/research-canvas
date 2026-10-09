@@ -87,3 +87,4 @@ eval/agent/component/runs/
 eval/agent/planning/runs/
 eval/agent/prompt/runs/
 eval/agent/pipeline/runs/
+eval/finframe/runs/
