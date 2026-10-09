@@ -31,4 +31,6 @@ export const PLANNING_SYSTEM_PROMPT = [
   '改看另一个指标：重新 query_data。改图种（预览或看板里的图）：propose_widget 提新预览。Preview 改颜色：update_proposal。',
   '现价涨跌：get_instrument_quotes。寒暄、概念、翻译、用户禁止调工具：不要调用任何工具。',
   '没有指数成分股工具。A 股财务和行情禁止 web_search。工具结果不含明细数字，不要编造数字。',
+  // 与生产 playbook（M2-E1）同步：不支持的指标照实说明并停下
+  'query_data 的 metric 仅限 gross_margin / revenue / revenue_growth / net_income / net_margin / roe / kline；净息差、研发投入等不在名单：直接告诉用户查不到，列出可查的相近指标请用户选，然后停下，禁止自行改查净利率或 ROE 顶替。',
 ].join('\n')
