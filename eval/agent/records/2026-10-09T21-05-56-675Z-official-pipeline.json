@@ -1,0 +1,314 @@
+{
+  "schema": "opptrix.eval.pipeline.v1",
+  "kind": "official",
+  "track": "agent",
+  "layer": "pipeline",
+  "focus": "agent_eval.three_layer",
+  "at": "2026-10-09T21:05:56.675Z",
+  "duration_ms": 342318,
+  "git": {
+    "commit": "b1125b82d14c14844e4bcde4c570d4ace0a4ce92",
+    "dirty": true
+  },
+  "llm": {
+    "model": "deepseek-flash",
+    "temperature": 0,
+    "max_tokens": 1024,
+    "tool_choice": "auto"
+  },
+  "notes": "三层全量串行；不合成加权总分；不进入 test:gate。",
+  "layers": {
+    "component": {
+      "layer": "component",
+      "kind": "official",
+      "at": "2026-10-09T21:08:19.209Z",
+      "duration_ms": 142408,
+      "dataset_id": "agent-component-tushare-v1",
+      "summary": {
+        "judged": 99,
+        "skipped": 1,
+        "passed": 93,
+        "failed": 6,
+        "pass_rate": 0.9393939393939394,
+        "failure_rate": 0.06060606060606061,
+        "effective_ratio": 0.9393939393939394,
+        "avg_decisions": 0.7272727272727273,
+        "avg_decisions_passed": 0.7096774193548387,
+        "avg_step_precision": 0.9393939393939394,
+        "constraint_hits": {
+          "must_not_call": 4
+        },
+        "by_family": {
+          "tushare_query_canvas": {
+            "judged": 32,
+            "passed": 30,
+            "failed": 2,
+            "skipped": 0
+          },
+          "tushare_query_quotes": {
+            "judged": 13,
+            "passed": 13,
+            "failed": 0,
+            "skipped": 0
+          },
+          "tushare_query_profile": {
+            "judged": 8,
+            "passed": 8,
+            "failed": 0,
+            "skipped": 0
+          },
+          "tushare_query_gate": {
+            "judged": 15,
+            "passed": 11,
+            "failed": 4,
+            "skipped": 1
+          },
+          "no_tool": {
+            "judged": 31,
+            "passed": 31,
+            "failed": 0,
+            "skipped": 0
+          }
+        }
+      },
+      "archive": "D:\\canvas agent\\eval\\agent\\records\\2026-10-09T21-08-19-209Z-official-component.json"
+    },
+    "planning": {
+      "layer": "planning",
+      "kind": "official",
+      "at": "2026-10-09T21:09:42.055Z",
+      "duration_ms": 82805,
+      "dataset_id": "agent-planning-canvas-v1",
+      "summary": {
+        "judged": 24,
+        "skipped": 0,
+        "passed": 23,
+        "failed": 1,
+        "pass_rate": 0.9583333333333334,
+        "failure_rate": 0.041666666666666664,
+        "effective_ratio": 0.9583333333333334,
+        "avg_decisions": 1.7916666666666667,
+        "avg_decisions_passed": 1.7826086956521738,
+        "avg_step_precision": 0.9166666666666666,
+        "by_family": {
+          "named_compare": {
+            "judged": 4,
+            "passed": 4,
+            "failed": 0,
+            "skipped": 0
+          },
+          "many_preview": {
+            "judged": 3,
+            "passed": 3,
+            "failed": 0,
+            "skipped": 0
+          },
+          "industry": {
+            "judged": 3,
+            "passed": 3,
+            "failed": 0,
+            "skipped": 0
+          },
+          "refine_view": {
+            "judged": 5,
+            "passed": 5,
+            "failed": 0,
+            "skipped": 0
+          },
+          "adopt_boundary": {
+            "judged": 3,
+            "passed": 3,
+            "failed": 0,
+            "skipped": 0
+          },
+          "quotes_and_stop": {
+            "judged": 6,
+            "passed": 5,
+            "failed": 1,
+            "skipped": 0
+          }
+        },
+        "constraint_hits": {
+          "no_fake_metric": 1
+        }
+      },
+      "archive": "D:\\canvas agent\\eval\\agent\\records\\2026-10-09T21-09-42-055Z-official-planning.json"
+    },
+    "prompt": {
+      "layer": "prompt",
+      "kind": "official",
+      "at": "2026-10-09T21:11:38.982Z",
+      "duration_ms": 116885,
+      "dataset_id": "agent-planning-canvas-v1",
+      "summary": {
+        "judged": 24,
+        "skipped": 0,
+        "passed": 22,
+        "failed": 2,
+        "pass_rate": 0.9166666666666666,
+        "failure_rate": 0.08333333333333333,
+        "effective_ratio": 0.9166666666666666,
+        "avg_decisions": 2,
+        "avg_decisions_passed": 1.8636363636363635,
+        "avg_step_precision": 0.8618055555555556,
+        "by_family": {
+          "named_compare": {
+            "judged": 4,
+            "passed": 4,
+            "failed": 0,
+            "skipped": 0
+          },
+          "many_preview": {
+            "judged": 3,
+            "passed": 2,
+            "failed": 1,
+            "skipped": 0
+          },
+          "industry": {
+            "judged": 3,
+            "passed": 3,
+            "failed": 0,
+            "skipped": 0
+          },
+          "refine_view": {
+            "judged": 5,
+            "passed": 5,
+            "failed": 0,
+            "skipped": 0
+          },
+          "adopt_boundary": {
+            "judged": 3,
+            "passed": 3,
+            "failed": 0,
+            "skipped": 0
+          },
+          "quotes_and_stop": {
+            "judged": 6,
+            "passed": 5,
+            "failed": 1,
+            "skipped": 0
+          }
+        },
+        "constraint_hits": {}
+      },
+      "archive": "D:\\canvas agent\\eval\\agent\\records\\2026-10-09T21-11-38-982Z-official-prompt.json"
+    }
+  },
+  "compare": {
+    "component": {
+      "hasBaseline": true,
+      "baseline_at": "2026-10-09T19:28:09.522Z",
+      "previous": {
+        "judged": 99,
+        "passed": 92,
+        "failed": 7,
+        "pass_rate": 0.9292929292929293,
+        "failure_rate": 0.0707070707070707,
+        "avg_decisions": 0.7474747474747475,
+        "avg_decisions_passed": 0.7282608695652174,
+        "avg_step_precision": 0.9292929292929293,
+        "constraint_hits": {
+          "must_not_call": 4
+        },
+        "duration_ms": 148423
+      },
+      "deltas": {
+        "pass_rate": 0.010101010101010166,
+        "failure_rate": -0.010101010101010097,
+        "avg_decisions": -0.02020202020202022,
+        "avg_decisions_passed": -0.01858345021037866,
+        "avg_step_precision": 0.010101010101010166,
+        "duration_ms": -6015
+      },
+      "newlyFailed": [],
+      "newlyPassed": [
+        {
+          "caseId": "qq-021",
+          "question": "帮我找一下寒武纪现在的价格",
+          "reasons": []
+        }
+      ]
+    },
+    "planning": {
+      "hasBaseline": true,
+      "baseline_at": "2026-10-09T20:57:26.156Z",
+      "previous": {
+        "judged": 24,
+        "passed": 21,
+        "failed": 3,
+        "pass_rate": 0.875,
+        "failure_rate": 0.125,
+        "avg_decisions": 1.8333333333333333,
+        "avg_decisions_passed": 1.6666666666666667,
+        "avg_step_precision": 0.8784722222222222,
+        "constraint_hits": {},
+        "duration_ms": 84435
+      },
+      "deltas": {
+        "pass_rate": 0.08333333333333337,
+        "failure_rate": -0.08333333333333334,
+        "avg_decisions": -0.04166666666666652,
+        "avg_decisions_passed": 0.1159420289855071,
+        "avg_step_precision": 0.03819444444444442,
+        "duration_ms": -1630
+      },
+      "newlyFailed": [],
+      "newlyPassed": [
+        {
+          "caseId": "pl-005",
+          "question": "比较茅台、五粮液、洋河、泸州老窖、山西汾酒 2020 到 2024 年营收",
+          "reasons": []
+        },
+        {
+          "caseId": "pl-007",
+          "question": "比较茅台、五粮液、洋河、泸州老窖、山西汾酒 2020 到 2024 年营收",
+          "reasons": []
+        }
+      ]
+    },
+    "prompt": {
+      "hasBaseline": true,
+      "baseline_at": "2026-10-09T20:59:30.868Z",
+      "previous": {
+        "judged": 24,
+        "passed": 22,
+        "failed": 2,
+        "pass_rate": 0.9166666666666666,
+        "failure_rate": 0.08333333333333333,
+        "avg_decisions": 2.0416666666666665,
+        "avg_decisions_passed": 2.090909090909091,
+        "avg_step_precision": 0.8027777777777779,
+        "constraint_hits": {},
+        "duration_ms": 124317
+      },
+      "deltas": {
+        "pass_rate": 0,
+        "failure_rate": 0,
+        "avg_decisions": -0.04166666666666652,
+        "avg_decisions_passed": -0.2272727272727273,
+        "avg_step_precision": 0.05902777777777768,
+        "duration_ms": -7432
+      },
+      "newlyFailed": [
+        {
+          "caseId": "pl-019",
+          "question": "五粮液现在什么价",
+          "reasons": [
+            "max_decisions 3，实际 4"
+          ]
+        }
+      ],
+      "newlyPassed": [
+        {
+          "caseId": "pl-015",
+          "question": "把预览里赛轮改成蓝色、玲珑改成橙色",
+          "reasons": []
+        }
+      ]
+    }
+  },
+  "diagnosis": [
+    "产品北星是 prompt 层（真实 system prompt）。component 是领先指标。planning 是量具健康度。",
+    "三层测的不是同一件事，禁止合成加权总分，也不进入 test:gate。"
+  ]
+}
