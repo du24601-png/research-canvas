@@ -13,6 +13,7 @@ import {
 } from '../sessionStreamRuntime'
 import { parseScheduleTurnWakeFromStep, type PendingWakeInfo } from '../turnWakeCountdown'
 import { publishResearchCanvasEvent } from '../research-canvas/researchCanvasBus'
+import { publishPlanGate } from '../plan-gate/planGateBus'
 import { applySubagentProgressToTasks, type SessionCollaborationTask } from '../sessionCollaborationTasks'
 import {
   buildChatAskNotification,
@@ -96,6 +97,9 @@ export function useStreamEventRouter(refs: ChatEngineRefs, ports: StreamEventRou
 
     if (event.type === 'research_canvas') {
       publishResearchCanvasEvent(event.event)
+    }
+    if (event.type === 'research_plan') {
+      publishPlanGate({ sessionId: targetSessionId, stepId: event.stepId, plan: event.plan, autoContinueMs: event.autoContinueMs })
     }
     if (event.type === 'tool_done') {
       const wake = parseScheduleTurnWakeFromStep(event.step)

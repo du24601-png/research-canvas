@@ -37,6 +37,7 @@ import {
 import ResearchWidgetPreviewCard from './research-canvas/ResearchWidgetPreviewCard'
 import ResearchFetchPlanCard from './research-canvas/ResearchFetchPlanCard'
 import ResearchTurnUi from '../generative-ui/ResearchTurnUi'
+import LivePlanGateCard from './plan-gate/LivePlanGateCard'
 import { fetchPlanFromToolStep } from './research-canvas/fetchPlanFromToolStep'
 import { usePinBoard } from './pin-board/PinBoardContext'
 import ChatStreamReceipt from './ChatStreamReceipt'
@@ -978,6 +979,7 @@ export default function ChatProcessTrace({
         />
       )}
 
+      {live && planFirst ? <LivePlanGateCard sessionId={sessionId ?? null} steps={steps} /> : null}
       {live && planFirst && planSteps.map(step => (
         <ResearchFetchPlanCard key={step.id} step={step} sessionId={sessionId} live isLatest={step.id === lastPlanId} />
       ))}

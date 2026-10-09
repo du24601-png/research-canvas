@@ -1,6 +1,7 @@
 import type { TokenUsage } from './chat'
 import type { ReasoningSegment } from '../chat/reasoningTimeline'
 import type { ResearchCanvasEvent } from '../chat/research-canvas/canvasController'
+import type { ResearchFetchPlan } from '@opptrix/shared/research-query-plan'
 
 export type ChatToolStepStatus = 'running' | 'done' | 'error'
 
@@ -82,6 +83,8 @@ export type ChatProgressEvent =
   | { type: 'research_canvas'; event: ResearchCanvasEvent }
   /** FinFrame M4：本轮 UI Spec，合成步骤 compose_research_ui */
   | { type: 'research_ui_spec'; step: ChatToolStep }
+  /** 取数计划确认（方案 B） */
+  | { type: 'research_plan'; stepId: string; plan: ResearchFetchPlan; autoContinueMs: number }
   | { type: 'user_prompt'; prompt: ChatUserPromptPayload }
   | { type: 'steer_applied'; message: string }
   | {

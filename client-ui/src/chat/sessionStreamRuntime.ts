@@ -175,6 +175,8 @@ export function applyChatProgressEvent(
       }
     case 'research_canvas':
       return snapshot
+    case 'research_plan':
+      return snapshot
     case 'research_ui_spec': {
       const steps = snapshot.liveTrace?.steps ?? []
       if (steps.some(step => step.id === event.step.id)) return snapshot

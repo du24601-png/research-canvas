@@ -5,7 +5,7 @@
  * 事件流：thinking → tool_start → tool_done → ... → done
  */
 
-import { parseNamespacedMcpTool, type ResearchCanvasEvent } from '@opptrix/shared'
+import { parseNamespacedMcpTool, type ResearchCanvasEvent, type ResearchFetchPlan } from '@opptrix/shared'
 import type { TokenUsage } from './llm/token-usage.js'
 import type { ReasoningSegment } from './reasoning-timeline.js'
 
@@ -241,6 +241,13 @@ export type ChatProgressEvent =
     type: 'research_ui_spec'
     step: ChatToolStep
   }
+  /** 取数计划确认（方案 B）：query_data 执行前的计划，倒计时后自动继续 */
+  | {
+    type: 'research_plan'
+    stepId: string
+    plan: ResearchFetchPlan
+    autoContinueMs: number
+  }
 
 /**
  * 聊天进度回调选项 — 配置进度推送回调和中断信号。
@@ -269,6 +276,8 @@ export interface ChatProgressOptions {
   researchCanvasSnapshot?: unknown
   /** 客户端开启对话优先 + Composer 时为 true：终答前跑一次 UI Spec 组装 */
   researchUiComposer?: boolean
+  /** 客户端开启「取数前确认」（默认关）：1–3 家的 query_data 先发计划，倒计时内可经 steer 调整 */
+  planConfirm?: boolean
 }
 
 // ── 工具中文标签映射 ──

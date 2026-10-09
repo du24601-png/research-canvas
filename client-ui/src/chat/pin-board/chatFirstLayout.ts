@@ -31,6 +31,17 @@ export function resolveUiComposer(chatFirst: boolean, storedValue: string | null
   return chatFirst && storedValue !== '0'
 }
 
+/** 取数前确认（方案 B）：默认关；localStorage `finframe.planConfirm`='1' 开启，仅对话优先布局 */
+export const PLAN_CONFIRM_STORAGE_KEY = 'finframe.planConfirm'
+
+export function isPlanConfirmEnabled(): boolean {
+  try {
+    return isChatFirstLayout() && window.localStorage.getItem(PLAN_CONFIRM_STORAGE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
 export function isUiComposerEnabled(): boolean {
   let stored: string | null = null
   try {

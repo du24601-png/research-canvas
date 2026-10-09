@@ -228,6 +228,7 @@ import type { ChatAttachmentMeta } from './media-types.js'
 import { isLibraryIngestKind, isTranscriptExtractKind } from './media-types.js'
 import { buildUserContentParts, chatMessageContentToText } from './content-parts.js'
 import { runResearchUiComposer } from './research-ui-composer-hook.js'
+import { runPlanGate } from './research-plan-gate.js'
 
 export interface SessionContextUsage {
   usedTokens: number
@@ -2356,7 +2357,9 @@ export class AgentEngine {
           const { tc, fn, args, runningStep } = prepared
           let result: unknown
           try {
-            const blocked = checkSpinGuard(sessionId, fn, args)
+            const blocked = checkSpinGuard(sessionId, fn, args) ?? await runPlanGate({
+              enabled: progress?.planConfirm === true && !unattended, tool: fn, args, stepId: runningStep.id, emit, hasSteer: () => this.steerBridge.hasPending(sessionId), signal,
+            })
             if (blocked) {
               result = blocked
             } else if (fn === 'ask_user') {
