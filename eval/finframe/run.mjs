@@ -15,19 +15,27 @@ import { publicLlmMeta } from '../agent/component/archive-record.mjs'
 import { hashEvalSources, readGitMeta } from '../agent/component/archive-meta.mjs'
 import { catalogToOpenAiTools } from '../agent/component/tools-openai.mjs'
 import { isDirectRun, MISSING_LLM_MESSAGE } from '../agent/eval-cli.mjs'
-import { FIXTURE_VERSION } from './fixture-data.mjs'
+import { FIXTURE_VERSION, fixtureMode, setFixtureMode } from './fixture-data.mjs'
 import { runFinframeCase } from './run-case.mjs'
 import { makeComposerChat } from './composer-eval.mjs'
 
 const DIR = path.dirname(fileURLToPath(import.meta.url))
 const REPO = path.resolve(DIR, '../..')
-const CASE_FILE = 'cases/seed-v1.json'
+/** EVAL_SEED=seed-v2 切换题集；默认 seed-v1（M1 起的基线） */
+const CASE_FILE = `cases/${process.env.EVAL_SEED || 'seed-v1'}.json`
 const MAX_TOKENS = 2048
 const SOURCE_FILES = [CASE_FILE, 'composer-eval.mjs', 'snapshot-data.mjs', 'fixture-data.mjs', 'fixtures.mjs', 'run-case.mjs', 'run.mjs', 'scorers/numbers-grounded.mjs', 'scorers/source-period.mjs', 'scorers/refusal.mjs']
 
 export async function loadSeedCases() {
   const pack = JSON.parse(await readFile(path.join(DIR, CASE_FILE), 'utf8'))
+  setFixtureMode(pack.fixture_mode)
   return { pack, cases: pack.cases }
+}
+
+/** 按 §4.3 切片分别计分 */
+export function tallyBySlice(results) {
+  const slices = [...new Set(results.map(r => r.slice))]
+  return Object.fromEntries(slices.map(slice => [slice, tallyScorers(results.filter(r => r.slice === slice))]))
 }
 
 export function tallyScorers(results) {
@@ -69,6 +77,7 @@ function buildSummary(results) {
     scorers: tallyScorers(results),
     all_scorers_passed: results.filter((r) => r.pass_all_scorers).length,
     composer: tallyComposer(results),
+    by_slice: tallyBySlice(results),
     usage: tallyUsage(results),
   }
 }
@@ -106,6 +115,7 @@ export async function runFinframeEval(opts = {}) {
     kind,
     dataset_id: pack.dataset_id,
     fixture_version: FIXTURE_VERSION,
+    fixture_mode: fixtureMode(),
     at,
     duration_ms: Date.now() - started,
     git: readGitMeta(REPO),

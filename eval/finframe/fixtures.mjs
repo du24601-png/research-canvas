@@ -142,11 +142,25 @@ function stubInstrument(name, args) {
 
 const INSTRUMENT_TOOLS = new Set(['search_instruments', 'get_instrument_financials', 'get_instrument_snapshot', 'get_instrument_profile', 'get_instrument_quotes'])
 
+/**
+ * 题目里声明的故障注入（seed-v2 工具错误与降级）：{ tool, calls: [1, 2] | 'all', result }
+ * calls 按该工具在本题里的第几次调用计（从 1 开始）。
+ */
+function injectedFault(call, evalCase, store) {
+  const faults = Array.isArray(evalCase?.faults) ? evalCase.faults : []
+  if (!faults.length) return null
+  store.toolCounts = store.toolCounts ?? new Map()
+  const n = (store.toolCounts.get(call.name) ?? 0) + 1
+  store.toolCounts.set(call.name, n)
+  const hit = faults.find(f => f.tool === call.name && (f.calls === 'all' || (Array.isArray(f.calls) && f.calls.includes(n))))
+  return hit ? { ...hit.result } : null
+}
+
 /** 每题一个 store：评分器在跑完后读 store.datasets */
 export function makeFinframeStub(store) {
   return (call, evalCase, state) => {
     state.datasets = store.datasets
-    return stubFinframeTool(call, evalCase, state)
+    return injectedFault(call, evalCase, store) ?? stubFinframeTool(call, evalCase, state)
   }
 }
 

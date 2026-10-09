@@ -5,6 +5,7 @@
  * O6-A 的真实冻结快照尚未生成，替换时只需换掉 metricValue()。
  */
 import { unsupportedMarketResult } from '../../packages/agent/dist/research-market-support.js'
+import { snapshotLookup } from './snapshot-data.mjs'
 
 export const FIXTURE_VERSION = 'finframe-synth-v1'
 export const FIXTURE_PROVIDER = 'eval-fixture'
@@ -21,6 +22,7 @@ const CN_ENTITIES = [
   { name: '比亚迪', ticker: '002594', aliases: ['002594'] },
   { name: '招商银行', ticker: '600036', aliases: ['招行', '600036'] },
   { name: '平安银行', ticker: '000001', aliases: ['000001'] },
+  { name: '中国平安', ticker: '601318', aliases: ['601318'] },
   { name: '海天味业', ticker: '603288', aliases: ['海天', '603288'] },
   { name: '美的集团', ticker: '000333', aliases: ['美的', '000333'] },
   { name: '格力电器', ticker: '000651', aliases: ['格力', '000651'] },
@@ -74,8 +76,23 @@ export function metricUnit(metric) {
   return RANGES[metric]?.[2] ?? ''
 }
 
+/** synthetic：全合成（seed-v1，M1 起的口径）；snapshot：快照里有的格用真实值（含真实的 null），其余仍合成（seed-v2） */
+let FIXTURE_MODE = 'synthetic'
+
+export function setFixtureMode(mode) {
+  FIXTURE_MODE = mode === 'snapshot' ? 'snapshot' : 'synthetic'
+}
+
+export function fixtureMode() {
+  return FIXTURE_MODE
+}
+
 export function metricValue(ticker, metric, year) {
   if (Number(year) > LATEST_FULL_YEAR) return null
+  if (FIXTURE_MODE === 'snapshot') {
+    const real = snapshotLookup(ticker, metric, year)
+    if (real.hit) return real.value
+  }
   if (MISSING.has(`${ticker}:${year}`)) return null
   const range = RANGES[metric]
   if (!range) return null
