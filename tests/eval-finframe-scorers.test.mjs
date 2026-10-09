@@ -16,6 +16,8 @@ test('extractClaimNumbers skips years, codes, counts, ids and list markers', () 
   assert.deepEqual(nums.map((n) => n.raw), ['12.5'])
   assert.deepEqual(extractClaimNumbers('截至 2026/9/14，2026 年 9 月尚未披露，2025-12-31 年报').map((n) => n.raw), [])
   assert.deepEqual(extractClaimNumbers('2021-2025 年，2024 年 37.5%，2023年 12 月 8%').map((n) => n.raw), ['37.5', '8'])
+  // M2：解释口径、覆盖度计数、月份区间、英文计数不算数值断言；真实断言照样抓
+  assert.deepEqual(extractClaimNumbers('股东每投入 100 元；完整（10/10）；2027 年 3–4 月披露；(5 years × 2 companies)；约 30%').map((n) => n.raw), ['30'])
 })
 
 test('numbers_grounded accepts dataset values at written precision, rejects others', () => {

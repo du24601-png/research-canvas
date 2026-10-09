@@ -5,7 +5,7 @@
  * 模型自己算的差值、均值也判无据：原则 1 要求数字由代码给出。
  */
 const NUM_RE = /-?\d+(?:,\d{3})*(?:\.\d+)?/g
-const COUNT_SUFFIX = /^\s*(?:家|个|只|年|项|步|张|期|条|种|次|位|季|月|日|号|大|类|组|列|行)/
+const COUNT_SUFFIX = /^\s*(?:家|个|只|年|项|步|张|期|条|种|次|位|季|月|日|号|大|类|组|列|行|years?|compan)/
 const ORDINAL_PREFIX = /(?:第|近|前|后|最近|每|Top|TOP|top|T\+?)\s*$/
 
 function stripNonClaims(text) {
@@ -13,7 +13,10 @@ function stripNonClaims(text) {
     .replace(/research-ds-[\w-]+|prop-[\w-]+|w-[\w-]+/g, ' ')
     .replace(/(?:19|20)\d{2}\s*[/.-]\s*\d{1,2}(?!\d)(?:\s*[/.-]\s*\d{1,2}(?!\d))?/g, ' ')
     .replace(/(?:19|20)\d{2}\s*年\s*\d{1,2}\s*月(?:\s*\d{1,2}\s*日)?/g, ' ')
+    .replace(/\d{1,2}\s*[–~-]\s*\d{1,2}\s*月/g, ' ')
     .replace(/\d{1,2}\s*月(?:\s*\d{1,2}\s*日)?/g, ' ')
+    // 覆盖度计数（如 10/10、9/10）来自工具结果的 coverage 字段，不是数值断言
+    .replace(/\d+\s*\/\s*\d+/g, ' ')
     .replace(/[A-Za-z_]+\d+[\w-]*/g, ' ')
     .replace(/^\s*(?:\d+[.)、]|[-*]\s)/gm, ' ')
 }
@@ -30,11 +33,13 @@ export function extractClaimNumbers(text) {
     const n = Number(raw)
     if (!Number.isFinite(n)) continue
     const before = src.slice(Math.max(0, m.index - 4), m.index)
-    const after = src.slice(m.index + m[0].length, m.index + m[0].length + 3)
+    const after = src.slice(m.index + m[0].length, m.index + m[0].length + 8)
     if (isYear(Math.abs(n), raw)) continue
     if (/^\d{5,6}$/.test(raw)) continue
     if (COUNT_SUFFIX.test(after) && !raw.includes('.')) continue
     if (ORDINAL_PREFIX.test(before)) continue
+    // 「每 100 元」「每投入 100 元」这类解释口径的单位量
+    if (/每[^\d，。；]{0,4}$/.test(src.slice(Math.max(0, m.index - 6), m.index))) continue
     if (/[QH]$/i.test(before.trim())) continue
     out.push({ raw: m[0], value: n })
   }

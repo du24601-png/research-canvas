@@ -15,6 +15,8 @@ const GATE = [
   'tests/research-ui-spec.test.mjs',
   'tests/research-ui-composer.test.mjs',
   'tests/research-plan-gate.test.mjs',
+  'tests/research-trend-labels.test.mjs',
+  'tests/research-market-support.test.mjs',
   'tests/mcp-tool-route-accuracy.test.mjs',
   'tests/session-artifacts-opt-in.test.mjs',
   'tests/session-tools-freeze.test.mjs',
