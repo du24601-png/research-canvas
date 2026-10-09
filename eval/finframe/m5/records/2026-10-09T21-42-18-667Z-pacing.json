@@ -1,0 +1,1145 @@
+{
+  "schema": "finframe.m5.pacing.v1",
+  "at": "2026-10-09T21:42:18.667Z",
+  "git": {
+    "commit": "7c7e760412c1720e64431a0ece77a7690e6ac196",
+    "dirty": true
+  },
+  "api": "http://127.0.0.1:8711/api",
+  "reps": 2,
+  "conditions": {
+    "C1": {
+      "label": "旧双栏画布（开关关）",
+      "body": {
+        "canvas_edit": true
+      }
+    },
+    "C2": {
+      "label": "对话优先 + 固定预览卡（Composer 关）",
+      "body": {}
+    },
+    "C3": {
+      "label": "对话优先 + 活报告（Composer 开）",
+      "body": {
+        "ui_composer": true
+      }
+    }
+  },
+  "runs": [
+    {
+      "condition": "C1",
+      "demo": "A",
+      "rep": 1,
+      "sessionId": "e233793e-e37c-4beb-8902-7308244328f1",
+      "actions": 4,
+      "turns": [
+        {
+          "text": "对比贵州茅台和五粮液最近五个已披露完整财年的净利率与 ROE。",
+          "t": {
+            "firstFeedback": 12970,
+            "lastPreview": 12970,
+            "spec": null,
+            "done": 14845
+          },
+          "reply": "两张预览已放在对话里，分别是 2021–2025 五个完整财年的净利率与净资产收益率，两家公司各年的年报数据都已披露齐全，没有缺数。\n\n从走势看两家的方向不太一样：净利率上，茅台和五粮液都是逐年走低的形态，茅台的高点出现在 2022 年、低点在 2025 年，五粮液的高点在 2023 年、低点同样在 2025 年；而净资产收益率上，茅台这五年整体是往上走的（低点 2021 年、高点 2024 年），五粮液则相反，从 2021 年的高点一路下行到 2025 年的低点。也就是说，两家利润率都在收窄，但茅台靠资产效率把 ROE 撑住了，五粮液的 ROE 则跟着利润率一起回落。\n\n需要的话可以改成每年并排柱看逐年的差距，或者把年份窗口挪到更早的几年做延长对照。",
+          "spec": null,
+          "steps": [
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_00_wKijcFbdGcJ6igEebxeh5543\",\n  \"type\": \"line_chart\",\n  \"title\": \"已确认的2家净利率走势（2021–2025）\",\n  \"datasetId\": \"research-ds-ebfac405-2f79-484b-9970-e4eb196489d7\",\n  \"suggestedTitle\": \"已确认的2家净利率走势（2021–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_01_JicIPuFEuxf955DcCEiX7484\",\n  \"type\": \"line_chart\",\n  \"title\": \"已确认的2家净资产收益率走势（2021–2025）\",\n  \"datasetId\": \"research-ds-92d0928e-b039-428c-8339-560648d82c88\",\n  \"suggestedTitle\": \"已确认的2家净资产收益率走势（2021–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            }
+          ],
+          "datasets": 2
+        }
+      ]
+    },
+    {
+      "condition": "C2",
+      "demo": "A",
+      "rep": 1,
+      "sessionId": "86fcdbb8-81ce-4dd5-892a-088a20898250",
+      "actions": 4,
+      "turns": [
+        {
+          "text": "对比贵州茅台和五粮液最近五个已披露完整财年的净利率与 ROE。",
+          "t": {
+            "firstFeedback": 8756,
+            "lastPreview": 8756,
+            "spec": null,
+            "done": 10737
+          },
+          "reply": "两张图已出：净利率（2021–2025 年报口径）两家都在走低，茅台高点在 2022 年、五粮液高点在 2023 年，低点都落在 2025 年，两条线整体呈同向下行。\n\nROE 的分化更明显：茅台是上升趋势，高点出现在 2024 年、低点在 2021 年；五粮液则一路下行，高点 2021 年、低点 2025 年——近五年两者在这条指标上的方向正好相反。\n\n需要的话可以改成并排柱看逐年差距，或者把其中一年单独拉出来比高低。",
+          "spec": null,
+          "steps": [
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_00_QNyN3HqPwk0Wrf7eK5A99404\",\n  \"type\": \"line_chart\",\n  \"title\": \"已确认的2家净利率走势（2021–2025）\",\n  \"datasetId\": \"research-ds-969ef053-2646-40f2-bc33-2d05a4bc0c69\",\n  \"suggestedTitle\": \"已确认的2家净利率走势（2021–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_01_TNNX9rKz0jPTvXdy7Kbd8947\",\n  \"type\": \"line_chart\",\n  \"title\": \"已确认的2家净资产收益率走势（2021–2025）\",\n  \"datasetId\": \"research-ds-218f801d-8165-4bb9-acbb-5240fe2e9149\",\n  \"suggestedTitle\": \"已确认的2家净资产收益率走势（2021–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            }
+          ],
+          "datasets": 2
+        }
+      ]
+    },
+    {
+      "condition": "C3",
+      "demo": "A",
+      "rep": 1,
+      "sessionId": "a5900445-e19d-438b-97b9-0a17542f3867",
+      "actions": 3,
+      "turns": [
+        {
+          "text": "对比贵州茅台和五粮液最近五个已披露完整财年的净利率与 ROE。",
+          "t": {
+            "firstFeedback": 8222,
+            "lastPreview": 8222,
+            "spec": 12832,
+            "done": 12832
+          },
+          "reply": "两张预览已按年报口径拉好（2021–2025 五个完整财年，两家各年数据齐全）：\n\n- **净利率**：两家都呈下行方向；茅台的高点落在 2022 年、五粮液落在 2023 年，两家低点都在 2025 年。\n- **ROE**：走势分化——茅台整体上行、高点在 2024 年（低点在 2021 年）；五粮液则一路下行，高点在 2021 年、低点在 2025 年。\n\n合起来看：茅台是「利润率缓降、但股东回报仍在抬升」的组合，五粮液是盈利效率和回报率同步走弱，两者的差距在这五年里是拉开的。想换个看法的话，可以让我改成逐年并排柱、只取 2024–2025 两年，或者把图钉到右侧看板。",
+          "spec": {
+            "version": 1,
+            "blocks": [
+              {
+                "component": "ComparisonView",
+                "datasetIds": [
+                  "research-ds-e1b130b3-5d45-4fa6-8af5-9fcc2a0f42d6",
+                  "research-ds-ee77cecd-ca1b-4b84-bae0-fd56d58477f3"
+                ],
+                "title": "净利率与净资产收益率对比",
+                "actions": [
+                  "pin",
+                  "open_sources",
+                  "adjust"
+                ]
+              },
+              {
+                "component": "EvidencePanel",
+                "datasetIds": [
+                  "research-ds-e1b130b3-5d45-4fa6-8af5-9fcc2a0f42d6",
+                  "research-ds-ee77cecd-ca1b-4b84-bae0-fd56d58477f3"
+                ]
+              }
+            ]
+          },
+          "steps": [
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_00_XJq77mSxGW62C9YO5ARf1658\",\n  \"type\": \"line_chart\",\n  \"title\": \"已确认的2家净利率走势（2021–2025）\",\n  \"datasetId\": \"research-ds-e1b130b3-5d45-4fa6-8af5-9fcc2a0f42d6\",\n  \"suggestedTitle\": \"已确认的2家净利率走势（2021–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_01_Y5Ep8vpgPQY5OrDh09fj3066\",\n  \"type\": \"line_chart\",\n  \"title\": \"已确认的2家净资产收益率走势（2021–2025）\",\n  \"datasetId\": \"research-ds-ee77cecd-ca1b-4b84-bae0-fd56d58477f3\",\n  \"suggestedTitle\": \"已确认的2家净资产收益率走势（2021–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            },
+            {
+              "tool": "compose_research_ui",
+              "status": "done"
+            }
+          ],
+          "datasets": 2
+        }
+      ]
+    },
+    {
+      "condition": "C1",
+      "demo": "B",
+      "rep": 1,
+      "sessionId": "8e900abf-2331-46cd-8585-2e862aa41ac4",
+      "actions": 5,
+      "turns": [
+        {
+          "text": "对比贵州茅台和五粮液最近五个已披露完整财年的净利率与 ROE。",
+          "t": {
+            "firstFeedback": 7941,
+            "lastPreview": 7941,
+            "spec": null,
+            "done": 9995
+          },
+          "reply": "两张对照图已经放到对话里供你预览：一张是两家 2021–2025 年年报口径的净利率走势，一张是同期 ROE 走势。\n\n图里能看出两家的分化：净利率都是逐年走弱的方向，茅台在 2022 年相对最高、2025 年落到区间低点，五粮液高点在 2023 年；ROE 则一升一降——茅台从 2021 年的区间低位往上走、2024 年到高点，五粮液反向从 2021 年高点一路回落。两家都是 2025 年年报数据齐全，五个财年无缺口。\n\n数字只在图里，鼠标悬停可看逐年读数。想改成年报和季报混看、只保留某几年，或者把其中一张钉到右侧画布，跟我说一声就行。",
+          "spec": null,
+          "steps": [
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_00_SoHfxo8imA3cmbct8o3K7596\",\n  \"type\": \"line_chart\",\n  \"title\": \"已确认的2家净利率走势（2021–2025）\",\n  \"datasetId\": \"research-ds-e431f066-ca21-48f2-8cd7-7833b414fa05\",\n  \"suggestedTitle\": \"已确认的2家净利率走势（2021–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_01_dik8jmq6yKWcUCdd3u865154\",\n  \"type\": \"line_chart\",\n  \"title\": \"已确认的2家净资产收益率走势（2021–2025）\",\n  \"datasetId\": \"research-ds-65de9778-e1ed-4dc5-ba22-c9285387868d\",\n  \"suggestedTitle\": \"已确认的2家净资产收益率走势（2021–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            }
+          ],
+          "datasets": 2
+        },
+        {
+          "text": "只看近三年，为什么其中一家的净利率变化比另一家更明显？",
+          "t": {
+            "firstFeedback": 20990,
+            "lastPreview": 20990,
+            "spec": null,
+            "done": 23327
+          },
+          "reply": "三年净利率对照图已经放到对话里了（2023–2025 年报口径，两家数据齐全无缺口）。\n\n具体谁更陡、差多少，看图最准——我这边只拿到方向，看不到逐格数值，所以不替你下结论。至于「为什么」，通常这类差异出在三处：一是产品结构，高端酒与系列酒/中低价产品的占比不同，摊薄净利率的力度就不一样；二是费用投放，渠道促销、补贴和销售费用率的变化会直接吃掉净利率；三是税金及附加与出厂价、渠道价差的关系。这属于推断，要落到哪一家、哪一项，得把两家的毛利率和费用率拉出来逐年对照才能定。\n\n要的话我把这两家同期的毛利率、销售费用率也拉进来，就能判断净利率变动是结构、价格还是费用在起作用。",
+          "spec": null,
+          "steps": [
+            {
+              "tool": "refine_dataset",
+              "status": "error"
+            },
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_00_aLRZMQEVofrL2JLbrZij3172\",\n  \"type\": \"line_chart\",\n  \"title\": \"已确认的2家净利率走势（2023–2025）\",\n  \"datasetId\": \"research-ds-b32da22f-3b5d-46a1-b7d1-de79c48395d4\",\n  \"suggestedTitle\": \"已确认的2家净利率走势（2023–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            }
+          ],
+          "datasets": 1
+        }
+      ]
+    },
+    {
+      "condition": "C2",
+      "demo": "B",
+      "rep": 1,
+      "sessionId": "2797ee33-8cf4-4d99-8e3e-faee57c8772b",
+      "actions": 5,
+      "turns": [
+        {
+          "text": "对比贵州茅台和五粮液最近五个已披露完整财年的净利率与 ROE。",
+          "t": {
+            "firstFeedback": 10180,
+            "lastPreview": 10180,
+            "spec": null,
+            "done": 12712
+          },
+          "reply": "两张预览已经放在对话里：一张看净利率，一张看 ROE，口径都是 2021–2025 年年报，两家公司五年数据都齐。\n\n方向上有意思的分歧：净利率两家都是往下走的，且都落在 2025 年这个最低点（茅台的高点在 2022 年，五粮液在 2023 年）；ROE 则分道扬镳——茅台整体是往上抬的，高点在 2024 年、低点在 2021 年，五粮液却是逐年下移，高点在 2021 年、低点在 2025 年。同为白酒龙头，ROE 的走势差异不止来自盈利能力，也受分红比例、净资产积累速度影响，所以净利率同向下滑时 ROE 才走出了两种形态。\n\n要不要把两张图并排看，或者换成每年并排的分组柱、再补上营收和净利润的增长情况？",
+          "spec": null,
+          "steps": [
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_00_S5BKhUrZga25CM3a4YNG2200\",\n  \"type\": \"line_chart\",\n  \"title\": \"已确认的2家净利率走势（2021–2025）\",\n  \"datasetId\": \"research-ds-8998dc74-490b-4318-ac70-170a0c8d4f7d\",\n  \"suggestedTitle\": \"已确认的2家净利率走势（2021–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_01_c5acEvJRxeIMXKx47iNd4004\",\n  \"type\": \"line_chart\",\n  \"title\": \"已确认的2家净资产收益率走势（2021–2025）\",\n  \"datasetId\": \"research-ds-6d69e45f-9527-4259-8d20-4f3276cdde35\",\n  \"suggestedTitle\": \"已确认的2家净资产收益率走势（2021–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            }
+          ],
+          "datasets": 2
+        },
+        {
+          "text": "只看近三年，为什么其中一家的净利率变化比另一家更明显？",
+          "t": {
+            "firstFeedback": 15671,
+            "lastPreview": 15671,
+            "spec": null,
+            "done": 19062
+          },
+          "reply": "预览已更新为 2023–2025 的三期净利率走势（年报口径，两家三年数据都齐）。\n\n从走势方向看，两家是一致的——都以 2023 年为区间高点、2025 年为低点，差别在斜率的陡缓；但净利率本身是\"结果指标\"，看不出成因，所以我没法直接给出谁为什么跌得更多。\n\n要回答\"为什么\"，需要把链条拆开：毛利端（产品结构变化、成本）和费用端（销售/管理费用投放节奏），再叠加税率与少数股东损益的影响——这些都不在这张图里。要不要我把两家的毛利率和营收增速调出来做对照，看是收入结构先动了，还是费用投放先加重了？",
+          "spec": null,
+          "steps": [
+            {
+              "tool": "refine_dataset",
+              "status": "error"
+            },
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_00_dHQTl3JbjuMnu359aBtj1744\",\n  \"type\": \"line_chart\",\n  \"title\": \"已确认的2家净利率走势（2023–2025）\",\n  \"datasetId\": \"research-ds-92b98189-d790-44c8-96ef-f458e1618807\",\n  \"suggestedTitle\": \"已确认的2家净利率走势（2023–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            }
+          ],
+          "datasets": 1
+        }
+      ]
+    },
+    {
+      "condition": "C3",
+      "demo": "B",
+      "rep": 1,
+      "sessionId": "58d00a79-c8c3-4adf-ac7b-0303abb28778",
+      "actions": 4,
+      "turns": [
+        {
+          "text": "对比贵州茅台和五粮液最近五个已披露完整财年的净利率与 ROE。",
+          "t": {
+            "firstFeedback": 8818,
+            "lastPreview": 8818,
+            "spec": 13571,
+            "done": 13571
+          },
+          "reply": "两张预览已出：净利率和净资产收益率各一张，横轴是 2021–2025 五个完整财年，两家数据都齐（年报口径），可以直接对照看。\n\n方向上，两家的净利率这五年都往下走；ROE 则分化——茅台整体是抬升的，五粮液一路回落。也就是说，同一个行业里，盈利能力的走向并不同步。\n\n想改的话可以：把某一家的线隐藏只留一条、换成并排柱看逐年差距，或者加第三家同业进来对比。把预览「钉住」就能放进右侧看板。",
+          "spec": {
+            "version": 1,
+            "blocks": [
+              {
+                "component": "ComparisonView",
+                "datasetIds": [
+                  "research-ds-92e702e3-9092-4d5f-a3d3-cc88f134c552",
+                  "research-ds-3a18e7c1-3219-4e10-9218-e22163e93738"
+                ],
+                "title": "两家白酒龙头盈利指标对比",
+                "actions": [
+                  "pin",
+                  "open_sources",
+                  "adjust"
+                ]
+              },
+              {
+                "component": "EvidencePanel",
+                "datasetIds": [
+                  "research-ds-92e702e3-9092-4d5f-a3d3-cc88f134c552",
+                  "research-ds-3a18e7c1-3219-4e10-9218-e22163e93738"
+                ]
+              }
+            ]
+          },
+          "steps": [
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_00_OQc5bw5RmA8L0mKLzT9r4461\",\n  \"type\": \"line_chart\",\n  \"title\": \"已确认的2家净利率走势（2021–2025）\",\n  \"datasetId\": \"research-ds-92e702e3-9092-4d5f-a3d3-cc88f134c552\",\n  \"suggestedTitle\": \"已确认的2家净利率走势（2021–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_01_YAFva5OccqI1r3YA9xYf8440\",\n  \"type\": \"line_chart\",\n  \"title\": \"已确认的2家净资产收益率走势（2021–2025）\",\n  \"datasetId\": \"research-ds-3a18e7c1-3219-4e10-9218-e22163e93738\",\n  \"suggestedTitle\": \"已确认的2家净资产收益率走势（2021–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            },
+            {
+              "tool": "compose_research_ui",
+              "status": "done"
+            }
+          ],
+          "datasets": 2
+        },
+        {
+          "text": "只看近三年，为什么其中一家的净利率变化比另一家更明显？",
+          "t": {
+            "firstFeedback": 18125,
+            "lastPreview": 18125,
+            "spec": 24791,
+            "done": 24791
+          },
+          "reply": "两张图都换成近三年（2023–2025，年报口径，截至 2026 年 10 月 10 日两家数据都齐）了：净利率这张能直接比坡度，谁的线更陡一眼可见——我这边拿到的只是走势方向，具体差多少以图为准。\n\n真正的线索在第二张：这三年两家的**毛利率是反向走的**——茅台逐年走低，五粮液逐年走高。所以净利率的下行不可能同源：跟着毛利率一起走低的那家，压力在产品结构、成本或价格这一层；毛利率反而走高的那家，净利率回落更可能来自毛利以下的环节（销售费用投放、管理费用、税费等）。后半句是推断，不是已证实结论。\n\n要坐实的话，下一步看期间费用率或税率对比——如果费用率没明显异常，那就得考虑非经常性损益的扰动。要我拉一张费用率对比，或者把年份放宽回五年吗？",
+          "spec": {
+            "version": 1,
+            "blocks": [
+              {
+                "component": "ComparisonView",
+                "datasetIds": [
+                  "research-ds-638b992f-561a-4b97-9ee7-6a755daed486",
+                  "research-ds-68cc7795-6451-47de-8058-bdef9abdd9f7"
+                ],
+                "title": "净利率与毛利率并排对比",
+                "actions": [
+                  "pin",
+                  "open_sources",
+                  "adjust"
+                ]
+              },
+              {
+                "component": "TrendView",
+                "datasetId": "research-ds-638b992f-561a-4b97-9ee7-6a755daed486",
+                "title": "净利率逐年走势",
+                "actions": [
+                  "highlight_largest_change",
+                  "pin",
+                  "open_sources",
+                  "rerun"
+                ]
+              },
+              {
+                "component": "EvidencePanel",
+                "datasetIds": [
+                  "research-ds-638b992f-561a-4b97-9ee7-6a755daed486",
+                  "research-ds-68cc7795-6451-47de-8058-bdef9abdd9f7"
+                ]
+              }
+            ]
+          },
+          "steps": [
+            {
+              "tool": "refine_dataset",
+              "status": "error"
+            },
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_00_1FX0gqwnYXcly38p89lk0972\",\n  \"type\": \"line_chart\",\n  \"title\": \"已确认的2家净利率走势（2023–2025）\",\n  \"datasetId\": \"research-ds-638b992f-561a-4b97-9ee7-6a755daed486\",\n  \"suggestedTitle\": \"已确认的2家净利率走势（2023–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_01_QMvwYs2sOPmIvN4Da7GT9013\",\n  \"type\": \"line_chart\",\n  \"title\": \"已确认的2家毛利率走势（2023–2025）\",\n  \"datasetId\": \"research-ds-68cc7795-6451-47de-8058-bdef9abdd9f7\",\n  \"suggestedTitle\": \"已确认的2家毛利率走势（2023–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            },
+            {
+              "tool": "compose_research_ui",
+              "status": "done"
+            }
+          ],
+          "datasets": 2
+        }
+      ]
+    },
+    {
+      "condition": "C1",
+      "demo": "C",
+      "rep": 1,
+      "sessionId": "d198b854-cf33-4b95-8e52-eee5dd071437",
+      "actions": 2,
+      "turns": [
+        {
+          "text": "看一下平安近五年的 ROE",
+          "t": {
+            "firstFeedback": 3516,
+            "lastPreview": 3516,
+            "spec": null,
+            "done": 4842
+          },
+          "reply": "中国平安近五年 ROE 的走势图已经生成在预览里（2021–2025 年报口径），数据五个年份都齐。\n\n从数据形状看是**波动**型走势——高点出现在 2025 年，低点在 2023 年，整体不是单调下行或上行，说明中间有起伏。\n\n口径提醒：这里是按年报的净资产收益率，保险公司的 ROE 受投资端收益和准备金计提影响较大，单看这条线还不足以判断盈利质量。想看更细可以：换成按季度的 ROE，或者拉上中国人寿、中国太保做横向对照。",
+          "spec": null,
+          "steps": [
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_00_QlKQAGEH3Nc87Rz1lFnC8577\",\n  \"type\": \"line_chart\",\n  \"title\": \"中国平安净资产收益率走势（2021–2025）\",\n  \"datasetId\": \"research-ds-95aaad45-d4c5-42a3-864c-c3eed526e14b\",\n  \"suggestedTitle\": \"中国平安净资产收益率走势（2021–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            }
+          ],
+          "datasets": 1
+        }
+      ]
+    },
+    {
+      "condition": "C2",
+      "demo": "C",
+      "rep": 1,
+      "sessionId": "5a50db4f-fb3e-4fcd-9f2b-66c477626bab",
+      "actions": 2,
+      "turns": [
+        {
+          "text": "看一下平安近五年的 ROE",
+          "t": {
+            "firstFeedback": 11964,
+            "lastPreview": 11964,
+            "spec": null,
+            "done": 14124
+          },
+          "reply": "已按「平安」取到中国平安（601318）的 ROE，图在右侧对话预览里。\n\n- 口径：2021–2025 五个年度，五个年份数据都齐，画的是年报净资产收益率走势。\n- 图里能看到的形态：五年间整体是波动的，区间内高点出现在 2025 年、低点在 2023 年（具体数值见图）。\n- 需要说明：如果你说的「平安」其实是平安银行（银行口径的 ROE 含义与保险不同），告诉我一声我换过来重画；也可以顺手把两家放一起对照，或只截取其中两三年看变化。",
+          "spec": null,
+          "steps": [
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_00_8hKzVkqXxuMNiQcyy8RT8485\",\n  \"type\": \"line_chart\",\n  \"title\": \"中国平安净资产收益率走势（2021–2025）\",\n  \"datasetId\": \"research-ds-1054ee37-e527-4d52-afb4-65a68a33eb06\",\n  \"suggestedTitle\": \"中国平安净资产收益率走势（2021–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            }
+          ],
+          "datasets": 1
+        }
+      ]
+    },
+    {
+      "condition": "C3",
+      "demo": "C",
+      "rep": 1,
+      "sessionId": "2e61cbd2-c0f2-4bcd-b82a-f3953f791921",
+      "actions": 2,
+      "turns": [
+        {
+          "text": "看一下平安近五年的 ROE",
+          "t": {
+            "firstFeedback": 5239,
+            "lastPreview": 5239,
+            "spec": 8056,
+            "done": 8056
+          },
+          "reply": "上图是中国平安（601318）2021–2025 年年报口径的净资产收益率走势。整体看是一条波动型曲线，五年里最高点出现在 2025 年、最低点在 2023 年，中间经历了一段回落再修复的过程。\n\n口径说明：数据按年报口径逐年拉齐，五年均已有值、无缺口。若你指的是平安银行（000001），我可以直接换成它再出一张；也可以把同业一起加进来横向对照，或把区间改为只看最近三年。",
+          "spec": {
+            "version": 1,
+            "blocks": [
+              {
+                "component": "TrendView",
+                "datasetId": "research-ds-362495ce-4214-41ed-8405-752872f9bf64",
+                "title": "平安近五年净资产收益率走势",
+                "actions": [
+                  "pin",
+                  "open_sources",
+                  "adjust"
+                ]
+              },
+              {
+                "component": "EvidencePanel",
+                "datasetIds": [
+                  "research-ds-362495ce-4214-41ed-8405-752872f9bf64"
+                ]
+              }
+            ]
+          },
+          "steps": [
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_00_McXFwfMzQcWIERZ1Py6I0519\",\n  \"type\": \"line_chart\",\n  \"title\": \"中国平安净资产收益率走势（2021–2025）\",\n  \"datasetId\": \"research-ds-362495ce-4214-41ed-8405-752872f9bf64\",\n  \"suggestedTitle\": \"中国平安净资产收益率走势（2021–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            },
+            {
+              "tool": "compose_research_ui",
+              "status": "done"
+            }
+          ],
+          "datasets": 1
+        }
+      ]
+    },
+    {
+      "condition": "C1",
+      "demo": "A",
+      "rep": 2,
+      "sessionId": "534033bf-f9e1-4be3-bd36-d690b2fae118",
+      "actions": 4,
+      "turns": [
+        {
+          "text": "对比贵州茅台和五粮液最近五个已披露完整财年的净利率与 ROE。",
+          "t": {
+            "firstFeedback": 7529,
+            "lastPreview": 7529,
+            "spec": null,
+            "done": 9960
+          },
+          "reply": "两张预览已放在对话里：上面是净利率、下面是净资产收益率，均为 2021–2025 五个完整财年（年报口径），两家公司五年的数字都已披露齐全。\n\n净利率这张：两家的走势方向一致向下，各自的最高点分别在区间前段，最低点都落在 2025 年。ROE 这张则出现分化——茅台整体呈上升方向、2021 年是区间低点，五粮液相反，一路向下、2025 年为最低。\n\n需要的话可以换成按年并排的分组柱、或只看 2025 单年的横向对比；想改颜色/图例也可以直接说。",
+          "spec": null,
+          "steps": [
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_00_TIQHhdS3VHhy8xdTezy82129\",\n  \"type\": \"line_chart\",\n  \"title\": \"已确认的2家净利率走势（2021–2025）\",\n  \"datasetId\": \"research-ds-4fc42eb4-d073-40b9-ac35-33dfe5dc60b8\",\n  \"suggestedTitle\": \"已确认的2家净利率走势（2021–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_01_R8yfxUlb4IzUGQIWHmQP4687\",\n  \"type\": \"line_chart\",\n  \"title\": \"已确认的2家净资产收益率走势（2021–2025）\",\n  \"datasetId\": \"research-ds-dcf04395-8e97-4a34-b291-53132db8ba96\",\n  \"suggestedTitle\": \"已确认的2家净资产收益率走势（2021–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            }
+          ],
+          "datasets": 2
+        }
+      ]
+    },
+    {
+      "condition": "C2",
+      "demo": "A",
+      "rep": 2,
+      "sessionId": "01318b99-bc97-422e-83ac-d3dfe8631a94",
+      "actions": 4,
+      "turns": [
+        {
+          "text": "对比贵州茅台和五粮液最近五个已披露完整财年的净利率与 ROE。",
+          "t": {
+            "firstFeedback": 9043,
+            "lastPreview": 9043,
+            "spec": null,
+            "done": 11064
+          },
+          "reply": "两张图放在右侧预览里了：净利率一张、ROE 一张，都是 2021–2025 年报口径，两个指标各有 10 个数据点、完整覆盖。\n\n从趋势看，两家的净利率都是往下走的方向，茅台的高点在 2022 年、五粮液在 2023 年，两家的低点都落在 2025 年。ROE 则出现分化：茅台整体是向上方向，高点在 2024 年、低点在 2021 年；五粮液是向下方向，高点在 2021 年、低点落到 2025 年——净利润率同步走弱、但股东回报走势不同，值得对着图看两家的差异。\n\n需要的话可以换个图种（比如每年并排看），或把年份收窄到最近三年；想留在看板上点预览上的「钉住」即可。",
+          "spec": null,
+          "steps": [
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_00_c9O0k7jLtRX8Fy6RfWM06890\",\n  \"type\": \"line_chart\",\n  \"title\": \"已确认的2家净利率走势（2021–2025）\",\n  \"datasetId\": \"research-ds-1392e1d4-086f-42d2-b4d3-c10ccd83570e\",\n  \"suggestedTitle\": \"已确认的2家净利率走势（2021–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_01_QQSelBC0jyyaVqZttrGs0618\",\n  \"type\": \"line_chart\",\n  \"title\": \"已确认的2家净资产收益率走势（2021–2025）\",\n  \"datasetId\": \"research-ds-0ab2b4f0-2ea3-4c64-9042-08241f60fff8\",\n  \"suggestedTitle\": \"已确认的2家净资产收益率走势（2021–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            }
+          ],
+          "datasets": 2
+        }
+      ]
+    },
+    {
+      "condition": "C3",
+      "demo": "A",
+      "rep": 2,
+      "sessionId": "13b89bb8-8990-4916-93b4-cb2a8da1dc03",
+      "actions": 3,
+      "turns": [
+        {
+          "text": "对比贵州茅台和五粮液最近五个已披露完整财年的净利率与 ROE。",
+          "t": {
+            "firstFeedback": 7820,
+            "lastPreview": 7820,
+            "spec": 11928,
+            "done": 11928
+          },
+          "reply": "两张预览已按你的要求出好：净利率和净资产收益率各一张，都是 2021–2025 五个完整年度的年报口径，两家公司数据齐全。\n\n从走势看，净利率端两家同向走弱——茅台高点在 2022 年、低点在 2025 年，五粮液高点在 2023 年、低点在 2025 年；ROE 端两家分化，茅台整体上行、高点在 2024 年，五粮液则从 2021 年一路回落到 2025 年。这说明五粮液是「盈利效率与回报率同步下行」，而茅台是利润率有回落、但股东回报仍在高位。\n\n想进一步看的话，可以换成分组柱让两家逐年并排、或用排名图只比 2025 年这一期；确认满意的图点预览上的「钉住」即可加入右侧画布。",
+          "spec": {
+            "version": 1,
+            "blocks": [
+              {
+                "component": "ComparisonView",
+                "datasetIds": [
+                  "research-ds-f527fe84-52f8-4f62-8d17-09ad144a1eac",
+                  "research-ds-b9ec2ede-35f3-4982-aad7-dc255ce8e579"
+                ],
+                "title": "两家酒企盈利能力对比",
+                "actions": [
+                  "pin",
+                  "open_sources",
+                  "adjust"
+                ]
+              },
+              {
+                "component": "TrendView",
+                "datasetId": "research-ds-f527fe84-52f8-4f62-8d17-09ad144a1eac",
+                "title": "净利率逐年走势",
+                "actions": [
+                  "pin",
+                  "open_sources",
+                  "highlight_largest_change"
+                ]
+              },
+              {
+                "component": "TrendView",
+                "datasetId": "research-ds-b9ec2ede-35f3-4982-aad7-dc255ce8e579",
+                "title": "净资产收益率逐年走势",
+                "actions": [
+                  "pin",
+                  "open_sources",
+                  "highlight_largest_change"
+                ]
+              },
+              {
+                "component": "EvidencePanel",
+                "datasetIds": [
+                  "research-ds-f527fe84-52f8-4f62-8d17-09ad144a1eac",
+                  "research-ds-b9ec2ede-35f3-4982-aad7-dc255ce8e579"
+                ]
+              }
+            ]
+          },
+          "steps": [
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_00_Mz6gK6MyuLsUFkinzx1C0978\",\n  \"type\": \"line_chart\",\n  \"title\": \"已确认的2家净利率走势（2021–2025）\",\n  \"datasetId\": \"research-ds-f527fe84-52f8-4f62-8d17-09ad144a1eac\",\n  \"suggestedTitle\": \"已确认的2家净利率走势（2021–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_01_knDUFUOXjbNpiJbgIZux4550\",\n  \"type\": \"line_chart\",\n  \"title\": \"已确认的2家净资产收益率走势（2021–2025）\",\n  \"datasetId\": \"research-ds-b9ec2ede-35f3-4982-aad7-dc255ce8e579\",\n  \"suggestedTitle\": \"已确认的2家净资产收益率走势（2021–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            },
+            {
+              "tool": "compose_research_ui",
+              "status": "done"
+            }
+          ],
+          "datasets": 2
+        }
+      ]
+    },
+    {
+      "condition": "C1",
+      "demo": "B",
+      "rep": 2,
+      "sessionId": "cde81601-94ab-46b2-a343-c282df2d5fa2",
+      "actions": 5,
+      "turns": [
+        {
+          "text": "对比贵州茅台和五粮液最近五个已披露完整财年的净利率与 ROE。",
+          "t": {
+            "firstFeedback": 7867,
+            "lastPreview": 7867,
+            "spec": null,
+            "done": 10263
+          },
+          "reply": "两张趋势图已经放在对话里预览：一张净利率、一张净资产收益率，都是 2021–2025 五个完整财年的年报口径（两家公司数据齐全，无缺期）。\n\n从走势看：净利率方面两家都呈下行方向，茅台的高点在 2022 年、五粮液的高点在 2023 年，低点都落在 2025 年；净资产收益率上两家的方向出现分化——茅台整体上行、高点在 2024 年，五粮液则下行、高点在 2021 年、低点在 2025 年。合起来看，茅台呈现出「净利率被摊薄、但股东回报率还在抬升」的组合，五粮液则是两项指标同步走弱。\n\n具体数值请直接看图上曲线与标签。想调整的话，可以换成每年并排的分组柱、只看某一年做横向对比，或者把两张图钉到右侧画布。",
+          "spec": null,
+          "steps": [
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_00_SlCXx51MzqLSz9ho5fXW0714\",\n  \"type\": \"line_chart\",\n  \"title\": \"已确认的2家净利率走势（2021–2025）\",\n  \"datasetId\": \"research-ds-ca7558a4-831d-4ba9-a8f0-c20c31932f5f\",\n  \"suggestedTitle\": \"已确认的2家净利率走势（2021–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_01_C5NItIRgriXxkylEaKMm8884\",\n  \"type\": \"line_chart\",\n  \"title\": \"已确认的2家净资产收益率走势（2021–2025）\",\n  \"datasetId\": \"research-ds-06f46c81-2ab3-4f30-9c34-bd78bb5854cc\",\n  \"suggestedTitle\": \"已确认的2家净资产收益率走势（2021–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            }
+          ],
+          "datasets": 2
+        },
+        {
+          "text": "只看近三年，为什么其中一家的净利率变化比另一家更明显？",
+          "t": {
+            "firstFeedback": 34279,
+            "lastPreview": 34279,
+            "spec": null,
+            "done": 37725
+          },
+          "reply": "近三年收窄后看，两家都在往下走，但斜率差别很明显：五粮液的净利率降幅远大于茅台，茅台更像是在高位小幅回落（两条线的最高点都在 2023 年、最低点都在 2025 年，口径为年报）。\n\n差别主要出在收入规模端，而不是产品本身赚钱能力崩塌：茅台的毛利率三年基本稳住，收入增速逐年放缓、2025 年转为小幅下滑，利润降幅略大于收入，净利率因此只是温和走低；五粮液则是收入出现大幅收缩，费用与税金的规模摊薄效应反转，同样的成本结构撑不住，净利率跌得更陡。\n\n有一处口径问题需要提醒：五粮液 2025 年披露的分期收入数据自相矛盾（中报累计反而低于一季报），这一年的净利率降幅我按存疑处理，建议以正式年报核对后再下结论。\n\n接下来可以把这张图钉到右侧，或改成 2025 单年横向对比，也可以把泸州老窖等同行拉进来做同业对照。",
+          "spec": null,
+          "steps": [
+            {
+              "tool": "refine_dataset",
+              "status": "error"
+            },
+            {
+              "tool": "get_instrument_income_statement",
+              "status": "error"
+            },
+            {
+              "tool": "get_instrument_income_statement",
+              "status": "error"
+            },
+            {
+              "tool": "get_instrument_financial_indicators",
+              "status": "error"
+            },
+            {
+              "tool": "get_instrument_financial_indicators",
+              "status": "error"
+            },
+            {
+              "tool": "get_instrument_financials",
+              "status": "done"
+            },
+            {
+              "tool": "get_instrument_financials",
+              "status": "done"
+            },
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_00_EapFwPAckeV243FkhyTy7415\",\n  \"type\": \"line_chart\",\n  \"title\": \"已确认的2家净利率走势（2023–2025）\",\n  \"datasetId\": \"research-ds-ec289d63-f391-4136-80b5-3cd168faa69b\",\n  \"suggestedTitle\": \"已确认的2家净利率走势（2023–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            }
+          ],
+          "datasets": 1
+        }
+      ]
+    },
+    {
+      "condition": "C2",
+      "demo": "B",
+      "rep": 2,
+      "sessionId": "dceaba85-8d53-4e56-ab40-20d263758c6f",
+      "actions": 5,
+      "turns": [
+        {
+          "text": "对比贵州茅台和五粮液最近五个已披露完整财年的净利率与 ROE。",
+          "t": {
+            "firstFeedback": 8595,
+            "lastPreview": 8595,
+            "spec": null,
+            "done": 10650
+          },
+          "reply": "两张图已经出来了：一张看净利率、一张看 ROE，都是 2021–2025 六个年报口径，两家公司五个年度的数据都齐（2025 年报已披露）。\n\n走势上两张图给出的是不太一样的故事——净利率两家都是逐年走低的节奏，茅台的高点在 2022、五粮液的高点在 2023，低点都落在 2025；ROE 则出现分歧，茅台是向上走的（低点在 2021、高点在 2024），五粮液是向下走的（高点在 2021、低点在 2025）。合起来看，茅台更像是「利润率被摊薄、但股东回报效率还在提升」，五粮液是两端同步回落。\n\n具体数值在图上，鼠标悬停可看逐年数据。想把某一家的两条线放在一起看，或者只截最近三年，告诉我一声就行。",
+          "spec": null,
+          "steps": [
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_00_tNgz1YeeqbbxAXBIcBGd7502\",\n  \"type\": \"line_chart\",\n  \"title\": \"已确认的2家净利率走势（2021–2025）\",\n  \"datasetId\": \"research-ds-d90dd410-0720-4d48-bc82-912d97bd956e\",\n  \"suggestedTitle\": \"已确认的2家净利率走势（2021–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_01_tHD62WByrjipLPQmW5RI0021\",\n  \"type\": \"line_chart\",\n  \"title\": \"已确认的2家净资产收益率走势（2021–2025）\",\n  \"datasetId\": \"research-ds-f47efefc-5368-400c-87ce-67062cbc1590\",\n  \"suggestedTitle\": \"已确认的2家净资产收益率走势（2021–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            }
+          ],
+          "datasets": 2
+        },
+        {
+          "text": "只看近三年，为什么其中一家的净利率变化比另一家更明显？",
+          "t": {
+            "firstFeedback": 34303,
+            "lastPreview": 34303,
+            "spec": null,
+            "done": 38953
+          },
+          "reply": "近三年（2023–2025 年报）里变化更明显的是五粮液：茅台的净利率是小幅缓降，五粮液则是从 2024 到 2025 一个台阶往下掉。\n\n原因不在毛利率这一层——这三年两家的毛利率基本没动（茅台九成以上、五粮液七成五上下）。差别在往下的那一段：茅台收入大体走平、只是费用和税负被轻微摊薄，所以净利率只掉了一点；五粮液 2025 年收入端出现断层式下滑（同比降幅过半，净利润降幅更大），而费用和税基不可能同比例缩，于是净利率被明显顶下来。这是从披露的财务摘要做的推断，不是公司口径的解释。\n\n另外提醒一句数据可靠性：五粮液 2025 年的季度收入在现有数据里自相对不上（一季度的规模与后续半年、全年衔接不上），这一年的数字建议再用年报原文核一遍，再拿去做趋势判断。想把两家的毛利率叠在一起看，或者把 2025 单年拉成柱状对比，说一声就行。",
+          "spec": null,
+          "steps": [
+            {
+              "tool": "refine_dataset",
+              "status": "error"
+            },
+            {
+              "tool": "get_instrument_financials",
+              "status": "done"
+            },
+            {
+              "tool": "get_instrument_financials",
+              "status": "done"
+            },
+            {
+              "tool": "get_instrument_income_statement",
+              "status": "error"
+            },
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_00_YTV8Tl8H9PtV12hhYDZS2900\",\n  \"type\": \"line_chart\",\n  \"title\": \"已确认的2家净利率走势（2023–2025）\",\n  \"datasetId\": \"research-ds-bd034f3a-8bd5-4e82-bd39-f129ec400d5e\",\n  \"suggestedTitle\": \"已确认的2家净利率走势（2023–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            }
+          ],
+          "datasets": 1
+        }
+      ]
+    },
+    {
+      "condition": "C3",
+      "demo": "B",
+      "rep": 2,
+      "sessionId": "1077d205-9ce6-46c7-b2f5-8ce7fa37c394",
+      "actions": 5,
+      "turns": [
+        {
+          "text": "对比贵州茅台和五粮液最近五个已披露完整财年的净利率与 ROE。",
+          "t": {
+            "firstFeedback": 7307,
+            "lastPreview": 7307,
+            "spec": null,
+            "done": 13140
+          },
+          "reply": "两张预览已经放在对话里了：白酒双雄 2021–2025 年报的净利率与净资产收益率。\n\n看走势对比，两者分化明显——净利率上两家这五年都是往下走的方向（茅台高点在 2022 年、五粮液高点在 2023 年，低点都落在 2025 年）；ROE 则相反，茅台是上行的方向（低点 2021、高点 2024），五粮液是下行的方向（高点 2021、低点 2025），一条往上一条往下的剪刀差是比较直观的看点。\n\n数据按年报口径、两家五年十个年度点都完整。想调的话可以说：改成并排柱看逐年对比、只留其中一段年份、或者把其中一张钉到右侧看板。",
+          "spec": null,
+          "steps": [
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_00_UmBOlqTzBvAp78TNJSB42078\",\n  \"type\": \"line_chart\",\n  \"title\": \"已确认的2家净利率走势（2021–2025）\",\n  \"datasetId\": \"research-ds-e1c4ef17-0c7f-4320-bf38-1f4cbeb38875\",\n  \"suggestedTitle\": \"已确认的2家净利率走势（2021–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_01_9vgVwKYVWDE60I7YRFSb2763\",\n  \"type\": \"line_chart\",\n  \"title\": \"已确认的2家净资产收益率走势（2021–2025）\",\n  \"datasetId\": \"research-ds-821b8307-7bd3-438c-81fa-e4bbb6f84548\",\n  \"suggestedTitle\": \"已确认的2家净资产收益率走势（2021–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            }
+          ],
+          "datasets": 2
+        },
+        {
+          "text": "只看近三年，为什么其中一家的净利率变化比另一家更明显？",
+          "t": {
+            "firstFeedback": 30491,
+            "lastPreview": 30491,
+            "spec": 37865,
+            "done": 37865
+          },
+          "reply": "已按你的要求把区间收到 2023–2025（年报口径，图已在对话里更新）。两家净利率这三年都在下行，但显著程度差在五粮液：茅台是在窄区间里小幅下移，五粮液是一段明显的下坡。\n\n机制上不复杂——茅台这几年收入端波动小得多，利润基本跟收入同步走，净利率自然稳；五粮液的毛利率三年几乎没动，但收入端出现明显收缩，而销售费用、税金及附加这类项目相对刚性，收入一缩就被放大到净利层面，净利率和净资产收益率的下行幅度因此远大于毛利率的变化。\n\n但要打个问号：2025 年五粮液的收入披露与同年前几期累计数不自洽（半年报累计口径低于一季报累计口径），这一年的数据口径存疑，下探幅度可能被放大，建议以公司正式年报原文复核后再下定性结论。\n\n要不要再出一张两家的营收对比图，看看收入端的分化是不是真有图上显示的那么大？",
+          "spec": {
+            "version": 1,
+            "blocks": [
+              {
+                "component": "TrendView",
+                "datasetId": "research-ds-51cbba2a-229c-408c-91e7-8b2bc9efdc78",
+                "title": "两家公司净利率走势对比",
+                "actions": [
+                  "highlight_largest_change",
+                  "pin",
+                  "open_sources",
+                  "adjust"
+                ]
+              },
+              {
+                "component": "EvidencePanel",
+                "datasetIds": [
+                  "research-ds-51cbba2a-229c-408c-91e7-8b2bc9efdc78"
+                ]
+              }
+            ]
+          },
+          "steps": [
+            {
+              "tool": "refine_dataset",
+              "status": "error"
+            },
+            {
+              "tool": "get_instrument_financials",
+              "status": "done"
+            },
+            {
+              "tool": "get_instrument_financials",
+              "status": "done"
+            },
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_00_vbAo86JpNIkIgMAAXZPU6447\",\n  \"type\": \"line_chart\",\n  \"title\": \"已确认的2家净利率走势（2023–2025）\",\n  \"datasetId\": \"research-ds-51cbba2a-229c-408c-91e7-8b2bc9efdc78\",\n  \"suggestedTitle\": \"已确认的2家净利率走势（2023–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            },
+            {
+              "tool": "compose_research_ui",
+              "status": "done"
+            }
+          ],
+          "datasets": 1
+        }
+      ]
+    },
+    {
+      "condition": "C1",
+      "demo": "C",
+      "rep": 2,
+      "sessionId": "f5da524b-cedd-4353-b086-ee08fc4455ec",
+      "actions": 2,
+      "turns": [
+        {
+          "text": "看一下平安近五年的 ROE",
+          "t": {
+            "firstFeedback": 3443,
+            "lastPreview": 3443,
+            "spec": null,
+            "done": 5396
+          },
+          "reply": "已经在右侧给出预览图：中国平安 2021–2025 年五个年报期的净资产收益率走势，数据五个年度都完整，没有缺口。\n\n从形态看是「先回落后修复」的波动走势——按年报口径，五年里最高的一年是 2025 年，最低的一年是 2023 年，中间是逐年抬升的过程，但整体斜率并不陡。\n\n想细看的话可以调几个方向：把图换成逐年柱状更直观，或者加进中国人寿、中国太保做同业对比，也可以只看其中某两三年。",
+          "spec": null,
+          "steps": [
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_00_RRtTHmnh0AouQEFJVMH70488\",\n  \"type\": \"line_chart\",\n  \"title\": \"中国平安净资产收益率走势（2021–2025）\",\n  \"datasetId\": \"research-ds-cdd4d2f5-b78c-4652-8aea-447c484e5706\",\n  \"suggestedTitle\": \"中国平安净资产收益率走势（2021–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            }
+          ],
+          "datasets": 1
+        }
+      ]
+    },
+    {
+      "condition": "C2",
+      "demo": "C",
+      "rep": 2,
+      "sessionId": "74bb2abf-81f3-452e-a7e8-c1d1b3b9436d",
+      "actions": 2,
+      "turns": [
+        {
+          "text": "看一下平安近五年的 ROE",
+          "t": {
+            "firstFeedback": 3190,
+            "lastPreview": 3190,
+            "spec": null,
+            "done": 5171
+          },
+          "reply": "中国平安近五年净资产收益率（ROE）的走势图已生成在右侧预览，可以点「钉住」固定到看板。\n\n看形状，这五年并非单边下行，而是先回落、后回升的波动走势：最低点出现在 2023 年，最高点在 2025 年。作为保险集团，其 ROE 受投资端收益与负债成本双重影响，波动本身往往比趋势更值得关注。\n\n想看更细的话，可以换成柱状图看逐年高低，或把平安银行、中国人寿等放进同一张图做横向对照——告诉我即可。",
+          "spec": null,
+          "steps": [
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_00_wdvlBHwA8zJJrAXu6vT98285\",\n  \"type\": \"line_chart\",\n  \"title\": \"中国平安净资产收益率走势（2021–2025）\",\n  \"datasetId\": \"research-ds-922c7c10-6001-4b74-82e9-45a83571726c\",\n  \"suggestedTitle\": \"中国平安净资产收益率走势（2021–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            }
+          ],
+          "datasets": 1
+        }
+      ]
+    },
+    {
+      "condition": "C3",
+      "demo": "C",
+      "rep": 2,
+      "sessionId": "207daf12-ee60-422a-a049-3357ad941796",
+      "actions": 2,
+      "turns": [
+        {
+          "text": "看一下平安近五年的 ROE",
+          "t": {
+            "firstFeedback": 4079,
+            "lastPreview": 4079,
+            "spec": 6952,
+            "done": 6952
+          },
+          "reply": "先说明一下：这里按「中国平安（601318）」来查的；如果你指的是平安银行，也可以换过来看。\n\n已按年报口径把近五年（2021–2025）的净资产收益率（ROE）做成了一条走势预览，放在右侧上方——五年数据都已覆盖，没有缺年份。整体看是波动型走势，高点出现在最近一年，低点在 2023 年。这张图可以直接点「钉住」加入看板；想改成年份区间、加上同业对比，或者换成柱状看单年高低，告诉我一声就行。",
+          "spec": {
+            "version": 1,
+            "blocks": [
+              {
+                "component": "TrendView",
+                "datasetId": "research-ds-ac369a31-f35c-4aee-9208-1edb79eca8c5",
+                "title": "中国平安净资产收益率走势",
+                "actions": [
+                  "pin",
+                  "open_sources",
+                  "adjust"
+                ]
+              },
+              {
+                "component": "EvidencePanel",
+                "datasetIds": [
+                  "research-ds-ac369a31-f35c-4aee-9208-1edb79eca8c5"
+                ]
+              }
+            ]
+          },
+          "steps": [
+            {
+              "tool": "query_data",
+              "status": "done"
+            },
+            {
+              "tool": "propose_widget",
+              "status": "done",
+              "resultDetail": "{\n  \"ok\": true,\n  \"proposalId\": \"call_00_2WyvPIv0yNvI3ZipAgxS2336\",\n  \"type\": \"line_chart\",\n  \"title\": \"中国平安净资产收益率走势（2021–2025）\",\n  \"datasetId\": \"research-ds-ac369a31-f35c-4aee-9208-1edb79eca8c5\",\n  \"suggestedTitle\": \"中国平安净资产收益率走势（2021–2025）\",\n  \"view\": {\n    \"intent\": \"trend\"\n  },\n  \"_mcp\": {\n    \"source\": \"local\",\n    \"degraded\": false,\n    \"sufficient\": true\n  }\n}"
+            },
+            {
+              "tool": "compose_research_ui",
+              "status": "done"
+            }
+          ],
+          "datasets": 1
+        }
+      ]
+    }
+  ]
+}
