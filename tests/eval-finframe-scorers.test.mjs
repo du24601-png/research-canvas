@@ -55,7 +55,7 @@ test('fixture mirrors production: no numbers to the model, CN only, future years
   assert.equal(ok.ok, true)
   assert.equal(JSON.stringify(ok).includes(String(metricValue('600519', 'roe', '2021'))), false)
   assert.equal(store.datasets.size, 1)
-  assert.match(stub({ name: 'query_data', args: { entities: ['苹果'], metric: 'revenue', start: '2020', end: '2024' } }, {}, {}).error, /无法确认/)
+  assert.equal(stub({ name: 'query_data', args: { entities: ['苹果'], metric: 'revenue', start: '2020', end: '2024' } }, {}, {}).status, 'unsupported_market')
   assert.match(stub({ name: 'query_data', args: { entities: ['中芯'], metric: 'gross_margin', start: '2021', end: '2025' } }, {}, {}).error, /多家/)
   assert.match(stub({ name: 'query_data', args: { entities: ['茅台'], metric: 'revenue', start: '2026', end: '2026' } }, {}, {}).error, /未能提供/)
 })

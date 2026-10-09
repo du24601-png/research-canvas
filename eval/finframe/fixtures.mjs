@@ -32,7 +32,7 @@ function resolveAll(names) {
   const entities = []
   for (const raw of names) {
     const hit = resolveFixtureEntity(raw)
-    if (hit.error) return { error: hit.error }
+    if (hit.error) return hit
     entities.push(hit.entity)
   }
   return { entities }

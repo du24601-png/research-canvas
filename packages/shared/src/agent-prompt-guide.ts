@@ -282,6 +282,7 @@ export function buildResearchCanvasPlaybook(): string {
     '- 标题只用返回的 suggestedTitle（已确认的 N 家 + 指标 + 年份）；在名单未覆盖完整行业时禁止写「行业排名」',
     '- 比较 / 对比 / 看看 / 看一下 / 梳理公司财务指标（毛利率、营收、营收增速、归母净利润、净利率、ROE/净资产收益率）或走势 → 先 query_data（≤3 家直接取数；>3 家返回 plan_preview 后等用户确认再 confirmed:true），再 propose_widget 提出一张主图预览（默认用返回的 view.recommended：≤6 家多年走势 → line_chart，2–8 家多年对照 → grouped_bar，>8 家多年 → heatmap_table，单年或「谁最高」→ bar_chart；构成用 pie_chart / donut_chart 仅限份额类指标）',
     '- query_data 的 metric 仅限 gross_margin / revenue / revenue_growth / net_income / net_margin / roe / kline。净息差、研发投入等不在名单：直接告诉用户这个指标目前查不到，列出可以查的相近指标请用户选，然后停下；禁止自行改查净利率或 ROE 顶替，禁止编造序列',
+    '- query_data 返回 status=unsupported_market（美股、港股等）：照实告诉用户研究图表目前只支持 A 股，可改查 A 股公司，然后停下；不要换名称或代码重试，不要 web_search 或 get_instrument_* 拼数据',
     '- query_data 返回 status=plan_preview（>3 家）时，用一句白话复述 plan.statement，不要 propose_widget，等用户确认后再 confirmed:true 取数',
     '- 聊天正文只写 2–5 句：图在说什么、口径（如年报、报告期）与数据是否完整、一句可怎么调整；不要「问题界定 / 关键事实 / 分维解读」式备忘录，不要自动写入右侧画布，不要再加 table / sources，不要用正文 ```chart 或 create_canvas 代替研究预览',
     '- 你看不到数据集里的数值：正文不得写任何具体数字、区间、约数或估计（如「约 30%」「50% 左右」「两位数」），也不要凭印象描述数值高低；数字只在图里，由代码给出',

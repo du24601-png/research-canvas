@@ -4,6 +4,7 @@ import {
   type InstrumentRef,
   type ResearchEntity,
 } from '@opptrix/shared'
+import { nonCnMarketOf, unsupportedMarketResult } from './research-market-support.js'
 
 export interface ResearchSearchHit {
   name: string | null
@@ -61,6 +62,8 @@ export function pickCnEquityHit(
 ): { entity: ResearchEntity } | { error: string } {
   const needle = keyword.trim()
   const rows = cnEquityHits(hits)
+  const foreign = rows.length ? null : nonCnMarketOf(hits)
+  if (foreign) return unsupportedMarketResult(needle, foreign)
   if (!rows.length) return { error: `无法确认「${needle}」对应的上市公司` }
   const needleNorm = normalizeName(needle)
   const exact = rows.filter(row => row.name === needle || normalizeName(row.name) === needleNorm)
@@ -105,6 +108,8 @@ export async function resolveResearchEntity(
     }
     return { entity: entityFromRef(parsed, keyword) }
   }
+  const foreignRef = parseCanonicalInstrumentInput(keyword)
+  if (foreignRef && foreignRef.market !== 'CN') return unsupportedMarketResult(keyword, foreignRef.market)
   let hits: ResearchSearchHit[] = []
   try {
     hits = await search.search(keyword)

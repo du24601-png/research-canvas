@@ -4,6 +4,8 @@
  * 这样模型凭记忆写出的「真实」数字会被 numbers_grounded 判为无据。
  * O6-A 的真实冻结快照尚未生成，替换时只需换掉 metricValue()。
  */
+import { unsupportedMarketResult } from '../../packages/agent/dist/research-market-support.js'
+
 export const FIXTURE_VERSION = 'finframe-synth-v1'
 export const FIXTURE_PROVIDER = 'eval-fixture'
 export const FIXTURE_FETCHED_AT = '2026-09-14T05:00:00.000Z'
@@ -29,8 +31,9 @@ const CN_ENTITIES = [
 /** 有歧义的简称：生产实体解析器会报「对应多家公司」 */
 const AMBIGUOUS = ['中芯', '平安', '银行']
 
-/** 非 A 股：生产 query_data 只接受 CN 标的 */
-const NON_CN = ['苹果', 'AAPL', '微软', 'MSFT', '英伟达', 'NVDA', '特斯拉', 'TSLA', '腾讯', '00700', '美团', '03690', '小米', '01810', '00981']
+/** 非 A 股：生产 query_data 只接受 CN 标的；值为搜索会返回的市场 */
+const NON_CN_MARKET = { 苹果: 'US', AAPL: 'US', 微软: 'US', MSFT: 'US', 英伟达: 'US', NVDA: 'US', 特斯拉: 'US', TSLA: 'US', 腾讯: 'HK', '00700': 'HK', 美团: 'HK', '03690': 'HK', 小米: 'HK', '01810': 'HK', '00981': 'HK' }
+const NON_CN = Object.keys(NON_CN_MARKET)
 
 /** 刻意缺数：这些 (ticker, 年份) 在所有指标上为 null */
 const MISSING = new Set(['688347:2020', '688347:2021'])
@@ -92,7 +95,9 @@ export function resolveFixtureEntity(raw) {
   const exact = CN_ENTITIES.find((e) => norm(e.name) === q || e.aliases.some((a) => norm(a) === q))
   if (exact) return { entity: toEntity(exact) }
   if (AMBIGUOUS.some((a) => norm(a) === q)) return { error: `「${raw}」对应多家公司，请改用全称或股票代码` }
-  if (NON_CN.some((a) => q.includes(norm(a)))) return { error: `无法确认「${raw}」对应的上市公司` }
+  const foreign = NON_CN.find((a) => q.includes(norm(a)))
+  // M2-E3 起与生产一致：搜到了但不是 A 股 → unsupported_market
+  if (foreign) return unsupportedMarketResult(raw, NON_CN_MARKET[foreign])
   const partial = CN_ENTITIES.filter((e) => norm(e.name).includes(q))
   if (partial.length === 1) return { entity: toEntity(partial[0]) }
   if (partial.length > 1) return { error: `「${raw}」对应多家公司，请改用全称或股票代码` }
