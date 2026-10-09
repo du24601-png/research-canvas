@@ -20,6 +20,7 @@ import { useResearchCanvas, type UseResearchCanvasOptions } from './useResearchC
 import CanvasEmptyState from './CanvasEmptyState'
 import { compactCanvasLayout } from './compactCanvasLayout'
 import { useWorkspaceUi } from '../workspace/WorkspaceUiContext'
+import { usePinBoard } from '../pin-board/PinBoardContext'
 import { DEFAULT_SESSION_DISPLAY_TITLE } from '../sessionSidebarPresentation'
 import type { PersistedCanvasState } from './types'
 
@@ -38,8 +39,10 @@ export default function ResearchCanvas({
 }: ResearchCanvasProps) {
   const ui = useWorkspaceUi()
   const presentMode = ui.presentMode
+  const { chatFirst } = usePinBoard()
   const canvasOptions: UseResearchCanvasOptions = {
     readonly: readonlyProp,
+    ignoreAgentCreates: chatFirst,
     ...(frozenState ? { frozenState } : {}),
   }
   const { width, containerRef, mounted } = useContainerWidth()

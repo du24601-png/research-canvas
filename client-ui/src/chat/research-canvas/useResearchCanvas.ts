@@ -22,6 +22,8 @@ import type { CanvasLayoutItem, Dataset, PersistedCanvasState, Widget } from './
 export interface UseResearchCanvasOptions {
   readonly?: boolean
   frozenState?: PersistedCanvasState
+  /** 对话优先布局：看板只收用户「钉住」的图，忽略 AI 的 widget_created */
+  ignoreAgentCreates?: boolean
 }
 
 function persistState(sessionId: string | null | undefined, state: PersistedCanvasState): void {
@@ -55,6 +57,7 @@ export function useResearchCanvas(
   options?: UseResearchCanvasOptions,
 ) {
   const readonly = options?.readonly ?? false
+  const ignoreAgentCreates = options?.ignoreAgentCreates ?? false
   const initial = useMemo(() => {
     if (options?.frozenState) return options.frozenState
     return readPersistedCanvasState(sessionId)
@@ -160,6 +163,7 @@ export function useResearchCanvas(
   useEffect(() => {
     if (readonly) return () => {}
     return subscribeResearchCanvasEvents((event) => {
+      if (ignoreAgentCreates && (event as { type?: unknown } | null)?.type === 'widget_created') return
       const applied = applyResearchCanvasEvent({
         version: 2,
         widgets: widgetsRef.current,
@@ -188,7 +192,7 @@ export function useResearchCanvas(
         setActiveWidget(null)
       }
     })
-  }, [clearUndo, persistLive, readonly])
+  }, [clearUndo, persistLive, readonly, ignoreAgentCreates])
 
   const handleLayoutChange = useCallback((nextLayout: Layout) => {
     commitLayout(nextLayout)

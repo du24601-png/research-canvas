@@ -99,6 +99,23 @@ describe('pin to board', () => {
     expect(screen.getByRole('button', { name: '看板，已钉住 1 项' })).toBeTruthy()
   })
 
+  it('chat-first board ignores agent widget_created; legacy canvas still applies it', async () => {
+    const { useResearchCanvas } = await import('../research-canvas/useResearchCanvas')
+    const { publishResearchCanvasEvent } = await import('../research-canvas/researchCanvasBus')
+    const created = { type: 'widget_created', widget: { id: 'w-agent-1', type: 'line_chart', title: TITLE, datasetId: DATASET_ID } }
+    function Host({ ignore }: { ignore: boolean }) {
+      useResearchCanvas(SESSION, { ignoreAgentCreates: ignore })
+      return null
+    }
+    const first = renderWithProviders(<Host ignore />)
+    await act(async () => publishResearchCanvasEvent(created))
+    expect(readPersistedCanvasState(SESSION).widgets).toHaveLength(0)
+    first.unmount()
+    renderWithProviders(<Host ignore={false} />)
+    await act(async () => publishResearchCanvasEvent(created))
+    expect(readPersistedCanvasState(SESSION).widgets).toHaveLength(1)
+  })
+
   it('board stays closed after pinning and shows the pinned item when opened', async () => {
     const { container } = renderWithProviders(<ChatFirstTurn />)
     const drawer = container.ownerDocument.querySelector('[data-pin-board]')

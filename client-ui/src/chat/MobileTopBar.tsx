@@ -16,6 +16,7 @@ import {
 } from '../theme/mobileChrome'
 import { ghostInteractive, hairlineBottom } from '../theme/mixins'
 import OpptrixButton from '../components/opptrix/OpptrixButton'
+import { usePinBoard } from './pin-board/PinBoardContext'
 
 const useStyles = makeStyles({
   bar: {
@@ -92,6 +93,7 @@ export default function MobileTopBar({
   filesPanelDisabled = false,
 }: MobileTopBarProps) {
   const s = useStyles()
+  const { chatFirst } = usePinBoard()
 
   return (
     <header className={s.bar}>
@@ -139,7 +141,7 @@ export default function MobileTopBar({
               ? <PanelRightContractRegular fontSize={MOBILE_HEADER_ICON_SIZE} />
               : <PanelRightExpandRegular fontSize={MOBILE_HEADER_ICON_SIZE} />}
             onClick={onOpenMarketPanel}
-            aria-label={marketPanelOpen ? '收起关注与持仓' : '打开关注与持仓'}
+            aria-label={`${marketPanelOpen ? '收起' : '打开'}${chatFirst ? '看板' : '研究画布'}`}
             aria-pressed={marketPanelOpen}
           />
         ) : null}
