@@ -1,0 +1,1626 @@
+{
+  "schema": "finframe.eval.seed.v1",
+  "kind": "official",
+  "dataset_id": "finframe-seed-v1",
+  "fixture_version": "finframe-synth-v1",
+  "at": "2026-10-09T17:05:58.731Z",
+  "duration_ms": 134584,
+  "git": {
+    "commit": "c3f9555a9e63163e45a83066d22a6c2bb3831f97",
+    "dirty": true
+  },
+  "llm": {
+    "model": "deepseek-flash",
+    "temperature": 0,
+    "max_tokens": 1024,
+    "tool_choice": "auto"
+  },
+  "params": {
+    "temperature": 0,
+    "max_tokens": 2048,
+    "tool_choice": "auto",
+    "prompt": "assembleSystemPrompt (production, artifacts off) + turn tail",
+    "tools": "eval/agent/component/tool-catalog.json",
+    "clock": "2026-09-14T05:00:00Z"
+  },
+  "sources": {
+    "hashes": {
+      "cases/seed-v1.json": "0ab3fbcd2c7fc0c0",
+      "fixture-data.mjs": "598fb8961e7500c3",
+      "fixtures.mjs": "ac71d6c05c62d6a5",
+      "run-case.mjs": "3f94d5d404ebf970",
+      "run.mjs": "d213f4d55c95a868",
+      "scorers/numbers-grounded.mjs": "ffd6a369456b6345",
+      "scorers/source-period.mjs": "2b8cba5e2f8df906",
+      "scorers/refusal.mjs": "964ecff7964d35bd"
+    }
+  },
+  "notes": "FinFrame M1 种子集。数值夹具为合成值（非真实财报）；不与 eval:agent 三层分数混合。",
+  "summary": {
+    "cases": 12,
+    "runner_errors": 0,
+    "chain": {
+      "passed": 9,
+      "judged": 12
+    },
+    "scorers": {
+      "numbers_grounded": {
+        "applicable": 12,
+        "passed": 12,
+        "failed_cases": []
+      },
+      "source_period": {
+        "applicable": 9,
+        "passed": 9,
+        "failed_cases": []
+      },
+      "refusal": {
+        "applicable": 12,
+        "passed": 10,
+        "failed_cases": [
+          "ff-009",
+          "ff-012"
+        ]
+      }
+    },
+    "all_scorers_passed": 10,
+    "usage": {
+      "prompt_tokens": 1129831,
+      "completion_tokens": 23537,
+      "cache_hit_tokens": 1116416,
+      "rounds": 49
+    }
+  },
+  "results": [
+    {
+      "caseId": "ff-001",
+      "slice": "basic_compare",
+      "expect": "answer",
+      "difficulty": "medium",
+      "question": "对比贵州茅台和五粮液最近五个已披露完整财年的净利率与 ROE。",
+      "error": null,
+      "chain": {
+        "pass": true,
+        "reasons": [],
+        "stats": {
+          "decisions": 4,
+          "gold_steps": 3,
+          "matched_steps": 3,
+          "step_precision": 0.75
+        }
+      },
+      "scores": [
+        {
+          "scorer": "numbers_grounded",
+          "applicable": true,
+          "pass": true,
+          "numbers": 0,
+          "ungrounded": [],
+          "reasons": []
+        },
+        {
+          "scorer": "source_period",
+          "applicable": true,
+          "pass": true,
+          "checks": {
+            "structural": true,
+            "period_in_reply": true,
+            "source_in_reply": false
+          },
+          "informational": [
+            "source_in_reply"
+          ],
+          "reasons": [
+            "（参考）回复未说明数据来源"
+          ]
+        },
+        {
+          "scorer": "refusal",
+          "applicable": true,
+          "expect": "answer",
+          "pass": true,
+          "reasons": []
+        }
+      ],
+      "pass_all_scorers": true,
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "贵州茅台",
+              "五粮液"
+            ],
+            "metric": "net_margin",
+            "start": "2021",
+            "end": "2025"
+          }
+        },
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "贵州茅台",
+              "五粮液"
+            ],
+            "metric": "roe",
+            "start": "2021",
+            "end": "2025"
+          }
+        },
+        {
+          "name": "propose_widget",
+          "args": {
+            "datasetId": "research-ds-ff-1",
+            "intent": "trend"
+          }
+        },
+        {
+          "name": "propose_widget",
+          "args": {
+            "datasetId": "research-ds-ff-2",
+            "intent": "trend"
+          }
+        }
+      ],
+      "texts": [
+        "两张预览已按你要的口径生成：左边是净利率走势、右边是 ROE 走势，都是 2 家 × 2021–2025 五个完整财年（2025 年报为最新一份完整年报）。\n\n从图上看到的：两条曲线在这五年里基本保持高低位的相对关系——贵州茅台在两个指标上都稳定高于五粮液，而且各自的年度波动不大，属于白酒龙头里少见的「高位平台型」形态，而不是趋势性上行或下行。\n\n口径说明：净利率按年报口径的净利润/营业收入，ROE 按年报口径的净资产收益率，均为年度值，不含季度。若想看逐年的并排对比，可以把图换成分组柱；若只关心最新一年的横向高低，可以出一张 2025 年的对比柱。\n\n主要风险提示：这两个指标是结果，不是原因——高端白酒的价格体系、渠道库存和消费需求若变化，利润率与 ROE 的稳定性会先于收入端受到考验。"
+      ],
+      "datasets": [
+        {
+          "id": "research-ds-ff-1",
+          "metric": "net_margin",
+          "entities": [
+            "贵州茅台",
+            "五粮液"
+          ],
+          "periods": [
+            "2021",
+            "2022",
+            "2023",
+            "2024",
+            "2025"
+          ],
+          "parentDatasetId": null
+        },
+        {
+          "id": "research-ds-ff-2",
+          "metric": "roe",
+          "entities": [
+            "贵州茅台",
+            "五粮液"
+          ],
+          "periods": [
+            "2021",
+            "2022",
+            "2023",
+            "2024",
+            "2025"
+          ],
+          "parentDatasetId": null
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 68463,
+        "completion_tokens": 1037,
+        "cache_hit_tokens": 67328,
+        "rounds": 3
+      },
+      "duration_ms": 6931
+    },
+    {
+      "caseId": "ff-002",
+      "slice": "basic_compare",
+      "expect": "answer",
+      "difficulty": "easy",
+      "question": "贵州茅台、五粮液、泸州老窖 2019 到 2024 年净利率",
+      "error": null,
+      "chain": {
+        "pass": true,
+        "reasons": [],
+        "stats": {
+          "decisions": 2,
+          "gold_steps": 2,
+          "matched_steps": 2,
+          "step_precision": 1
+        }
+      },
+      "scores": [
+        {
+          "scorer": "numbers_grounded",
+          "applicable": true,
+          "pass": true,
+          "numbers": 0,
+          "ungrounded": [],
+          "reasons": []
+        },
+        {
+          "scorer": "source_period",
+          "applicable": true,
+          "pass": true,
+          "checks": {
+            "structural": true,
+            "period_in_reply": true,
+            "source_in_reply": false
+          },
+          "informational": [
+            "source_in_reply"
+          ],
+          "reasons": [
+            "（参考）回复未说明数据来源"
+          ]
+        },
+        {
+          "scorer": "refusal",
+          "applicable": true,
+          "expect": "answer",
+          "pass": true,
+          "reasons": []
+        }
+      ],
+      "pass_all_scorers": true,
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "贵州茅台",
+              "五粮液",
+              "泸州老窖"
+            ],
+            "metric": "net_margin",
+            "start": "2019",
+            "end": "2024"
+          }
+        },
+        {
+          "name": "propose_widget",
+          "args": {
+            "datasetId": "research-ds-ff-1",
+            "intent": "trend"
+          }
+        }
+      ],
+      "texts": [
+        "已按 2019–2024 年报口径，把三家白酒公司的净利率走势放进右侧预览（3 家 × 6 年，数据齐全）。\n\n- 三家都在这六年里走的是**向上抬升**的路径，净利率整体呈阶梯式走高，说明高端白酒的提价能力和费用摊薄在这段周期里仍在兑现。\n- 期间排序基本稳定：贵州茅台领先，五粮液与泸州老窖处在相近区间并互相靠近，差距随时间收窄。\n- 2022 年后抬升斜率略有放缓，可与行业需求、渠道库存和产品结构变化对照看，不宜单看一条曲线。\n\n需要的话我可以：改成按年份并排柱状图看逐年对比，或把区间收窄到近三年、只留其中两家。主要风险提示：净利率是结果指标，提价与结构升级一旦遇阻、或消费税与渠道政策有变化，这条上升线未必能线性外推。"
+      ],
+      "datasets": [
+        {
+          "id": "research-ds-ff-1",
+          "metric": "net_margin",
+          "entities": [
+            "贵州茅台",
+            "五粮液",
+            "泸州老窖"
+          ],
+          "periods": [
+            "2019",
+            "2020",
+            "2021",
+            "2022",
+            "2023",
+            "2024"
+          ],
+          "parentDatasetId": null
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 67368,
+        "completion_tokens": 436,
+        "cache_hit_tokens": 66560,
+        "rounds": 3
+      },
+      "duration_ms": 3963
+    },
+    {
+      "caseId": "ff-003",
+      "slice": "basic_compare",
+      "expect": "answer",
+      "difficulty": "easy",
+      "question": "招商银行和平安银行近五年 ROE 对比",
+      "error": null,
+      "chain": {
+        "pass": true,
+        "reasons": [],
+        "stats": {
+          "decisions": 4,
+          "gold_steps": 2,
+          "matched_steps": 2,
+          "step_precision": 0.5
+        }
+      },
+      "scores": [
+        {
+          "scorer": "numbers_grounded",
+          "applicable": true,
+          "pass": true,
+          "numbers": 0,
+          "ungrounded": [],
+          "reasons": []
+        },
+        {
+          "scorer": "source_period",
+          "applicable": true,
+          "pass": true,
+          "checks": {
+            "structural": true,
+            "period_in_reply": true,
+            "source_in_reply": true
+          },
+          "informational": [
+            "source_in_reply"
+          ],
+          "reasons": []
+        },
+        {
+          "scorer": "refusal",
+          "applicable": true,
+          "expect": "answer",
+          "pass": true,
+          "reasons": []
+        }
+      ],
+      "pass_all_scorers": true,
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "招商银行",
+              "平安银行"
+            ],
+            "metric": "roe",
+            "start": "2021",
+            "end": "2025"
+          }
+        },
+        {
+          "name": "propose_widget",
+          "args": {
+            "datasetId": "research-ds-ff-1",
+            "intent": "trend"
+          }
+        },
+        {
+          "name": "get_instrument_financials",
+          "args": {
+            "symbol": "600036",
+            "market": "CN",
+            "report_type": "annual"
+          }
+        },
+        {
+          "name": "get_instrument_financials",
+          "args": {
+            "symbol": "000001",
+            "market": "CN",
+            "report_type": "annual"
+          }
+        }
+      ],
+      "texts": [
+        "已把两家银行 2021–2025 年的净资产收益率做成五年趋势对照预览，两个数据系列同轴呈现，可以直接看出水平档位差与各自的回落节奏。\n\n从预览上读，两条线都是 2021 年以来逐级下行，招商银行的绝对水平整体高出一档，平安银行的斜率更陡一些，两家的差距在观察期末段仍没有收敛。口径为年报净资产收益率，2025 年报数据已纳入，时点截至 2026 年 9 月 14 日。\n\n可以顺手做的两个调整：一是切换成分组柱，逐年并排看差距变化；二是若要解释差异来源，再补一张净息差或不良率的对照会更直接。\n\n风险提示：银行 ROE 对息差、拨备计提节奏和资本补充高度敏感，单看 ROE 一条线容易把「分母变化」误读成「盈利能力变化」，判断时需结合资本充足率一起看。"
+      ],
+      "datasets": [
+        {
+          "id": "research-ds-ff-1",
+          "metric": "roe",
+          "entities": [
+            "招商银行",
+            "平安银行"
+          ],
+          "periods": [
+            "2021",
+            "2022",
+            "2023",
+            "2024",
+            "2025"
+          ],
+          "parentDatasetId": null
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 90921,
+        "completion_tokens": 1739,
+        "cache_hit_tokens": 89984,
+        "rounds": 4
+      },
+      "duration_ms": 10201
+    },
+    {
+      "caseId": "ff-004",
+      "slice": "decompose_evidence",
+      "expect": "answer",
+      "difficulty": "hard",
+      "question": "对比贵州茅台和五粮液的近五年净利率和 ROE，找出变化明显的年份。再解释哪些结论有数据支持，并给我打开来源核对。",
+      "error": null,
+      "chain": {
+        "pass": false,
+        "reasons": [
+          "max_decisions 6，实际 9"
+        ],
+        "stats": {
+          "decisions": 9,
+          "gold_steps": 2,
+          "matched_steps": 2,
+          "step_precision": 0.2222222222222222
+        }
+      },
+      "scores": [
+        {
+          "scorer": "numbers_grounded",
+          "applicable": true,
+          "pass": true,
+          "numbers": 0,
+          "ungrounded": [],
+          "reasons": []
+        },
+        {
+          "scorer": "source_period",
+          "applicable": true,
+          "pass": true,
+          "checks": {
+            "structural": true,
+            "period_in_reply": true,
+            "source_in_reply": true
+          },
+          "informational": [
+            "source_in_reply"
+          ],
+          "reasons": []
+        },
+        {
+          "scorer": "refusal",
+          "applicable": true,
+          "expect": "answer",
+          "pass": true,
+          "reasons": []
+        }
+      ],
+      "pass_all_scorers": true,
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "贵州茅台",
+              "五粮液"
+            ],
+            "metric": "net_margin",
+            "start": "2021",
+            "end": "2025"
+          }
+        },
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "贵州茅台",
+              "五粮液"
+            ],
+            "metric": "roe",
+            "start": "2021",
+            "end": "2025"
+          }
+        },
+        {
+          "name": "propose_widget",
+          "args": {
+            "datasetId": "research-ds-ff-1",
+            "intent": "trend"
+          }
+        },
+        {
+          "name": "propose_widget",
+          "args": {
+            "datasetId": "research-ds-ff-2",
+            "intent": "trend"
+          }
+        },
+        {
+          "name": "propose_widget",
+          "args": {
+            "datasetId": "research-ds-ff-1",
+            "type": "sources",
+            "title": "数据来源与口径核对（贵州茅台 / 五粮液，2021–2025）"
+          }
+        },
+        {
+          "name": "get_instrument_financials",
+          "args": {
+            "code": "CN:STOCK:600519.SH",
+            "report_type": "annual"
+          }
+        },
+        {
+          "name": "get_instrument_financials",
+          "args": {
+            "code": "CN:STOCK:000858.SZ",
+            "report_type": "annual"
+          }
+        },
+        {
+          "name": "get_instrument_snapshot",
+          "args": {
+            "code": "CN:STOCK:600519.SH"
+          }
+        },
+        {
+          "name": "get_instrument_snapshot",
+          "args": {
+            "code": "CN:STOCK:000858.SZ"
+          }
+        }
+      ],
+      "texts": [
+        "已把两家 2021–2025 的净利率、ROE 逐年做成两张趋势预览，并附一张来源核对面板，方便你逐项打开比对。\n\n**结论摘要**\n- 两组序列各 10 个年度数据点（2 家 × 5 年）全部取到，2025 为最新完整年度，无需担心某年缺数造成断点。\n- 逐年精确百分比请以上图标注为准；我这边不把具体数字用文字复述，避免与图表口径出现不一致。找「变化明显的年份」的正确标尺是**相邻年份的变动幅度**（同比变化），而不是绝对水平谁高谁低。\n- 「有数据支持」的结论 = 图上能直接读出的：逐年数值、逐年变动方向、两家在同一年的相对高低（年报口径）。\n- 「暂不支持的结论」= 对这些变化的原因解释（提价、产品结构、费用、税率、股本变动等），本次没有拉取到对应证据，属于待验证，不能当作已证实。\n\n**事实依据与口径**\n- 期间：2021–2025 年度（年报口径），截至本轮会话时间 2026/9/14，2025 年报已披露。\n- 指标：净利率、净资产收益率；两家均为 A 股白酒公司（贵州茅台 600519、五粮液 000858）。\n- 口径提示：ROE 分加权/摊薄，净利率是否剔除少数股东损益，都会影响可比性，核对时以来源面板列示的口径为准。\n\n**怎么核对**\n- 两张趋势图上的每个年度点都可点开看数值；下面的来源面板列出这两组序列的出处与口径，可逐项对照原始口径。若要换图种（比如改成每年并排柱、或只看单年谁更高），告诉我即可调整。\n\n**主要风险一句**：ROE 高低需结合净资产结构和杠杆一起看，单看 ROE 或单看净利率都容易得出片面结论。"
+      ],
+      "datasets": [
+        {
+          "id": "research-ds-ff-1",
+          "metric": "net_margin",
+          "entities": [
+            "贵州茅台",
+            "五粮液"
+          ],
+          "periods": [
+            "2021",
+            "2022",
+            "2023",
+            "2024",
+            "2025"
+          ],
+          "parentDatasetId": null
+        },
+        {
+          "id": "research-ds-ff-2",
+          "metric": "roe",
+          "entities": [
+            "贵州茅台",
+            "五粮液"
+          ],
+          "periods": [
+            "2021",
+            "2022",
+            "2023",
+            "2024",
+            "2025"
+          ],
+          "parentDatasetId": null
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 119011,
+        "completion_tokens": 3956,
+        "cache_hit_tokens": 117376,
+        "rounds": 5
+      },
+      "duration_ms": 20411
+    },
+    {
+      "caseId": "ff-005",
+      "slice": "decompose_evidence",
+      "expect": "answer",
+      "difficulty": "hard",
+      "question": "海天味业 2020 到 2024 年 ROE 为什么下滑？是净利率、资产周转还是杠杆的贡献？",
+      "error": null,
+      "chain": {
+        "pass": false,
+        "reasons": [
+          "max_decisions 6，实际 7",
+          "no_web：禁止工具 web_search"
+        ],
+        "stats": {
+          "decisions": 7,
+          "gold_steps": 2,
+          "matched_steps": 2,
+          "step_precision": 0.2857142857142857
+        }
+      },
+      "scores": [
+        {
+          "scorer": "numbers_grounded",
+          "applicable": true,
+          "pass": true,
+          "numbers": 0,
+          "ungrounded": [],
+          "reasons": []
+        },
+        {
+          "scorer": "source_period",
+          "applicable": true,
+          "pass": true,
+          "checks": {
+            "structural": true,
+            "period_in_reply": true,
+            "source_in_reply": false
+          },
+          "informational": [
+            "source_in_reply"
+          ],
+          "reasons": [
+            "（参考）回复未说明数据来源"
+          ]
+        },
+        {
+          "scorer": "refusal",
+          "applicable": true,
+          "expect": "answer",
+          "pass": true,
+          "reasons": []
+        }
+      ],
+      "pass_all_scorers": true,
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "海天味业"
+            ],
+            "metric": "roe",
+            "start": "2020",
+            "end": "2024"
+          }
+        },
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "海天味业"
+            ],
+            "metric": "net_margin",
+            "start": "2020",
+            "end": "2024"
+          }
+        },
+        {
+          "name": "get_instrument_financials",
+          "args": {
+            "code": "CN:STOCK:603288.SH",
+            "report_type": "annual"
+          }
+        },
+        {
+          "name": "propose_widget",
+          "args": {
+            "intent": "trend",
+            "datasetId": "research-ds-ff-1"
+          }
+        },
+        {
+          "name": "get_instrument_snapshot",
+          "args": {
+            "code": "CN:STOCK:603288.SH"
+          }
+        },
+        {
+          "name": "propose_widget",
+          "args": {
+            "intent": "trend",
+            "datasetId": "research-ds-ff-2"
+          }
+        },
+        {
+          "name": "web_search",
+          "args": {
+            "query": "海天味业 2020 2021 2022 2023 2024 年报 总资产 净资产 权益乘数 总资产周转率",
+            "region": "cn"
+          }
+        }
+      ],
+      "texts": [
+        "已经把两条关键曲线放进右侧预览了：**海天味业净资产收益率（2020–2024）** 和 **净利率（2020–2024）**，你可以直接对照看。\n\n**拆解框架**：ROE = 净利率 × 总资产周转率 × 权益乘数。三因素里，净利率这条线能被单独画出来（已在右侧），剩下两项（周转率、杠杆）只能合起来作为一个整体看。\n\n**怎么读这两张图**\n- 如果两条曲线**基本同步下滑** → 净利率是主因，说明毛利/费用端在恶化，ROE 的下滑「含金量」偏经营层面。\n- 如果 ROE 的跌幅**明显大于**净利率的变动幅度（净利率大体走平或只小幅回落）→ 拖累主要来自周转或杠杆：要么是收入没跟上资产扩张（周转变慢），要么是权益变厚、负债端收缩（杠杆降低），这两者都会让 ROE 往下走而净利率不动。\n- 三种情况往往**同时发生但权重不同**，所以判断重点是「哪一项解释了大部分跌幅」。\n\n**一个必须说明的数据缺口**：本环境取不到海天资产负债表明细（总资产、净资产），所以我没法把周转率和权益乘数拆开、也没法给出每一项贡献的具体百分比；现在只能通过 ROE 与净利率的相对变化去推断主因方向，属于推断而非已证实结论。若你能提供年报中的总资产/净资产口径数据，我可以把三因素贡献度算实。\n\n**风险提示**：ROE 的会计口径（加权/摊薄、期初期末净资产取法）会明显影响分项拆分结果；另外 2020 年基数中若含一次性因素（如疫情期渠道补库、投资收益），会放大后续年份的「下滑」幅度，判断前建议先核对口径与基数是否可比。"
+      ],
+      "datasets": [
+        {
+          "id": "research-ds-ff-1",
+          "metric": "roe",
+          "entities": [
+            "海天味业"
+          ],
+          "periods": [
+            "2020",
+            "2021",
+            "2022",
+            "2023",
+            "2024"
+          ],
+          "parentDatasetId": null
+        },
+        {
+          "id": "research-ds-ff-2",
+          "metric": "net_margin",
+          "entities": [
+            "海天味业"
+          ],
+          "periods": [
+            "2020",
+            "2021",
+            "2022",
+            "2023",
+            "2024"
+          ],
+          "parentDatasetId": null
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 97267,
+        "completion_tokens": 4522,
+        "cache_hit_tokens": 96000,
+        "rounds": 4
+      },
+      "duration_ms": 22098
+    },
+    {
+      "caseId": "ff-006",
+      "slice": "multi_turn",
+      "expect": "answer",
+      "difficulty": "hard",
+      "question": "对比贵州茅台和五粮液 2021 到 2025 年净利率",
+      "error": null,
+      "chain": {
+        "pass": true,
+        "reasons": [],
+        "stats": {
+          "decisions": 7,
+          "gold_steps": 4,
+          "matched_steps": 4,
+          "step_precision": 0.5714285714285714
+        }
+      },
+      "scores": [
+        {
+          "scorer": "numbers_grounded",
+          "applicable": true,
+          "pass": true,
+          "numbers": 0,
+          "ungrounded": [],
+          "reasons": []
+        },
+        {
+          "scorer": "source_period",
+          "applicable": true,
+          "pass": true,
+          "checks": {
+            "structural": true,
+            "period_in_reply": true,
+            "source_in_reply": false
+          },
+          "informational": [
+            "source_in_reply"
+          ],
+          "reasons": [
+            "（参考）回复未说明数据来源"
+          ]
+        },
+        {
+          "scorer": "refusal",
+          "applicable": true,
+          "expect": "answer",
+          "pass": true,
+          "reasons": []
+        }
+      ],
+      "pass_all_scorers": true,
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "贵州茅台",
+              "五粮液"
+            ],
+            "metric": "net_margin",
+            "start": "2021",
+            "end": "2025"
+          }
+        },
+        {
+          "name": "propose_widget",
+          "args": {
+            "datasetId": "research-ds-ff-1",
+            "intent": "trend"
+          }
+        },
+        {
+          "name": "refine_dataset",
+          "args": {
+            "datasetId": "research-ds-ff-1",
+            "operation": {
+              "type": "change_period",
+              "start": "2023",
+              "end": "2025"
+            }
+          }
+        },
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "贵州茅台",
+              "五粮液"
+            ],
+            "metric": "gross_margin",
+            "start": "2023",
+            "end": "2025"
+          }
+        },
+        {
+          "name": "get_instrument_financials",
+          "args": {
+            "instrument": {
+              "market": "CN",
+              "assetClass": "STOCK",
+              "symbol": "600519.SH",
+              "exchange": "SH"
+            },
+            "report_type": "annual"
+          }
+        },
+        {
+          "name": "propose_widget",
+          "args": {
+            "datasetId": "research-ds-ff-2",
+            "intent": "trend"
+          }
+        },
+        {
+          "name": "propose_widget",
+          "args": {
+            "datasetId": "research-ds-ff-3",
+            "intent": "trend"
+          }
+        }
+      ],
+      "texts": [
+        "已按你的要求生成预览：两家公司 2021–2025 年净利率走势（2 家 × 5 年，共 10 个数据点全部齐备）。\n\n图中两条线可直接对照：看点主要是两条线的相对高低——茅台是否始终位于五粮液上方、两者差距在这五年是扩大还是收窄，以及各自的年度波动方向。\n\n说明两点口径：一是净利率按年报口径（归母净利润/营业收入）逐年列出，2025 年为最新一期；二是净利率受产品结构、提价节奏和税费基数影响，单看这一条指标不足以判断经营质量，配合毛利率、营收增速一起看更完整。\n\n风险提示：白酒行业的净利率对渠道结构和出厂价调整较敏感，历史年份的高低不等于未来延续。如果想换成分组柱并排对比、或加看毛利率，告诉我即可。",
+        "已把窗口收窄到 2023–2025，并额外拉了一张毛利率的对照图放在旁边——要回答\"为什么波动更大\"，毛利率是第一个要看的地方。\n\n**事实依据**\n- 图一：两家公司 2023–2025 年净利率走势（年报口径，2025 为最新一期），6 个数据点齐全。\n- 图二：同期毛利率走势，同样 6 个点齐全。\n\n**净利率的拆解思路**\n净利率大致等于：毛利率 − 期间费用率（销售费用是大头）− 税金及附加/所得税影响。白酒公司的毛利率普遍很高，所以年度摆动基本由两块决定：一是毛利率（出厂价、产品结构、直销与经销的比例变化都会带动），二是销售费用率（渠道投放、促销、市场支持的节奏）。\n\n由此可以分两种情形看：\n- 如果两家在图二里的毛利率走势几乎是平行的，那净利率的差异就不在毛利端，而更可能落在费用投放节奏、税金或非经常性损益上；\n- 如果毛利率本身一家走平、一家明显下移，那净利率曲线的陡缓基本就由这一块解释了，属于价格体系或产品结构层面的变化。\n\n把两张图叠着看，指向哪一类会很直观——图里曲线更陡的一方，通常就是这两块同时发生变动的一方。\n\n**一点提醒**\n净利率的年度波动也可能来自基数效应（比如某年有一次性收益垫高），而且白酒的净利率对渠道库存和批价变化比较敏感，所以单看这一条指标不宜直接推演未来。想更进一步的话，可以把营收增速一起加进来，看是\"收入端变了\"还是\"成本/费用端变了\"。"
+      ],
+      "datasets": [
+        {
+          "id": "research-ds-ff-1",
+          "metric": "net_margin",
+          "entities": [
+            "贵州茅台",
+            "五粮液"
+          ],
+          "periods": [
+            "2021",
+            "2022",
+            "2023",
+            "2024",
+            "2025"
+          ],
+          "parentDatasetId": null
+        },
+        {
+          "id": "research-ds-ff-2",
+          "metric": "net_margin",
+          "entities": [
+            "贵州茅台",
+            "五粮液"
+          ],
+          "periods": [
+            "2023",
+            "2024",
+            "2025"
+          ],
+          "parentDatasetId": "research-ds-ff-1"
+        },
+        {
+          "id": "research-ds-ff-3",
+          "metric": "gross_margin",
+          "entities": [
+            "贵州茅台",
+            "五粮液"
+          ],
+          "periods": [
+            "2023",
+            "2024",
+            "2025"
+          ],
+          "parentDatasetId": null
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 142376,
+        "completion_tokens": 4259,
+        "cache_hit_tokens": 140160,
+        "rounds": 6
+      },
+      "duration_ms": 23683
+    },
+    {
+      "caseId": "ff-007",
+      "slice": "multi_turn",
+      "expect": "answer",
+      "difficulty": "medium",
+      "question": "只看 2022 年以后",
+      "error": null,
+      "chain": {
+        "pass": true,
+        "reasons": [],
+        "stats": {
+          "decisions": 2,
+          "gold_steps": 2,
+          "matched_steps": 2,
+          "step_precision": 1
+        }
+      },
+      "scores": [
+        {
+          "scorer": "numbers_grounded",
+          "applicable": true,
+          "pass": true,
+          "numbers": 0,
+          "ungrounded": [],
+          "reasons": []
+        },
+        {
+          "scorer": "source_period",
+          "applicable": true,
+          "pass": true,
+          "checks": {
+            "structural": true,
+            "period_in_reply": true,
+            "source_in_reply": false
+          },
+          "informational": [
+            "source_in_reply"
+          ],
+          "reasons": [
+            "（参考）回复未说明数据来源"
+          ]
+        },
+        {
+          "scorer": "refusal",
+          "applicable": true,
+          "expect": "answer",
+          "pass": true,
+          "reasons": []
+        }
+      ],
+      "pass_all_scorers": true,
+      "calls": [
+        {
+          "name": "refine_dataset",
+          "args": {
+            "datasetId": "research-ds-1",
+            "operation": {
+              "type": "change_period",
+              "start": "2022",
+              "end": "2024"
+            }
+          }
+        },
+        {
+          "name": "propose_widget",
+          "args": {
+            "datasetId": "research-ds-ff-2",
+            "intent": "compare",
+            "type": "grouped_bar",
+            "title": "宁德时代、比亚迪 毛利率（2022–2024）"
+          }
+        }
+      ],
+      "texts": [
+        "已按 2022 年之后重画，区间收窄到 2022–2024（原来含 2020–2021）。\n\n- 图看什么：两根柱子并排，横轴是年份，对比宁德时代与比亚迪的毛利率变化。\n- 口径：取自两家公司的年度报告，2022、2023、2024 三个年度数据齐全。\n- 可以怎么调：想看走势感更强可换成折线，或只看 2024 一年做横向高低对比。\n\n一个提醒：样本只有两家，单看毛利率容易忽略业务结构差异（电池制造 vs 整车+电池），判断盈利质量最好再搭配净利率或 ROE 一起看。"
+      ],
+      "datasets": [
+        {
+          "id": "research-ds-1",
+          "metric": "gross_margin",
+          "entities": [
+            "宁德时代",
+            "比亚迪"
+          ],
+          "periods": [
+            "2020",
+            "2021",
+            "2022",
+            "2023",
+            "2024"
+          ],
+          "parentDatasetId": null
+        },
+        {
+          "id": "research-ds-ff-2",
+          "metric": "gross_margin",
+          "entities": [
+            "宁德时代",
+            "比亚迪"
+          ],
+          "periods": [
+            "2022",
+            "2023",
+            "2024"
+          ],
+          "parentDatasetId": "research-ds-1"
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 68084,
+        "completion_tokens": 902,
+        "cache_hit_tokens": 67328,
+        "rounds": 3
+      },
+      "duration_ms": 5085
+    },
+    {
+      "caseId": "ff-008",
+      "slice": "multi_turn",
+      "expect": "answer",
+      "difficulty": "medium",
+      "question": "不要泸州老窖了，只留另外两家",
+      "error": null,
+      "chain": {
+        "pass": true,
+        "reasons": [],
+        "stats": {
+          "decisions": 2,
+          "gold_steps": 2,
+          "matched_steps": 2,
+          "step_precision": 1
+        }
+      },
+      "scores": [
+        {
+          "scorer": "numbers_grounded",
+          "applicable": true,
+          "pass": true,
+          "numbers": 0,
+          "ungrounded": [],
+          "reasons": []
+        },
+        {
+          "scorer": "source_period",
+          "applicable": true,
+          "pass": true,
+          "checks": {
+            "structural": true,
+            "period_in_reply": true,
+            "source_in_reply": false
+          },
+          "informational": [
+            "source_in_reply"
+          ],
+          "reasons": [
+            "（参考）回复未说明数据来源"
+          ]
+        },
+        {
+          "scorer": "refusal",
+          "applicable": true,
+          "expect": "answer",
+          "pass": true,
+          "reasons": []
+        }
+      ],
+      "pass_all_scorers": true,
+      "calls": [
+        {
+          "name": "refine_dataset",
+          "args": {
+            "datasetId": "research-ds-1",
+            "operation": {
+              "type": "remove_entities",
+              "entities": [
+                "泸州老窖"
+              ]
+            }
+          }
+        },
+        {
+          "name": "propose_widget",
+          "args": {
+            "datasetId": "research-ds-ff-2",
+            "intent": "trend"
+          }
+        }
+      ],
+      "texts": [
+        "已经把泸州老窖从这组数据里去掉，图上现在只保留**贵州茅台**和**五粮液**两家，2021–2025 五个年度的净利率数据都齐（右侧预览已是更新后的两线走势）。\n\n- 两家都是高端白酒里净利率处在高位的公司，看这条线主要看的是**品牌力能否持续支撑价格体系**，以及费用投放节奏和产品结构变化对利润率的影响；\n- 两家放在一起对照，可以观察它们利润率差距是收窄还是扩大——收窄通常意味着产品结构或渠道政策在往同一方向走，扩大则往往对应品牌溢价或高端占比的进一步分化；\n- 年份跨度覆盖了 2021 年以来的完整区间，能看出中间的波动是否属于一次性因素。\n\n需要的话可以只留其中一年的横向对比，或者把口径换成毛利率、营收增速再看看。"
+      ],
+      "datasets": [
+        {
+          "id": "research-ds-1",
+          "metric": "net_margin",
+          "entities": [
+            "贵州茅台",
+            "五粮液",
+            "泸州老窖"
+          ],
+          "periods": [
+            "2021",
+            "2022",
+            "2023",
+            "2024",
+            "2025"
+          ],
+          "parentDatasetId": null
+        },
+        {
+          "id": "research-ds-ff-2",
+          "metric": "net_margin",
+          "entities": [
+            "贵州茅台",
+            "五粮液"
+          ],
+          "periods": [
+            "2021",
+            "2022",
+            "2023",
+            "2024",
+            "2025"
+          ],
+          "parentDatasetId": "research-ds-1"
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 67900,
+        "completion_tokens": 962,
+        "cache_hit_tokens": 67200,
+        "rounds": 3
+      },
+      "duration_ms": 6571
+    },
+    {
+      "caseId": "ff-009",
+      "slice": "ambiguity_missing",
+      "expect": "clarify",
+      "difficulty": "medium",
+      "question": "看一下中芯近五年的毛利率",
+      "error": null,
+      "chain": {
+        "pass": true,
+        "reasons": [],
+        "stats": {
+          "decisions": 3,
+          "gold_steps": 0,
+          "matched_steps": 0,
+          "step_precision": 0
+        }
+      },
+      "scores": [
+        {
+          "scorer": "numbers_grounded",
+          "applicable": true,
+          "pass": true,
+          "numbers": 0,
+          "ungrounded": [],
+          "reasons": []
+        },
+        {
+          "scorer": "source_period",
+          "applicable": false,
+          "pass": null,
+          "reasons": []
+        },
+        {
+          "scorer": "refusal",
+          "applicable": true,
+          "expect": "clarify",
+          "pass": false,
+          "reasons": [
+            "歧义未澄清就出了预览",
+            "未向用户澄清"
+          ]
+        }
+      ],
+      "pass_all_scorers": false,
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "中芯国际"
+            ],
+            "metric": "gross_margin",
+            "start": "2021",
+            "end": "2025"
+          }
+        },
+        {
+          "name": "propose_widget",
+          "args": {
+            "datasetId": "research-ds-ff-1",
+            "intent": "trend"
+          }
+        },
+        {
+          "name": "get_instrument_financials",
+          "args": {
+            "code": "CN:STOCK:688981.SH",
+            "report_type": "annual"
+          }
+        }
+      ],
+      "texts": [
+        "已把中芯国际 2021–2025 年的年度毛利率做成一张走势预览，放在你右侧的研究画布上（5 个报告期数据齐全，采用年报口径）。\n\n看图时可以抓三个位置：2022 年前后的高点、2023–2024 年的回落区间、以及最近一年的修复斜率——代工毛利率本质由产能利用率、晶圆均价和折旧节奏共同决定，所以曲线的拐点通常对应行业供需和扩产周期的切换。具体每个年份的数值以图中为准，我这边不单独复述以免和图上口径打架。\n\n想改成柱状对比、或换看净利率、营收增速，说一句就行。风险提示：单看毛利率容易漏掉折旧与产能爬坡的影响，判断盈利趋势最好和营收、净利率一起看。"
+      ],
+      "datasets": [
+        {
+          "id": "research-ds-ff-1",
+          "metric": "gross_margin",
+          "entities": [
+            "中芯国际"
+          ],
+          "periods": [
+            "2021",
+            "2022",
+            "2023",
+            "2024",
+            "2025"
+          ],
+          "parentDatasetId": null
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 90650,
+        "completion_tokens": 1646,
+        "cache_hit_tokens": 89600,
+        "rounds": 4
+      },
+      "duration_ms": 10187
+    },
+    {
+      "caseId": "ff-010",
+      "slice": "ambiguity_missing",
+      "expect": "answer_with_gap",
+      "difficulty": "medium",
+      "question": "比较中芯国际和华虹公司 2020 到 2024 年毛利率",
+      "error": null,
+      "chain": {
+        "pass": true,
+        "reasons": [],
+        "stats": {
+          "decisions": 2,
+          "gold_steps": 2,
+          "matched_steps": 2,
+          "step_precision": 1
+        }
+      },
+      "scores": [
+        {
+          "scorer": "numbers_grounded",
+          "applicable": true,
+          "pass": true,
+          "numbers": 0,
+          "ungrounded": [],
+          "reasons": []
+        },
+        {
+          "scorer": "source_period",
+          "applicable": true,
+          "pass": true,
+          "checks": {
+            "structural": true,
+            "period_in_reply": true,
+            "source_in_reply": false
+          },
+          "informational": [
+            "source_in_reply"
+          ],
+          "reasons": [
+            "（参考）回复未说明数据来源"
+          ]
+        },
+        {
+          "scorer": "refusal",
+          "applicable": true,
+          "expect": "answer_with_gap",
+          "pass": true,
+          "reasons": []
+        }
+      ],
+      "pass_all_scorers": true,
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "中芯国际",
+              "华虹公司"
+            ],
+            "metric": "gross_margin",
+            "start": "2020",
+            "end": "2024"
+          }
+        },
+        {
+          "name": "propose_widget",
+          "args": {
+            "datasetId": "research-ds-ff-1",
+            "intent": "trend"
+          }
+        }
+      ],
+      "texts": [
+        "已在右侧生成两张毛利率走势预览（2020–2024）。\n\n**结论摘要**：两家头部晶圆代工的毛利率走势并不平行——中芯国际更早出现高位回落，华虹公司的波动幅度更大。但要注意，**华虹公司只有 2022 年起的年度毛利率可取到**（其 A 股 2023 年才上市），所以 2020–2021 的对照其实是单边数据，不能当作完整双线比较。\n\n**事实口径**：\n- 中芯国际（688981）：2020–2024 五个年度毛利率均有数据。\n- 华虹公司（688347）：仅 2022、2023、2024 三个年度可取。\n- 覆盖情况：10 个「公司×年度」格子中取到 8 个，缺口集中在华虹的 2020–2021。\n\n**简短解读**：半导体代工的毛利率本质是「产能利用率 + 价格 + 折旧」三件事的结果。2022 年前后行业处于缺芯景气高点，两家毛利率都被推到相对高位；2023–2024 随着消费电子去库存、成熟制程价格竞争加剧，以及新产线折旧开始计入，毛利率普遍承压。中芯的体量与产品结构更偏中高端，华虹更集中于成熟特色工艺（功率、模拟等），后者对单一品类价格更敏感，因此波动通常更大。上图中后段两家的斜率差异，基本就是这个逻辑的体现。\n\n**主要风险 / 注意**：华虹早年数据缺口会让「谁更高」的历史对比结论偏弱；另外毛利率是年度口径，无法反映季度内的剧烈波动，若要判断当前盈利位置，建议改用季度数据再看一次。\n\n要不要我把华虹的起止年份缩到 2022–2024 做一条干净的双线对照？"
+      ],
+      "datasets": [
+        {
+          "id": "research-ds-ff-1",
+          "metric": "gross_margin",
+          "entities": [
+            "中芯国际",
+            "华虹公司"
+          ],
+          "periods": [
+            "2020",
+            "2021",
+            "2022",
+            "2023",
+            "2024"
+          ],
+          "parentDatasetId": null
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 67451,
+        "completion_tokens": 730,
+        "cache_hit_tokens": 66688,
+        "rounds": 3
+      },
+      "duration_ms": 5195
+    },
+    {
+      "caseId": "ff-011",
+      "slice": "ambiguity_missing",
+      "expect": "refuse",
+      "difficulty": "medium",
+      "question": "看贵州茅台 2026 年全年营收",
+      "error": null,
+      "chain": {
+        "pass": true,
+        "reasons": [],
+        "stats": {
+          "decisions": 2,
+          "gold_steps": 0,
+          "matched_steps": 0,
+          "step_precision": 0
+        }
+      },
+      "scores": [
+        {
+          "scorer": "numbers_grounded",
+          "applicable": true,
+          "pass": true,
+          "numbers": 0,
+          "ungrounded": [],
+          "reasons": []
+        },
+        {
+          "scorer": "source_period",
+          "applicable": false,
+          "pass": null,
+          "reasons": []
+        },
+        {
+          "scorer": "refusal",
+          "applicable": true,
+          "expect": "refuse",
+          "pass": true,
+          "reasons": [],
+          "alternative_offered": true
+        }
+      ],
+      "pass_all_scorers": true,
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "贵州茅台"
+            ],
+            "metric": "revenue",
+            "start": "2021",
+            "end": "2026"
+          }
+        },
+        {
+          "name": "propose_widget",
+          "args": {
+            "datasetId": "research-ds-ff-1",
+            "intent": "trend"
+          }
+        }
+      ],
+      "texts": [
+        "贵州茅台 2026 年**全年**营收目前还没有——截至今天（2026 年 9 月 14 日），2026 年年报尚未披露，年度本身也没走完，所以这个数字既不存在也无法推算给你。右侧预览展示的是 2021–2025 五个完整年度的营收走势（年报口径），2026 那一栏是空的，并非零。\n\n从已有序列看，公司营收过去几年保持逐年抬升的节奏，但各年增速并非匀速，这也是看这条线时最该关注的地方。\n\n想接着看的话，两个更实在的口径：一是改看 2026 年中报的营收及同比（反映全年已完成部分），二是把指标换成营收增速，看斜率是否在放缓。风险提示：白酒终端需求与批发价波动会直接影响发货节奏，全年确认收入还取决于四季度，现在谈 2026 全年数字为时过早。"
+      ],
+      "datasets": [
+        {
+          "id": "research-ds-ff-1",
+          "metric": "revenue",
+          "entities": [
+            "贵州茅台"
+          ],
+          "periods": [
+            "2021",
+            "2022",
+            "2023",
+            "2024",
+            "2025",
+            "2026"
+          ],
+          "parentDatasetId": null
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 67983,
+        "completion_tokens": 1285,
+        "cache_hit_tokens": 67200,
+        "rounds": 3
+      },
+      "duration_ms": 7780
+    },
+    {
+      "caseId": "ff-012",
+      "slice": "tool_degrade",
+      "expect": "refuse",
+      "difficulty": "medium",
+      "question": "比较苹果和腾讯控股 2020 到 2024 年营收",
+      "error": null,
+      "chain": {
+        "pass": false,
+        "reasons": [
+          "max_decisions 4，实际 12",
+          "no_web：禁止工具 web_search, web_search"
+        ],
+        "stats": {
+          "decisions": 12,
+          "gold_steps": 0,
+          "matched_steps": 0,
+          "step_precision": 0
+        }
+      },
+      "scores": [
+        {
+          "scorer": "numbers_grounded",
+          "applicable": true,
+          "pass": true,
+          "numbers": 0,
+          "ungrounded": [],
+          "reasons": []
+        },
+        {
+          "scorer": "source_period",
+          "applicable": false,
+          "pass": null,
+          "reasons": []
+        },
+        {
+          "scorer": "refusal",
+          "applicable": true,
+          "expect": "refuse",
+          "pass": false,
+          "reasons": [
+            "未明确说明做不到/数据不可用",
+            "工具调用 12 次，超过 4（反复重试）"
+          ]
+        }
+      ],
+      "pass_all_scorers": false,
+      "calls": [
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "苹果",
+              "腾讯控股"
+            ],
+            "metric": "revenue",
+            "start": "2020",
+            "end": "2024"
+          }
+        },
+        {
+          "name": "search_instruments",
+          "args": {
+            "keyword": "苹果",
+            "markets": [
+              "US"
+            ]
+          }
+        },
+        {
+          "name": "search_instruments",
+          "args": {
+            "keyword": "腾讯控股",
+            "markets": [
+              "HK"
+            ]
+          }
+        },
+        {
+          "name": "search_instruments",
+          "args": {
+            "keyword": "腾讯控股"
+          }
+        },
+        {
+          "name": "search_instruments",
+          "args": {
+            "keyword": "AAPL"
+          }
+        },
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "AAPL.US",
+              "00700.HK"
+            ],
+            "end": "2024",
+            "metric": "revenue",
+            "start": "2020"
+          }
+        },
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "苹果公司",
+              "腾讯"
+            ],
+            "end": "2024",
+            "metric": "revenue",
+            "start": "2020"
+          }
+        },
+        {
+          "name": "query_data",
+          "args": {
+            "entities": [
+              "腾讯控股"
+            ],
+            "end": "2024",
+            "metric": "revenue",
+            "start": "2020"
+          }
+        },
+        {
+          "name": "web_search",
+          "args": {
+            "query": "Apple annual revenue fiscal 2020 2021 2022 2023 2024 total net sales billion",
+            "region": "global"
+          }
+        },
+        {
+          "name": "web_search",
+          "args": {
+            "query": "腾讯控股 2020 2021 2022 2023 2024 全年 营业收入 亿元",
+            "region": "cn"
+          }
+        },
+        {
+          "name": "get_instrument_financials",
+          "args": {
+            "market": "US",
+            "symbol": "AAPL",
+            "report_type": "annual"
+          }
+        },
+        {
+          "name": "get_instrument_financials",
+          "args": {
+            "market": "HK",
+            "symbol": "00700",
+            "report_type": "annual"
+          }
+        }
+      ],
+      "texts": [],
+      "datasets": [],
+      "usage": {
+        "prompt_tokens": 182357,
+        "completion_tokens": 2063,
+        "cache_hit_tokens": 180992,
+        "rounds": 8
+      },
+      "duration_ms": 12475
+    }
+  ]
+}
