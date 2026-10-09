@@ -3,7 +3,8 @@
  * expect:
  * - answer：须提出至少一个指向有效数据集的预览（不误拒）
  * - answer_with_gap：同上，且正文说明缺失
- * - refuse：不出预览，正文说明做不到，工具调用不超过 max_calls（防反复重试）
+ * - refuse：正文说明做不到，工具调用不超过 max_calls（防反复重试）；
+ *   简报 Demo C 允许给「可查询的替代范围」，所以说明做不到之后出替代预览不算错
  * - clarify：不出预览，调用 ask_user 或正文向用户提问
  */
 const REFUSE_RE = /不支持|暂不|无法|没有|未能|不提供|缺少|缺失|不可用|查不到|拿不到|尚未|未披露|暂无|做不到|不能/
@@ -27,8 +28,7 @@ function judge(expect, ctx) {
   }
   if (expect === 'refuse') {
     return [
-      ...(proposed ? ['不应出研究预览（数据不可用）'] : []),
-      ...(REFUSE_RE.test(reply) ? [] : ['未明确说明做不到/数据不可用']),
+      ...(REFUSE_RE.test(reply) ? [] : [proposed ? '出了预览却未说明所问数据不可用' : '未明确说明做不到/数据不可用']),
       ...(calls.length > maxCalls ? [`工具调用 ${calls.length} 次，超过 ${maxCalls}（反复重试）`] : []),
     ]
   }
@@ -50,5 +50,6 @@ export function scoreRefusal({ evalCase, calls, texts, datasets }) {
     proposed: validProposals(calls, datasets).length > 0,
     maxCalls: evalCase?.max_calls ?? DEFAULT_MAX_CALLS,
   })
-  return { scorer: 'refusal', applicable: true, expect, pass: reasons.length === 0, reasons }
+  const alternative = expect === 'refuse' && validProposals(calls, datasets).length > 0
+  return { scorer: 'refusal', applicable: true, expect, pass: reasons.length === 0, reasons, ...(alternative ? { alternative_offered: true } : {}) }
 }
