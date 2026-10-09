@@ -87,6 +87,32 @@ describe('ResearchTurnUi', () => {
     unregister()
   })
 
+  it('switching the chart in the component is local; pin carries the chosen view', () => {
+    renderWithProviders(<Turn steps={[PROPOSAL, COMPOSE]} />)
+    const plot = document.querySelector('[data-generative-ui-block="ComparisonView"] [data-view-type]')
+    expect(plot?.getAttribute('data-view-type')).toBe('line_chart')
+    fireEvent.click(screen.getAllByRole('tab', { name: '表格' })[0] as HTMLElement)
+    expect(document.querySelector('[data-generative-ui-block="ComparisonView"] [data-view-type]')?.getAttribute('data-view-type')).toBe('table')
+    expect(events).toEqual([])
+    fireEvent.click(screen.getByRole('button', { name: '钉住' }))
+    const adopted = events.filter(e => (e as { type?: string }).type === 'widget_adopted') as Array<{ proposal: { id: string; type: string } }>
+    expect(adopted.map(e => [e.proposal.id, e.proposal.type])).toEqual([['call_p1', 'table'], [`spec-pin-${ROE.id}`, 'table']])
+  })
+
+  it('调整 hands this chart (with the switched view) to the next turn via the existing adjust path', async () => {
+    const { registerResearchAdjustDraftSink, consumePendingAdjustProposal } = await import('../chat/research-canvas/researchPreviewAdjust')
+    const drafts: string[] = []
+    const off = registerResearchAdjustDraftSink(text => drafts.push(text))
+    const spec = { version: 1, blocks: [{ component: 'TrendView', datasetId: NET_MARGIN.id, actions: ['adjust'] }] }
+    renderWithProviders(<Turn steps={[PROPOSAL, step('compose_research_ui', { ok: true, spec })]} />)
+    fireEvent.click(screen.getAllByRole('tab', { name: '表格' })[0] as HTMLElement)
+    fireEvent.click(screen.getByRole('button', { name: '调整' }))
+    expect(drafts[0]).toMatch(/^调整「/)
+    expect(consumePendingAdjustProposal()).toMatchObject({ proposalId: 'call_p1', type: 'table', datasetId: NET_MARGIN.id })
+    expect(events).toEqual([])
+    off()
+  })
+
   it('stream runtime stores research_ui_spec as a step of the live turn', () => {
     const base = applyChatProgressEvent({ liveTrace: null } as never, { type: 'tool_start', step: { ...PROPOSAL, status: 'running' } })
     const next = applyChatProgressEvent(base, { type: 'research_ui_spec', step: COMPOSE })

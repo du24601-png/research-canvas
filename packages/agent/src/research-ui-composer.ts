@@ -26,7 +26,7 @@ const SYSTEM = [
   '- TrendView {"component":"TrendView","datasetId":id,"actions":[...]}：单个数据集随年份的走势。用户问「哪年变化最大 / 变化明显」时加 "highlight_largest_change"。',
   '- MissingData {"component":"MissingData","datasetId":id}：数据集覆盖不完整时放一个。',
   '- EvidencePanel {"component":"EvidencePanel","datasetIds":[...]}：来源与口径，放在最后，列出用到的数据集。',
-  'actions 只能用 "pin"（钉住）、"open_sources"（查看来源）、"rerun"（再查一次）、"highlight_largest_change"（仅 TrendView）。',
+  'actions 只能用 "pin"（钉住）、"open_sources"（查看来源）、"rerun"（再查一次）、"adjust"（让用户说明怎么调整这张图）、"highlight_largest_change"（仅 TrendView）。',
   '只能引用下面列出的 datasetId。可选 "title"，须为中文短语，不得包含数字（年份除外）。你看不到数值，也不得写任何数值。',
 ].join('\n')
 

@@ -11,7 +11,7 @@ export const RESEARCH_UI_SPEC_VERSION = 1
 export const RESEARCH_UI_COMPONENTS = ['ComparisonView', 'TrendView', 'EvidencePanel', 'MissingData'] as const
 export type ResearchUiComponent = typeof RESEARCH_UI_COMPONENTS[number]
 
-export const RESEARCH_UI_ACTIONS = ['pin', 'open_sources', 'highlight_largest_change', 'rerun'] as const
+export const RESEARCH_UI_ACTIONS = ['pin', 'open_sources', 'highlight_largest_change', 'rerun', 'adjust'] as const
 export type ResearchUiAction = typeof RESEARCH_UI_ACTIONS[number]
 
 export type ResearchUiBlock =
@@ -47,8 +47,8 @@ const FIELDS: Record<ResearchUiComponent, readonly string[]> = {
 }
 
 const ACTIONS_FOR: Record<ResearchUiComponent, readonly ResearchUiAction[]> = {
-  ComparisonView: ['pin', 'open_sources', 'rerun'],
-  TrendView: ['pin', 'open_sources', 'highlight_largest_change', 'rerun'],
+  ComparisonView: ['pin', 'open_sources', 'rerun', 'adjust'],
+  TrendView: ['pin', 'open_sources', 'highlight_largest_change', 'rerun', 'adjust'],
   EvidencePanel: [],
   MissingData: [],
 }

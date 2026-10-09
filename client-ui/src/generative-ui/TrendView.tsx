@@ -2,11 +2,12 @@ import { useState } from 'react'
 import { Text } from '@fluentui/react-components'
 import type { ResearchUiBlock } from '@opptrix/shared/research-ui-spec'
 import { largestAbsDelta, yoyDeltaDataset } from '@opptrix/shared/research-dataset-delta'
-import LineChartWidget from '../chat/research-canvas/LineChartWidget'
+import PreviewPlot from '../chat/research-canvas/PreviewPlot'
+import { ViewSwitcher } from '../chat/research-canvas/ViewSwitcher'
 import { researchMetricLabel } from '../chat/research-canvas/sourcePresentation'
 import type { Dataset } from '../chat/research-canvas/types'
 import { BlockFrame, useBlockStyles } from './BlockFrame'
-import { hostActions, periodRange, type BlockProps } from './types'
+import { hostActions, periodRange, type BlockProps, type BlockView } from './types'
 
 type TrendBlock = Extract<ResearchUiBlock, { component: 'TrendView' }>
 
@@ -29,6 +30,7 @@ function localDelta(dataset: Dataset): Dataset | undefined {
 export default function TrendView({ block, getDataset, onAction }: BlockProps<TrendBlock>) {
   const s = useBlockStyles()
   const [highlight, setHighlight] = useState(false)
+  const [view, setView] = useState<BlockView>({ type: 'line_chart' })
   const dataset = getDataset(block.datasetId)
   if (!dataset) return null
   const delta = block.deltaDatasetId ? getDataset(block.deltaDatasetId) : localDelta(dataset)
@@ -40,14 +42,15 @@ export default function TrendView({ block, getDataset, onAction }: BlockProps<Tr
       pressed: highlight,
       onClick: () => setHighlight(value => !value),
     }] : []),
-    ...hostActions(block, onAction),
+    ...hostActions(block, onAction, view),
   ]
   const note = highlight && delta ? largestChangeNote(dataset, delta) : null
   return (
-    <BlockFrame title={block.title ?? `${researchMetricLabel(dataset.metric)}走势`} kind="TrendView" actions={actions}>
+    <BlockFrame title={block.title ?? view.title ?? `${researchMetricLabel(dataset.metric)}走势`} kind="TrendView" actions={actions}>
       <Text className={s.note} block>{dataset.unit || '单位未记录'} · {periodRange(dataset)}</Text>
-      <div className={s.plot}>
-        <LineChartWidget dataset={dataset} />
+      <ViewSwitcher dataset={dataset} type={view.type} period={view.period} onChange={next => setView({ type: next.type, period: next.period, title: next.title })} />
+      <div className={s.plot} data-view-type={view.type}>
+        <PreviewPlot type={view.type} dataset={dataset} period={view.period} />
       </div>
       {note ? <Text className={s.note} block data-largest-change>由代码计算：{note}</Text> : null}
     </BlockFrame>

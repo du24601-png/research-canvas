@@ -74,7 +74,7 @@ describe('SpecRenderer', () => {
     expect(events).toEqual([])
     expect(readPersistedCanvasState(SESSION).widgets).toEqual([])
     fireEvent.click(screen.getAllByRole('button', { name: '钉住' })[0] as HTMLElement)
-    expect(onAction).toHaveBeenCalledWith('pin', expect.objectContaining({ component: 'ComparisonView' }))
+    expect(onAction).toHaveBeenCalledWith('pin', expect.objectContaining({ component: 'ComparisonView' }), expect.objectContaining({ type: 'line_chart' }))
     expect(events).toEqual([])
     expect(readPersistedCanvasState(SESSION).widgets).toEqual([])
   })
