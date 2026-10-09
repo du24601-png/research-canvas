@@ -20,15 +20,10 @@ function datasetSourced(ds) {
 
 function structuralReasons(calls, datasets) {
   const byId = new Map(datasets.map((d) => [d.id, d]))
-  const ids = proposedDatasetIds(calls)
-  if (!ids.length) return ['未提出任何研究视图，无法核对来源']
-  const reasons = []
-  for (const id of ids) {
-    const ds = byId.get(id)
-    if (!ds) reasons.push(`预览引用了不存在的数据集 ${id || '(空)'}`)
-    else if (!datasetSourced(ds)) reasons.push(`数据集 ${id} 有数据点缺来源或报告期`)
-  }
-  return reasons
+  // 引用不存在数据集的预览会被工具拒绝、不会显示给用户（seed-v2 的错误 id 题就是这样设计的），不计入
+  const ids = proposedDatasetIds(calls).filter(id => byId.has(id))
+  if (!ids.length) return ['没有成功出现的研究视图，无法核对来源']
+  return ids.filter(id => !datasetSourced(byId.get(id))).map(id => `数据集 ${id} 有数据点缺来源或报告期`)
 }
 
 export function scoreSourcePeriod({ evalCase, calls, texts, datasets }) {
