@@ -10,7 +10,7 @@ const DELTA = 'research-ds-33333333-3333-4333-8333-333333333333'
 const known = new Map([[DS, {}], [DELTA, { parentDatasetId: DS, transformType: 'yoy_delta' }]])
 
 test('valid spec parses to the same blocks', () => {
-  const raw = { version: 1, blocks: [{ component: 'TrendView', datasetId: DS, deltaDatasetId: DELTA, title: '2021–2025 净利率', actions: ['highlight_largest_change'] }] }
+  const raw = { version: 1, blocks: [{ component: 'TrendView', datasetId: DS, deltaDatasetId: DELTA, title: '2021–2025 净利率', actions: ['highlight_largest_change'] }, { component: 'EvidencePanel', datasetIds: [DS], title: '数据来源' }] }
   const result = parseResearchUiSpec(raw, known)
   assert.equal(result.ok, true)
   assert.deepEqual(result.spec, raw)

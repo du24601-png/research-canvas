@@ -47,7 +47,7 @@ export default function EvidencePanel({ block, getDataset }: BlockProps<Evidence
   const s = useBlockStyles()
   const datasets = block.datasetIds.map(getDataset).filter((d): d is Dataset => Boolean(d))
   return (
-    <BlockFrame title="来源与口径" kind="EvidencePanel">
+    <BlockFrame title={block.title ?? '来源与口径'} kind="EvidencePanel">
       {datasets.map(dataset => <EvidenceRows key={dataset.id} dataset={dataset} />)}
       <Text className={s.note} block>获取时间不等于报告披露时间；目前能追到数据源和报告期，还不能定位到公告原文页。</Text>
     </BlockFrame>

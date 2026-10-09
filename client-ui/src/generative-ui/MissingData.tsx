@@ -20,7 +20,7 @@ export default function MissingData({ block, getDataset }: BlockProps<MissingBlo
   if (!dataset) return null
   const rows = missingCells(dataset)
   return (
-    <BlockFrame title={rows.length ? '有数据没取到' : '数据完整'} kind="MissingData">
+    <BlockFrame title={block.title ?? (rows.length ? '有数据没取到' : '数据完整')} kind="MissingData">
       {rows.length ? (
         <>
           {rows.map(row => (

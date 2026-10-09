@@ -17,8 +17,8 @@ export type ResearchUiAction = typeof RESEARCH_UI_ACTIONS[number]
 export type ResearchUiBlock =
   | { component: 'ComparisonView'; datasetIds: string[]; title?: string; actions?: ResearchUiAction[] }
   | { component: 'TrendView'; datasetId: string; deltaDatasetId?: string; title?: string; actions?: ResearchUiAction[] }
-  | { component: 'EvidencePanel'; datasetIds: string[] }
-  | { component: 'MissingData'; datasetId: string }
+  | { component: 'EvidencePanel'; datasetIds: string[]; title?: string }
+  | { component: 'MissingData'; datasetId: string; title?: string }
 
 export interface ResearchUiSpec {
   version: typeof RESEARCH_UI_SPEC_VERSION
@@ -42,8 +42,8 @@ const YEAR_TOKEN = /(?:19|20)\d{2}/g
 const FIELDS: Record<ResearchUiComponent, readonly string[]> = {
   ComparisonView: ['component', 'datasetIds', 'title', 'actions'],
   TrendView: ['component', 'datasetId', 'deltaDatasetId', 'title', 'actions'],
-  EvidencePanel: ['component', 'datasetIds'],
-  MissingData: ['component', 'datasetId'],
+  EvidencePanel: ['component', 'datasetIds', 'title'],
+  MissingData: ['component', 'datasetId', 'title'],
 }
 
 const ACTIONS_FOR: Record<ResearchUiComponent, readonly ResearchUiAction[]> = {
@@ -120,9 +120,10 @@ function parseBlock(raw: unknown, at: string, known: ReadonlyMap<string, Researc
   for (const key of Object.keys(raw)) {
     if (!FIELDS[component].includes(key)) errors.push(`${at} 不允许字段 ${key}`)
   }
-  if (component === 'EvidencePanel') return { component, datasetIds: checkDatasetIds(raw.datasetIds, `${at}.datasetIds`, known, errors) }
-  if (component === 'MissingData') return { component, datasetId: checkDatasetId(raw.datasetId, `${at}.datasetId`, known, errors) }
   const title = checkTitle(raw.title, at, errors)
+  const titled = title ? { title } : {}
+  if (component === 'EvidencePanel') return { component, datasetIds: checkDatasetIds(raw.datasetIds, `${at}.datasetIds`, known, errors), ...titled }
+  if (component === 'MissingData') return { component, datasetId: checkDatasetId(raw.datasetId, `${at}.datasetId`, known, errors), ...titled }
   const actions = checkActions(raw.actions, component, at, errors)
   const extra = { ...(title ? { title } : {}), ...(actions ? { actions } : {}) }
   if (component === 'ComparisonView') {
