@@ -1,0 +1,710 @@
+{
+  "id": "research-ds-00999267-9499-42d2-bcad-605dfe47ba9a",
+  "title": "贵州茅台、五粮液、泸州老窖、招商银行、平安银行、中国平安、佛山市海天调味食品、宁德时代、比亚迪、中芯国际、华虹宏力毛利率",
+  "metric": "gross_margin",
+  "unit": "%",
+  "entities": [
+    {
+      "id": "CN:SH.600519",
+      "name": "贵州茅台",
+      "ticker": "600519.SH",
+      "market": "CN",
+      "type": "equity"
+    },
+    {
+      "id": "CN:SZ.000858",
+      "name": "五粮液",
+      "ticker": "000858.SZ",
+      "market": "CN",
+      "type": "equity"
+    },
+    {
+      "id": "CN:SZ.000568",
+      "name": "泸州老窖",
+      "ticker": "000568.SZ",
+      "market": "CN",
+      "type": "equity"
+    },
+    {
+      "id": "CN:SH.600036",
+      "name": "招商银行",
+      "ticker": "600036.SH",
+      "market": "CN",
+      "type": "equity"
+    },
+    {
+      "id": "CN:SZ.000001",
+      "name": "平安银行",
+      "ticker": "000001.SZ",
+      "market": "CN",
+      "type": "equity"
+    },
+    {
+      "id": "CN:SH.601318",
+      "name": "中国平安",
+      "ticker": "601318.SH",
+      "market": "CN",
+      "type": "equity"
+    },
+    {
+      "id": "CN:SH.603288",
+      "name": "佛山市海天调味食品",
+      "ticker": "603288.SH",
+      "market": "CN",
+      "type": "equity"
+    },
+    {
+      "id": "CN:SZ.300750",
+      "name": "宁德时代",
+      "ticker": "300750.SZ",
+      "market": "CN",
+      "type": "equity"
+    },
+    {
+      "id": "CN:SZ.002594",
+      "name": "比亚迪",
+      "ticker": "002594.SZ",
+      "market": "CN",
+      "type": "equity"
+    },
+    {
+      "id": "CN:SH.688981",
+      "name": "中芯国际",
+      "ticker": "688981.SH",
+      "market": "CN",
+      "type": "equity"
+    },
+    {
+      "id": "CN:SH.688347",
+      "name": "华虹宏力",
+      "ticker": "688347.SH",
+      "market": "CN",
+      "type": "equity"
+    }
+  ],
+  "periods": [
+    "2021",
+    "2022",
+    "2023",
+    "2024",
+    "2025"
+  ],
+  "data": [
+    {
+      "entityId": "CN:SH.600519",
+      "period": "2021",
+      "value": 91.5403
+    },
+    {
+      "entityId": "CN:SH.600519",
+      "period": "2022",
+      "value": 91.8667
+    },
+    {
+      "entityId": "CN:SH.600519",
+      "period": "2023",
+      "value": 91.9649
+    },
+    {
+      "entityId": "CN:SH.600519",
+      "period": "2024",
+      "value": 91.9312
+    },
+    {
+      "entityId": "CN:SH.600519",
+      "period": "2025",
+      "value": 91.1796
+    },
+    {
+      "entityId": "CN:SZ.000858",
+      "period": "2021",
+      "value": 75.3526
+    },
+    {
+      "entityId": "CN:SZ.000858",
+      "period": "2022",
+      "value": 75.4241
+    },
+    {
+      "entityId": "CN:SZ.000858",
+      "period": "2023",
+      "value": 75.7936
+    },
+    {
+      "entityId": "CN:SZ.000858",
+      "period": "2024",
+      "value": 77.0548
+    },
+    {
+      "entityId": "CN:SZ.000858",
+      "period": "2025",
+      "value": 77.5418
+    },
+    {
+      "entityId": "CN:SZ.000568",
+      "period": "2021",
+      "value": 85.6972
+    },
+    {
+      "entityId": "CN:SZ.000568",
+      "period": "2022",
+      "value": 86.5882
+    },
+    {
+      "entityId": "CN:SZ.000568",
+      "period": "2023",
+      "value": 88.3005
+    },
+    {
+      "entityId": "CN:SZ.000568",
+      "period": "2024",
+      "value": 87.5366
+    },
+    {
+      "entityId": "CN:SZ.000568",
+      "period": "2025",
+      "value": 86.6241
+    },
+    {
+      "entityId": "CN:SH.600036",
+      "period": "2021",
+      "value": null
+    },
+    {
+      "entityId": "CN:SH.600036",
+      "period": "2022",
+      "value": null
+    },
+    {
+      "entityId": "CN:SH.600036",
+      "period": "2023",
+      "value": null
+    },
+    {
+      "entityId": "CN:SH.600036",
+      "period": "2024",
+      "value": null
+    },
+    {
+      "entityId": "CN:SH.600036",
+      "period": "2025",
+      "value": null
+    },
+    {
+      "entityId": "CN:SZ.000001",
+      "period": "2021",
+      "value": null
+    },
+    {
+      "entityId": "CN:SZ.000001",
+      "period": "2022",
+      "value": null
+    },
+    {
+      "entityId": "CN:SZ.000001",
+      "period": "2023",
+      "value": null
+    },
+    {
+      "entityId": "CN:SZ.000001",
+      "period": "2024",
+      "value": null
+    },
+    {
+      "entityId": "CN:SZ.000001",
+      "period": "2025",
+      "value": null
+    },
+    {
+      "entityId": "CN:SH.601318",
+      "period": "2021",
+      "value": null
+    },
+    {
+      "entityId": "CN:SH.601318",
+      "period": "2022",
+      "value": null
+    },
+    {
+      "entityId": "CN:SH.601318",
+      "period": "2023",
+      "value": null
+    },
+    {
+      "entityId": "CN:SH.601318",
+      "period": "2024",
+      "value": null
+    },
+    {
+      "entityId": "CN:SH.601318",
+      "period": "2025",
+      "value": null
+    },
+    {
+      "entityId": "CN:SH.603288",
+      "period": "2021",
+      "value": 38.6625
+    },
+    {
+      "entityId": "CN:SH.603288",
+      "period": "2022",
+      "value": 35.6812
+    },
+    {
+      "entityId": "CN:SH.603288",
+      "period": "2023",
+      "value": 34.7354
+    },
+    {
+      "entityId": "CN:SH.603288",
+      "period": "2024",
+      "value": 36.9974
+    },
+    {
+      "entityId": "CN:SH.603288",
+      "period": "2025",
+      "value": 40.2229
+    },
+    {
+      "entityId": "CN:SZ.300750",
+      "period": "2021",
+      "value": 26.2835
+    },
+    {
+      "entityId": "CN:SZ.300750",
+      "period": "2022",
+      "value": 20.2512
+    },
+    {
+      "entityId": "CN:SZ.300750",
+      "period": "2023",
+      "value": 22.9091
+    },
+    {
+      "entityId": "CN:SZ.300750",
+      "period": "2024",
+      "value": 24.4449
+    },
+    {
+      "entityId": "CN:SZ.300750",
+      "period": "2025",
+      "value": 26.2728
+    },
+    {
+      "entityId": "CN:SZ.002594",
+      "period": "2021",
+      "value": 13.0214
+    },
+    {
+      "entityId": "CN:SZ.002594",
+      "period": "2022",
+      "value": 17.0365
+    },
+    {
+      "entityId": "CN:SZ.002594",
+      "period": "2023",
+      "value": 20.2148
+    },
+    {
+      "entityId": "CN:SZ.002594",
+      "period": "2024",
+      "value": 19.4383
+    },
+    {
+      "entityId": "CN:SZ.002594",
+      "period": "2025",
+      "value": 17.7445
+    },
+    {
+      "entityId": "CN:SH.688981",
+      "period": "2021",
+      "value": 29.305
+    },
+    {
+      "entityId": "CN:SH.688981",
+      "period": "2022",
+      "value": 38.2975
+    },
+    {
+      "entityId": "CN:SH.688981",
+      "period": "2023",
+      "value": 21.8874
+    },
+    {
+      "entityId": "CN:SH.688981",
+      "period": "2024",
+      "value": 18.5902
+    },
+    {
+      "entityId": "CN:SH.688981",
+      "period": "2025",
+      "value": 21.6242
+    },
+    {
+      "entityId": "CN:SH.688347",
+      "period": "2021",
+      "value": 28.0934
+    },
+    {
+      "entityId": "CN:SH.688347",
+      "period": "2022",
+      "value": 35.8623
+    },
+    {
+      "entityId": "CN:SH.688347",
+      "period": "2023",
+      "value": 27.102
+    },
+    {
+      "entityId": "CN:SH.688347",
+      "period": "2024",
+      "value": 17.4334
+    },
+    {
+      "entityId": "CN:SH.688347",
+      "period": "2025",
+      "value": 18.7239
+    }
+  ],
+  "sources": [
+    {
+      "provider": "tushare",
+      "entityId": "CN:SH.600519",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2021",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SH.600519",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2022",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SH.600519",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2023",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SH.600519",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2024",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SH.600519",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2025",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SZ.000858",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2021",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SZ.000858",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2022",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SZ.000858",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2023",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SZ.000858",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2024",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SZ.000858",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2025",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SZ.000568",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2021",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SZ.000568",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2022",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SZ.000568",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2023",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SZ.000568",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2024",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SZ.000568",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2025",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SH.603288",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2021",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SH.603288",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2022",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SH.603288",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2023",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SH.603288",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2024",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SH.603288",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2025",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SZ.300750",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2021",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SZ.300750",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2022",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SZ.300750",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2023",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SZ.300750",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2024",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SZ.300750",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2025",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SZ.002594",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2021",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SZ.002594",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2022",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SZ.002594",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2023",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SZ.002594",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2024",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SZ.002594",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2025",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SH.688981",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2021",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SH.688981",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2022",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SH.688981",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2023",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SH.688981",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2024",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SH.688981",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2025",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SH.688347",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2021",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SH.688347",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2022",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SH.688347",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2023",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SH.688347",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2024",
+      "fieldLabel": "毛利率"
+    },
+    {
+      "provider": "tushare",
+      "entityId": "CN:SH.688347",
+      "metric": "gross_margin",
+      "fetchedAt": "2026-10-09T17:24:39.091Z",
+      "period": "2025",
+      "fieldLabel": "毛利率"
+    }
+  ],
+  "query": {
+    "entities": [
+      "600519.SH",
+      "000858.SZ",
+      "000568.SZ",
+      "600036.SH",
+      "000001.SZ",
+      "601318.SH",
+      "603288.SH",
+      "300750.SZ",
+      "002594.SZ",
+      "688981.SH",
+      "688347.SH"
+    ],
+    "metric": "gross_margin",
+    "start": "2021",
+    "end": "2025"
+  },
+  "createdAt": "2026-10-09T17:24:39.091Z"
+}
