@@ -1,7 +1,7 @@
 {
-  "name": "Research Canvas",
-  "short_name": "Research Canvas",
-  "description": "AI 投研 Agent · 交互式数据分析画布",
+  "name": "FinFrame",
+  "short_name": "FinFrame",
+  "description": "AI 投研对话 · 每个数字都能点开看来源",
   "start_url": "/",
   "display": "browser",
   "background_color": "#F3F3F3",

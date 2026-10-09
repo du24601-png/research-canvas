@@ -37,6 +37,7 @@ import {
 import ResearchWidgetPreviewCard from './research-canvas/ResearchWidgetPreviewCard'
 import ResearchFetchPlanCard from './research-canvas/ResearchFetchPlanCard'
 import { fetchPlanFromToolStep } from './research-canvas/fetchPlanFromToolStep'
+import { usePinBoard } from './pin-board/PinBoardContext'
 import ChatStreamReceipt from './ChatStreamReceipt'
 import {
   buildThinkingSummary,
@@ -903,6 +904,8 @@ export default function ChatProcessTrace({
   const [detailsExpanded, setDetailsExpanded] = useState(false)
   const [thinkingExpanded, setThinkingExpanded] = useState(false)
   const [statusDismissed, setStatusDismissed] = useState(false)
+  /** 对话优先：取数计划置顶，不随状态卡收起 */
+  const planFirst = usePinBoard().chatFirst
 
   const segments = resolveReasoningSegments(thinkingSegments, thinkingSnippet)
   const runningStep = live ? steps.find(st => st.status === 'running') : null
@@ -955,7 +958,7 @@ export default function ChatProcessTrace({
     return null
   }
 
-  if (live && statusDismissed && !hasPreviews && !showDetailsToggle && !showLiveThinking) {
+  if (live && statusDismissed && !hasPreviews && !showDetailsToggle && !showLiveThinking && !(planFirst && hasPlans)) {
     return null
   }
 
@@ -973,6 +976,10 @@ export default function ChatProcessTrace({
           onExpand={showDetailsToggle ? () => setDetailsExpanded(true) : undefined}
         />
       )}
+
+      {live && planFirst && planSteps.map(step => (
+        <ResearchFetchPlanCard key={step.id} step={step} sessionId={sessionId} live isLatest={step.id === lastPlanId} />
+      ))}
 
       {showLiveStatus && (
         <div className={s.statusCard}>
@@ -1041,7 +1048,7 @@ export default function ChatProcessTrace({
         </>
       )}
 
-      {showLivePreviews && planSteps.map(step => (
+      {showLivePreviews && !planFirst && planSteps.map(step => (
         <ResearchFetchPlanCard
           key={step.id}
           step={step}

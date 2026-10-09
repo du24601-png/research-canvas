@@ -4,9 +4,9 @@
 
 ## 产品定位
 
-**交互画布投研 Agent：每个数字都能点开看来源的投研画布。**
+**FinFrame：对话式投研 Agent，回答是一份「活报告」，每个数字都能点开看来源。**
 
-主路径：左侧 Chat 提问 → `query_data` 取真实财务 / K 线数据 → `propose_widget` 在聊天区出预览 → 用户 Adopt → 右侧 ECharts 画布。
+主路径（对话优先布局，默认）：全宽对话提问 → `query_data` 取真实财务 / K 线数据 → `propose_widget` 在回答里流式出现图表预览 → 用户点「钉住」→ 收进看板（抽屉，复用原研究画布的状态与持久化）。开关 `VITE_FINFRAME_CHAT_FIRST=0` 或 localStorage `finframe.chatFirst=0` 恢复旧的双栏画布布局（左 Chat、右 ECharts 画布），代码只隐藏不删除。对外品牌为 FinFrame（`OUTWARD_BRAND`）；包名、数据目录、工具名、提示词里的内部名 `PRODUCT_BRAND` 不变。
 
 **报告与脑图（artifacts）默认关闭**：`create_canvas` / `create_mindmap` / `create_web` 不在默认 tools 里；用户须在输入框 **+ → 报告与脑图** 勾选后才会进入会话冻结列表。`activate_tool_pack` 与技能 `required-packs: artifacts` **不能**替用户打开；未开启时用研究预览或文字，勿与右侧 Research Canvas 混淆。
 
@@ -14,7 +14,7 @@
 
 1. **LLM decides, Code executes**：模型只决定查什么、选哪种图；所有数字由代码从 Provider 取回。**禁止模型生成或计算财务数字**，禁止模型直接产出 ECharts option / React。
 2. **宁愿没有数据，也不要猜数据**：`null ≠ 0`，缺失显示 `—`；字段全空则 fail closed。口径冲突如实呈现，不由模型裁决。
-3. **Preview → Adopt**：`propose_widget` 只提议，画布 no-op；只有用户点「添加到画布」才写入。AI 不得偷改右侧画布（除非用户明确要求改某张已有图）。
+3. **Preview → Pin**：`propose_widget` 只提议，看板 no-op；只有用户点「钉住」（旧布局叫「添加到画布」）才写入，仍走 `adoptProposal` 同一路径与持久化。AI 不得往看板写东西，也不得偷改看板（除非用户明确要求改某张已有图）。
 4. **Dataset 不可变**：数据语义变化 → 新 `research-ds-*` + `parentDatasetId` / `transform`；仅视图变化 → 同一 `datasetId` 再 `propose_widget`。
 5. **增量改动**：按用户最新指示做最小 diff，不顺手重构。
 
@@ -42,6 +42,7 @@ client-ui/src/chat/session/useSessionData.ts  # PATCH artifactsEnabled
 client-ui/src/chat/tracePresentation.ts       # 流式 status morph、溯源 chip、Receipt
 client-ui/src/chat/ChatProcessTrace.tsx       # live/history trace；Preview 槽位；折叠详细过程
 client-ui/src/chat/ChatComposer.tsx           # 输入框布局 + streamStatusLabel footer
+client-ui/src/chat/pin-board/                 # 对话优先布局开关、看板抽屉、「钉住」文案
 apps/server/src/index.ts                      # /chat、/chat/stream、PATCH sessions
 packages/agent/src/engine.ts                  # tool loop、runInToolSession
 packages/agent/src/research-canvas-tools.ts   # query_data / refine_dataset / propose_widget / create|update|delete_widget

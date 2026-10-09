@@ -7,7 +7,7 @@ export interface ChatWelcomeVariant {
 export const CHAT_WELCOME_VARIANTS: ChatWelcomeVariant[] = [
   {
     title: '想研究什么？',
-    subtitle: '输入公司、指标或研究问题，我会先生成数据视图供你确认。',
+    subtitle: '我是 FinFrame。输入公司、指标或研究问题，我会先取数生成图表，每个数字都能点开看来源。',
     starters: [
       '对比宁德时代和比亚迪近五年毛利率',
       '看一下贵州茅台的净资产收益率走势',

@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
-import { PRODUCT_BRAND } from '../packages/shared/src/product-brand.ts'
+import { OUTWARD_BRAND, PRODUCT_BRAND } from '../packages/shared/src/product-brand.ts'
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
 const USER_FACING_FILES = [
@@ -78,26 +78,33 @@ function stripComments(src) {
     .replace(/^\s*\/\/.*$/gm, '')
 }
 
-test('PRODUCT_BRAND is the rename source of truth', () => {
+test('PRODUCT_BRAND (internal, feeds the system prompt) stays unchanged', () => {
   assert.equal(PRODUCT_BRAND.name, 'Research Canvas')
   assert.equal(PRODUCT_BRAND.shortName, 'Research Canvas')
   assert.equal(PRODUCT_BRAND.description, 'AI 投研 Agent · 交互式数据分析画布')
 })
 
+test('OUTWARD_BRAND is the user-facing rename source of truth', () => {
+  assert.equal(OUTWARD_BRAND.name, 'FinFrame')
+  assert.equal(OUTWARD_BRAND.shortName, 'FinFrame')
+  const client = fs.readFileSync(path.join(repoRoot, 'client-ui/src/branding/productBrand.ts'), 'utf8')
+  assert.match(client, /OUTWARD_BRAND as PRODUCT_BRAND/)
+})
+
 test('index.html and manifest do not leak Opptrix product brand', () => {
   const html = fs.readFileSync(path.join(repoRoot, 'client-ui/index.html'), 'utf8')
-  assert.match(html, /<title>Research Canvas<\/title>/)
-  assert.match(html, /name="application-name"[^>]*content="Research Canvas"/)
-  assert.match(html, /name="apple-mobile-web-app-title"[^>]*content="Research Canvas"/)
-  assert.match(html, /name="description"[^>]*content="AI 投研 Agent · 交互式数据分析画布"/)
+  assert.match(html, new RegExp(`<title>${OUTWARD_BRAND.name}</title>`))
+  assert.match(html, new RegExp(`name="application-name"[^>]*content="${OUTWARD_BRAND.name}"`))
+  assert.match(html, new RegExp(`name="apple-mobile-web-app-title"[^>]*content="${OUTWARD_BRAND.name}"`))
+  assert.match(html, new RegExp(`name="description"[^>]*content="${OUTWARD_BRAND.description}"`))
   assert.doesNotMatch(html.replace(/opptrix-theme-preference/g, ''), /Opptrix/)
 
   const manifest = JSON.parse(
     fs.readFileSync(path.join(repoRoot, 'client-ui/public/manifest.webmanifest'), 'utf8'),
   )
-  assert.equal(manifest.name, PRODUCT_BRAND.name)
-  assert.equal(manifest.short_name, PRODUCT_BRAND.shortName)
-  assert.equal(manifest.description, PRODUCT_BRAND.description)
+  assert.equal(manifest.name, OUTWARD_BRAND.name)
+  assert.equal(manifest.short_name, OUTWARD_BRAND.shortName)
+  assert.equal(manifest.description, OUTWARD_BRAND.description)
 })
 
 test('user-facing client files have no leftover Opptrix chrome copy', () => {

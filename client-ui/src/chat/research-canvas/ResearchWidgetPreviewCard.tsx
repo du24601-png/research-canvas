@@ -30,6 +30,8 @@ import { compactResearchWidgetView, sanitizeResearchWidgetView } from '@opptrix/
 import { previewLoadingStageLabel } from '../toolLiveStatus'
 import { asWidgetType, proposalMetaFromToolStep, toolStepHasProposalError, type PreviewProposalMeta } from './proposalFromToolStep'
 import type { Dataset, Widget, WidgetType } from './types'
+import { usePinBoard } from '../pin-board/PinBoardContext'
+import { adoptLabels } from '../pin-board/pinLabels'
 
 const useStyles = makeStyles({
   card: {
@@ -155,6 +157,8 @@ export default function ResearchWidgetPreviewCard({ step, sessionId = null }: Pr
   const [adoptedHere, setAdoptedHere] = useState(false)
   const [dismissed, setDismissed] = useState(false)
   const plotRef = useRef<HTMLDivElement>(null)
+  const board = usePinBoard()
+  const labels = adoptLabels(board.chatFirst)
 
   useEffect(() => subscribeResearchCanvasEvents((event) => {
     if (typeof event !== 'object' || event === null) return
@@ -241,6 +245,7 @@ export default function ResearchWidgetPreviewCard({ step, sessionId = null }: Pr
   const coverage = coverageLabel(dataset)
 
   const focusOnCanvas = () => {
+    board.openBoard()
     publishResearchCanvasEvent({
       type: 'focus_widget',
       proposal: {
@@ -295,14 +300,14 @@ export default function ResearchWidgetPreviewCard({ step, sessionId = null }: Pr
           <div className={s.actions}>
             <Text className={s.accepted}>
               <CheckmarkRegular fontSize={14} aria-hidden />
-              已添加到画布
+              {labels.accepted}
             </Text>
             <OpptrixButton
               variant="primary"
               size="small"
               onClick={focusOnCanvas}
             >
-              在画布中定位
+              {labels.locate}
             </OpptrixButton>
           </div>
         ) : (
@@ -331,7 +336,7 @@ export default function ResearchWidgetPreviewCard({ step, sessionId = null }: Pr
               size="medium"
               className={s.adoptButton}
               onClick={() => {
-                if (plotRef.current) flyPreviewToCanvas(plotRef.current)
+                if (plotRef.current && !board.chatFirst) flyPreviewToCanvas(plotRef.current)
                 setAdoptedHere(true)
                 publishResearchCanvasEvent({
                   type: 'widget_adopted',
@@ -344,11 +349,11 @@ export default function ResearchWidgetPreviewCard({ step, sessionId = null }: Pr
                     ...(meta.style ? { style: meta.style } : {}),
                   },
                 })
-                focusOnCanvas()
+                if (!board.chatFirst) focusOnCanvas()
                 setPersistEpoch(value => value + 1)
               }}
             >
-              添加到画布
+              {labels.adopt}
             </OpptrixButton>
           </div>
         )}

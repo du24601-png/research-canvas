@@ -55,9 +55,9 @@ test('manifest.webmanifest has branding fields', () => {
 
 test('index.html declares Apple title, description, and touch icons', () => {
   const html = fs.readFileSync(indexHtml, 'utf8')
-  assert.match(html, /name="description"[^>]*content="AI 投研 Agent · 交互式数据分析画布"/)
-  assert.match(html, /name="apple-mobile-web-app-title"[^>]*content="Research Canvas"/)
-  assert.match(html, /<title>Research Canvas<\/title>/)
+  assert.match(html, /name="description"[^>]*content="AI 投研对话 · 每个数字都能点开看来源"/)
+  assert.match(html, /name="apple-mobile-web-app-title"[^>]*content="FinFrame"/)
+  assert.match(html, /<title>FinFrame<\/title>/)
   assert.match(html, /rel="apple-touch-icon"[^>]*href="\/apple-touch-icon\.png"/)
   assert.match(html, /rel="apple-touch-icon"[^>]*href="\/icons\/apple-touch-icon\.png"/)
   assert.match(html, /rel="manifest"[^>]*href="\/manifest\.webmanifest"/)

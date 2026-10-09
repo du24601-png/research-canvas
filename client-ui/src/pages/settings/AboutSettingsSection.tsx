@@ -162,7 +162,7 @@ export default function AboutSettingsSection({ contentFlush = false }: AboutSett
     <div className={mergeClasses(s.root, contentFlush && s.rootFlush)}>
       <div className={mergeClasses(s.prose, contentFlush && s.proseFlush)}>
         <Text className={s.lead} block>
-          {PRODUCT_BRAND.name} 是 AI 投研 Agent 与交互式数据分析画布。用日常中文提出研究问题，我会先生成数据视图供你确认，再整理成可读的分析。
+          {PRODUCT_BRAND.name} 是对话式 AI 投研助手。用日常中文提出研究问题，我会先取真实数据生成图表，每个数字都能点开看来源，再整理成可读的分析。
         </Text>
         <Text className={s.note} block>
           本软件仅供学习与研究参考，不构成投资建议，也不能代替券商下单或自动交易。请自行核实信息并独立做出投资决策。

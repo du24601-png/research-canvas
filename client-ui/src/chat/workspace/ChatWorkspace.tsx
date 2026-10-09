@@ -1,5 +1,5 @@
 import { mergeClasses } from '@fluentui/react-components'
-import type { ReactNode } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import ChatView from '../ChatView'
 import RightPanel from '../RightPanel'
 import WorkspaceSplitDivider from '../WorkspaceSplitDivider'
@@ -8,6 +8,10 @@ import { WORKSPACE_CHAT_MIN_WIDTH } from '../../desktop/constants'
 import { useMobileSlideStyles, useWorkspaceUi } from './WorkspaceUiContext'
 import { useWorkspaceShellStyles } from './workspaceShellStyles'
 import type { ChatColumnSharedProps } from './useChatColumnSharedProps'
+import { isChatFirstLayout } from '../pin-board/chatFirstLayout'
+import { PinBoardProvider, usePinBoard } from '../pin-board/PinBoardContext'
+import PinBoardButton from '../pin-board/PinBoardButton'
+import PinBoardDrawer from '../pin-board/PinBoardDrawer'
 
 export interface ChatWorkspaceProps {
   /** 当前路由是否落在聊天视图 */
@@ -25,11 +29,25 @@ export interface ChatWorkspaceProps {
 }
 
 /**
- * 聊天工作区：mobile 三段轨道（drawer | ChatView | RightPanel sheet）
+ * 聊天工作区。对话优先布局（默认）：对话占满宽度，右栏只用于文件预览，
+ * 研究画布收进「看板」抽屉；关闭开关则恢复原双栏。
+ */
+export function ChatWorkspace(props: ChatWorkspaceProps) {
+  const chatFirst = useMemo(() => isChatFirstLayout(), [])
+  return (
+    <PinBoardProvider chatFirst={chatFirst} sessionId={props.chat.sessionId ?? null}>
+      <ChatWorkspaceBody {...props} />
+      {chatFirst ? <PinBoardDrawer sessionId={props.chat.sessionId ?? null} sessionTitle={props.chat.title} /> : null}
+    </PinBoardProvider>
+  )
+}
+
+/**
+ * mobile 三段轨道（drawer | ChatView | RightPanel sheet）
  * 与 desktop 分栏（chatColumn | splitter | RightPanel）。
  * mobile / desktop 的开关语义差异是故意的，逐项对应原实现。
  */
-export function ChatWorkspace({
+function ChatWorkspaceBody({
   active,
   hidden,
   drawerSidebar,
@@ -45,6 +63,13 @@ export function ChatWorkspace({
   const ui = useWorkspaceUi()
   const { trackStyle, mainStyle, rightSheetStyle } = useMobileSlideStyles()
   const viewHidden = !active || hidden
+  const board = usePinBoard()
+  const chatFirst = board.chatFirst
+  /** 对话优先：右栏只在文件预览时出现 */
+  const rightVisible = chatFirst ? ui.rightPanelVisible && ui.paneMode === 'preview' : ui.rightPanelVisible
+  const showSplitter = chatFirst ? ui.showSplitter && rightVisible : ui.showSplitter
+  /** 对话优先：不存在「最大化右栏、隐藏对话」的状态 */
+  const chatVisible = chatFirst || ui.chatVisible
 
   return (
     <div
@@ -76,11 +101,11 @@ export function ChatWorkspace({
                 isMobile
                 onOpenSidebar={ui.toggleSidebar}
                 onToggleSidebar={undefined}
-                rightPanelOpen={ui.mobileRightSheet === 'market'}
+                rightPanelOpen={chatFirst ? board.open : ui.mobileRightSheet === 'market'}
                 onToggleRightPanel={undefined}
                 onToggleChatColumn={undefined}
                 sessionFilesPreviewOpen={ui.mobileRightSheet === 'preview'}
-                onOpenMobileMarketPanel={ui.openMobileMarketPanel}
+                onOpenMobileMarketPanel={chatFirst ? board.toggleBoard : ui.openMobileMarketPanel}
                 onOpenMobileFilesPanel={onOpenMobileFilesPanel}
               />
             </div>
@@ -98,6 +123,7 @@ export function ChatWorkspace({
               <RightPanel
                 visible
                 fullWidth
+                canvasEnabled={!chatFirst}
                 transitionEnabled={false}
                 onToggleRightPanel={ui.mobileSheetOpen ? ui.closeMobileRightSheet : undefined}
                 previewMode={ui.mobileRightSheet === 'preview'}
@@ -113,7 +139,7 @@ export function ChatWorkspace({
         </div>
       ) : (
         <>
-          {ui.chatVisible && !ui.presentMode && (
+          {chatVisible && !ui.presentMode && (
             <div
               className={mergeClasses(
                 s.chatColumn,
@@ -121,7 +147,7 @@ export function ChatWorkspace({
                 ui.isSplitDragging && s.chatColumnDragging,
               )}
               style={
-                ui.isSplitDragging && ui.showSplitter
+                ui.isSplitDragging && showSplitter
                   ? {
                       flex: '0 0 auto',
                       width: ui.chatWidth,
@@ -130,7 +156,7 @@ export function ChatWorkspace({
                   : {
                       flex: 1,
                       width: undefined,
-                      minWidth: ui.showSplitter ? WORKSPACE_CHAT_MIN_WIDTH : 0,
+                      minWidth: showSplitter ? WORKSPACE_CHAT_MIN_WIDTH : 0,
                     }
               }
             >
@@ -145,16 +171,17 @@ export function ChatWorkspace({
                   contextHint={contextHint}
                   onOpenSidebar={ui.toggleSidebarVisible}
                   onToggleSidebar={undefined}
-                  rightPanelOpen={ui.rightPanelVisible}
-                  onToggleRightPanel={ui.toggleRightPanel}
-                  onToggleChatColumn={ui.canToggleChatColumn ? ui.toggleChatColumn : undefined}
+                  headerTrailing={chatFirst ? <PinBoardButton /> : undefined}
+                  rightPanelOpen={rightVisible}
+                  onToggleRightPanel={chatFirst ? undefined : ui.toggleRightPanel}
+                  onToggleChatColumn={!chatFirst && ui.canToggleChatColumn ? ui.toggleChatColumn : undefined}
                   sessionFilesPreviewOpen={ui.paneMode === 'preview'}
                 />
               </div>
             </div>
           )}
 
-          {ui.showSplitter && !ui.presentMode && (
+          {showSplitter && !ui.presentMode && (
             <WorkspaceSplitDivider
               electronChrome={ui.electronChrome}
               extendIntoSecondaryChrome={ui.electronChrome}
@@ -164,12 +191,13 @@ export function ChatWorkspace({
           )}
 
           <RightPanel
-            visible={ui.rightPanelVisible}
+            visible={rightVisible}
+            canvasEnabled={!chatFirst}
             width={ui.rightPanelWidth}
-            fullWidth={!ui.chatVisible || ui.presentMode}
+            fullWidth={!chatVisible || ui.presentMode}
             transitionEnabled={!ui.isSplitDragging}
             electronChrome={ui.electronChrome}
-            chatColumnVisible={ui.chatVisible}
+            chatColumnVisible={chatVisible}
             chromeToolbarReserve={ui.chromeToolbarReserve}
             onToggleRightPanel={ui.toggleRightPanel}
             onToggleChatColumn={ui.canToggleChatColumn ? ui.toggleChatColumn : undefined}

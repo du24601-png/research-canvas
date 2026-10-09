@@ -134,6 +134,8 @@ interface Props {
   previewSessionId?: string | null
   canvasSessionId?: string | null
   canvasTitle?: string
+  /** false：对话优先布局，右栏只做文件预览，研究画布改由看板抽屉承载 */
+  canvasEnabled?: boolean
   onSelectAttachment?: (attachment: ChatAttachmentMeta) => void
   onClosePreview?: () => void
   onSlideTransitionEnd?: () => void
@@ -154,6 +156,7 @@ function RightPanel({
   previewSessionId = null,
   canvasSessionId = null,
   canvasTitle,
+  canvasEnabled = true,
   onSelectAttachment,
   onClosePreview,
   onSlideTransitionEnd,
@@ -334,7 +337,7 @@ function RightPanel({
             className={mergeClasses(s.pane, !marketPaneActive && s.paneOffscreen)}
             aria-hidden={!marketPaneActive}
           >
-            {marketPaneAwake ? (
+            {marketPaneAwake && canvasEnabled ? (
               <BlankCanvasPlaceholder
                 electronChrome={electronChrome}
                 chatColumnVisible={chatColumnVisible}
