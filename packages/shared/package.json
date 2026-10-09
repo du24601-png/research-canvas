@@ -78,6 +78,14 @@
       "types": "./dist/research-view-recommendation.d.ts",
       "import": "./dist/research-view-recommendation.js"
     },
+    "./research-ui-spec": {
+      "types": "./dist/research-ui-spec.d.ts",
+      "import": "./dist/research-ui-spec.js"
+    },
+    "./research-dataset-delta": {
+      "types": "./dist/research-dataset-delta.d.ts",
+      "import": "./dist/research-dataset-delta.js"
+    },
     "./research-view-params": {
       "types": "./dist/research-view-params.d.ts",
       "import": "./dist/research-view-params.js"

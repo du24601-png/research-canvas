@@ -107,6 +107,7 @@ export type DatasetTransform =
     method: 'arithmetic_mean'
     groups: Array<{ id: string; name: string; memberIds: string[] }>
   }
+  | { type: 'yoy_delta' }
 
 export interface Dataset {
   id: string

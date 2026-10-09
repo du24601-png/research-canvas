@@ -88,6 +88,10 @@ export type DatasetTransform =
     method: 'arithmetic_mean'
     groups: Array<{ id: string; name: string; memberIds: string[] }>
   }
+  /** 相邻两期之差（代码计算）；periods 从父集第二期开始 */
+  | {
+    type: 'yoy_delta'
+  }
 
 export interface ResearchDataset {
   id: string
@@ -385,6 +389,7 @@ function sanitizeDatasetTransform(raw: unknown): DatasetTransform | null {
     }
     return { type: 'aggregate_groups', method: 'arithmetic_mean', groups }
   }
+  if (raw.type === 'yoy_delta') return { type: 'yoy_delta' }
   return null
 }
 

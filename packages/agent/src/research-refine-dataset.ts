@@ -14,6 +14,7 @@ import {
   RESEARCH_DATASET_ENTITY_LIMIT,
   resolveResearchMetric,
   uniqueSortedPeriods,
+  yoyDeltaDataset,
   type AggregateGroupSpec,
   type DatasetTransform,
   type ResearchDataset,
@@ -35,7 +36,8 @@ import {
 
 const YEAR_RE = /^\d{4}$/
 const ENTITY_LIMIT = RESEARCH_DATASET_ENTITY_LIMIT
-const OPERATION_TYPES = new Set(['remove_entities', 'add_entities', 'change_period', 'aggregate_groups'])
+const OPERATION_TYPES = new Set(['remove_entities', 'add_entities', 'change_period', 'aggregate_groups', 'yoy_delta'])
+const OPERATION_HINT = 'operation.type 须为 remove_entities / add_entities / change_period / aggregate_groups / yoy_delta'
 const GROUP_LIMIT = 10
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -82,9 +84,11 @@ function parseOperation(raw: unknown):
   | { type: 'add_entities'; entities: string[] }
   | { type: 'change_period'; start: string; end: string }
   | { type: 'aggregate_groups'; method: 'arithmetic_mean'; groups: Array<{ name: string; members: string[] }> }
+  | { type: 'yoy_delta' }
   | { error: string } {
-  if (!isRecord(raw) || typeof raw.type !== 'string' || !OPERATION_TYPES.has(raw.type)) {
-    return { error: 'operation.type 须为 remove_entities / add_entities / change_period / aggregate_groups' }
+  if (!isRecord(raw) || typeof raw.type !== 'string' || !OPERATION_TYPES.has(raw.type)) return { error: OPERATION_HINT }
+  if (raw.type === 'yoy_delta') {
+    return Object.keys(raw).length === 1 ? { type: 'yoy_delta' } : { error: 'yoy_delta 不接受其他参数' }
   }
   const allowed = raw.type === 'change_period'
     ? new Set(['type', 'start', 'end'])
@@ -112,7 +116,7 @@ function parseOperation(raw: unknown):
     if ('error' in aggregate) return aggregate
     return { type: 'aggregate_groups', method: aggregate.method, groups: aggregate.groups }
   }
-  return { error: 'operation.type 须为 remove_entities / add_entities / change_period / aggregate_groups' }
+  return { error: OPERATION_HINT }
 }
 
 function resolveAggregateGroups(
@@ -305,6 +309,12 @@ export async function executeRefineDataset(
         memberIds: [...spec.memberIds],
       })),
     })
+  }
+
+  if (operation.type === 'yoy_delta') {
+    const delta = yoyDeltaDataset(parent)
+    if ('error' in delta) return delta
+    return rejectIfMutated(parent, parentSnapshot) ?? finishDerived(turn.sessionId, parent, delta, { type: 'yoy_delta' })
   }
 
   const body = await changePeriod(hub, parent, operation.start, operation.end)

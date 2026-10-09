@@ -234,7 +234,7 @@ export function buildResearchCanvasTools(hub?: ResearchDataHub | null): Research
     {
       name: 'refine_dataset',
       category: '研究画布',
-      description: '在已有数据集上增删公司、调整年份或按组算术平均，生成新的派生数据集，绝不覆盖原数据集。成功后调用 propose_widget，不要 update_widget。去掉公司或收窄年份不重新取数；改指标请用 query_data；改图种请用 propose_widget。',
+      description: '在已有数据集上增删公司、调整年份、按组算术平均，或计算相邻年度变化（yoy_delta，用于「变化最大的年份」，差值由代码算），生成新的派生数据集，绝不覆盖原数据集。成功后调用 propose_widget，不要 update_widget。去掉公司或收窄年份不重新取数；改指标请用 query_data；改图种请用 propose_widget。',
       parameters: S({
         datasetId: {
           type: 'string',
@@ -242,11 +242,11 @@ export function buildResearchCanvasTools(hub?: ResearchDataHub | null): Research
         },
         operation: {
           type: 'object',
-          description: 'remove_entities / add_entities / change_period / aggregate_groups',
+          description: 'remove_entities / add_entities / change_period / aggregate_groups / yoy_delta',
           properties: {
             type: {
               type: 'string',
-              enum: ['remove_entities', 'add_entities', 'change_period', 'aggregate_groups'],
+              enum: ['remove_entities', 'add_entities', 'change_period', 'aggregate_groups', 'yoy_delta'],
               description: '调整类型',
             },
             entities: {

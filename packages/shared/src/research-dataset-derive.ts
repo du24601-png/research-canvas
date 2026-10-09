@@ -53,6 +53,7 @@ function cloneTransform(transform: DatasetTransform): DatasetTransform {
       })),
     }
   }
+  if (transform.type === 'yoy_delta') return { type: 'yoy_delta' }
   return { type: 'filter_period', start: transform.start, end: transform.end }
 }
 

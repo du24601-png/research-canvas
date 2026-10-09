@@ -311,6 +311,7 @@ function normalizeTransform(raw: unknown): Dataset['transform'] | null {
     if (!YEAR_RE.test(start) || !YEAR_RE.test(end) || start > end) return null
     return { type: 'filter_period', start, end }
   }
+  if (raw.type === 'yoy_delta') return { type: 'yoy_delta' }
   return null
 }
 
@@ -433,7 +434,7 @@ export function clonePersistedDataset(dataset: Dataset): Dataset {
   if (dataset.query) cloned.query = { ...dataset.query, entities: [...dataset.query.entities] }
   if (dataset.parentDatasetId) cloned.parentDatasetId = dataset.parentDatasetId
   if (dataset.transform) {
-    if (dataset.transform.type === 'filter_period') {
+    if (dataset.transform.type === 'filter_period' || dataset.transform.type === 'yoy_delta') {
       cloned.transform = { ...dataset.transform }
     } else if (dataset.transform.type === 'filter_entities') {
       cloned.transform = { type: 'filter_entities', removedEntityIds: [...dataset.transform.removedEntityIds] }
