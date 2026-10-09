@@ -23,6 +23,8 @@ export interface SessionFrozenToolsEntry {
   schemaGeneration: number
   /** 冻结时是否含 artifacts；切换勾选后须重建 */
   artifactsEnabled: boolean
+  /** 冻结时是否含 research_canvas_edit（旧双栏布局）；切换后须重建 */
+  canvasEdit?: boolean
 }
 
 /** 稳定排序：remoteFirst + 名字典序；禁止 preferred 重排 */
@@ -32,12 +34,21 @@ export function orderToolsStable<T extends { function?: { name?: string }; name?
   return orderToolsByPreference([...tools], [], { remoteFirst: true })
 }
 
-export function resolveFullSessionPackIds(opts?: { artifactsEnabled?: boolean }): ToolPackId[] {
-  if (opts?.artifactsEnabled) return allToolPackIds()
-  return defaultSessionPackIds()
+export interface SessionPackOptions {
+  artifactsEnabled?: boolean
+  /** 旧双栏布局（对话优先开关关闭）时由客户端每次请求带上：加载 research_canvas_edit */
+  canvasEdit?: boolean
 }
 
-export function resolveFullSessionToolNames(opts?: { artifactsEnabled?: boolean }): string[] {
+/** 默认包 + 用户勾选的 artifacts + 旧布局的 research_canvas_edit；各可选包互不连带 */
+export function resolveFullSessionPackIds(opts?: SessionPackOptions): ToolPackId[] {
+  const wanted = new Set<ToolPackId>(defaultSessionPackIds())
+  if (opts?.artifactsEnabled) wanted.add('artifacts')
+  if (opts?.canvasEdit) wanted.add('research_canvas_edit')
+  return allToolPackIds().filter(id => wanted.has(id))
+}
+
+export function resolveFullSessionToolNames(opts?: SessionPackOptions): string[] {
   return toolNamesForPacks(resolveFullSessionPackIds(opts))
 }
 
@@ -50,6 +61,7 @@ export function filterFrozenToolsForSubagent(entry: SessionFrozenToolsEntry): Se
     toolsJson: JSON.stringify(openAiTools),
     schemaGeneration: entry.schemaGeneration,
     artifactsEnabled: entry.artifactsEnabled,
+    canvasEdit: entry.canvasEdit,
   }
 }
 
@@ -62,6 +74,7 @@ export function filterFrozenToolsForUnattended(entry: SessionFrozenToolsEntry): 
     toolsJson: JSON.stringify(openAiTools),
     schemaGeneration: entry.schemaGeneration,
     artifactsEnabled: entry.artifactsEnabled,
+    canvasEdit: entry.canvasEdit,
   }
 }
 

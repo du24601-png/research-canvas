@@ -276,6 +276,8 @@ export interface ChatProgressOptions {
   researchCanvasSnapshot?: unknown
   /** 客户端开启对话优先 + Composer 时为 true：终答前跑一次 UI Spec 组装 */
   researchUiComposer?: boolean
+  /** 旧双栏布局（对话优先开关关闭）：加载 research_canvas_edit，保留 AI 改画布能力 */
+  researchCanvasEdit?: boolean
   /** 客户端开启「取数前确认」（默认关）：1–3 家的 query_data 先发计划，倒计时内可经 steer 调整 */
   planConfirm?: boolean
 }

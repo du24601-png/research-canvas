@@ -508,12 +508,11 @@ export class AgentEngine {
   /** 稳定 system（无每轮时钟/选型卡/档位长分支，利于前缀缓存） */
   private buildRoundSystemPrompt(sessionId: string) {
     const record = this.ensureSessionRolePersona(sessionId)
-    const artifactsEnabled = record?.artifactsEnabled === true
     return this.tools.systemPrompt({
       sessionRolePersona: record?.rolePersona ?? null,
       dataSourcingPolicy: this.buildStaticDataSourcingPolicy(),
       agentSkillCatalog: buildSkillCatalogPrompt(),
-      activePacks: resolveFullSessionPackIds({ artifactsEnabled }),
+      activePacks: resolveFullSessionPackIds(this.sessionPackOptions(sessionId)),
     })
   }
 
@@ -628,6 +627,13 @@ export class AgentEngine {
     return this.sessions.get(sessionId)?.artifactsEnabled === true
   }
 
+  /** 旧双栏布局：客户端每次请求带 canvas_edit，按会话记最近一次 */
+  private readonly canvasEditBySession = new Map<string, boolean>()
+
+  private sessionPackOptions(sessionId: string): { artifactsEnabled: boolean; canvasEdit: boolean } {
+    return { artifactsEnabled: this.sessionArtifactsEnabled(sessionId), canvasEdit: this.canvasEditBySession.get(sessionId) === true }
+  }
+
   private async ensureFrozenSessionTools(
     sessionId: string,
     opts: {
@@ -636,9 +642,9 @@ export class AgentEngine {
       isSubSession?: boolean
     },
   ): Promise<SessionFrozenToolsEntry> {
-    const artifactsEnabled = this.sessionArtifactsEnabled(sessionId)
+    const { artifactsEnabled, canvasEdit } = this.sessionPackOptions(sessionId)
     const cached = this.frozenToolsBySession.get(sessionId)
-    if (cached && cached.artifactsEnabled === artifactsEnabled) return cached
+    if (cached && cached.artifactsEnabled === artifactsEnabled && (cached.canvasEdit === true) === canvasEdit) return cached
     if (cached) {
       this.frozenToolsSchemaGeneration += 1
       this.clearFrozenToolsForSubtree(sessionId)
@@ -661,7 +667,9 @@ export class AgentEngine {
     } else {
       this.toolPackSessions.deactivate(sessionId, ['artifacts'])
     }
-    let activeNames = resolveFullSessionToolNames({ artifactsEnabled })
+    if (canvasEdit) this.toolPackSessions.activate(sessionId, ['research_canvas_edit'], { allowOptIn: true })
+    else this.toolPackSessions.deactivate(sessionId, ['research_canvas_edit'])
+    let activeNames = resolveFullSessionToolNames({ artifactsEnabled, canvasEdit })
     if (opts.unattended) activeNames = filterToolNamesForUnattended(activeNames)
     const { broker, openAiTools } = await this.rebuildRoundTools(activeNames, opts.unattended)
     await broker.close().catch(() => {})
@@ -671,6 +679,7 @@ export class AgentEngine {
       toolsJson: JSON.stringify(openAiTools),
       schemaGeneration: this.frozenToolsSchemaGeneration,
       artifactsEnabled,
+      canvasEdit,
     }
     this.frozenToolsBySession.set(sessionId, entry)
     return entry
@@ -945,7 +954,7 @@ export class AgentEngine {
   }
 
   private bindPackBridge(sessionId: string): number {
-    const packOpts = () => ({ artifactsEnabled: this.sessionArtifactsEnabled(sessionId) })
+    const packOpts = () => this.sessionPackOptions(sessionId)
     return this.tools.bindPackSession({
       sessionId,
       listPacks: () => listToolPacksPayload(resolveFullSessionPackIds(packOpts())),
@@ -1094,9 +1103,7 @@ export class AgentEngine {
       keepRecent: KEEP_RECENT_DEFAULT,
       contextProjection: record.contextProjection,
     })
-    let toolsTokens = resolveFullSessionToolNames({
-      artifactsEnabled: record.artifactsEnabled === true,
-    }).length * 120
+    let toolsTokens = resolveFullSessionToolNames(this.sessionPackOptions(sessionId)).length * 120
     const frozen = this.frozenToolsBySession.get(sessionId)
     if (frozen) {
       toolsTokens = estimateToolsTokens(frozen.openAiTools)
@@ -1979,9 +1986,8 @@ export class AgentEngine {
         emit,
         signal,
       })
-    this.lastRoundPackIds = resolveFullSessionPackIds({
-      artifactsEnabled: record.artifactsEnabled === true,
-    })
+    if (!isSubSession) this.canvasEditBySession.set(sessionId, progress?.researchCanvasEdit === true)
+    this.lastRoundPackIds = resolveFullSessionPackIds(this.sessionPackOptions(sessionId))
     const frozenEntry = await this.ensureFrozenSessionTools(sessionId, {
       parentSessionId: record.parentSessionId,
       unattended,

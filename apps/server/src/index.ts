@@ -2392,7 +2392,7 @@ app.post<{
   },
 )
 
-app.post<{ Params: { id: string }; Body: { message: string; model?: string; attachments?: string[]; research_canvas?: unknown; ui_composer?: unknown; plan_confirm?: unknown } }>(
+app.post<{ Params: { id: string }; Body: { message: string; model?: string; attachments?: string[]; research_canvas?: unknown; ui_composer?: unknown; plan_confirm?: unknown; canvas_edit?: unknown } }>(
   '/api/sessions/:id/chat/stream',
   async (req, reply) => {
     if (isReadonlyCollaborationSession(req.params.id)) {
@@ -2441,6 +2441,7 @@ app.post<{ Params: { id: string }; Body: { message: string; model?: string; atta
           researchCanvasSnapshot: req.body.research_canvas,
           researchUiComposer: req.body.ui_composer === true,
           planConfirm: req.body.plan_confirm === true,
+          researchCanvasEdit: req.body.canvas_edit === true,
         },
         req.body.attachments,
       )

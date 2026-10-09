@@ -2211,7 +2211,7 @@ export async function streamSessionChat(
     }
   },
   /** FinFrame：uiComposer 终答前组装 UI Spec；planConfirm 1–3 家取数前先发计划（默认关） */
-  flags?: { uiComposer?: boolean; planConfirm?: boolean },
+  flags?: { uiComposer?: boolean; planConfirm?: boolean; canvasEdit?: boolean },
 ): Promise<void> {
   const resp = await fetchWithTimeout(`${API_BASE}/sessions/${sessionId}/chat/stream`, {
     method: 'POST',
@@ -2226,6 +2226,7 @@ export async function streamSessionChat(
       ...(researchCanvas ? { research_canvas: researchCanvas } : {}),
       ...(flags?.uiComposer ? { ui_composer: true } : {}),
       ...(flags?.planConfirm ? { plan_confirm: true } : {}),
+      ...(flags?.canvasEdit ? { canvas_edit: true } : {}),
     }),
     signal,
   }, CHAT_REQUEST_TIMEOUT)

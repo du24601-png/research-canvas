@@ -11,7 +11,7 @@ import { readPersistedCanvasState } from '../research-canvas/layoutStorage'
 import { consumePendingAdjustProposal } from '../research-canvas/researchPreviewAdjust'
 import { buildResearchCanvasAgentSnapshot } from '../research-canvas/sessionDatasetSnapshot'
 import type { ChatEngineRefs, ChatSubmitPorts, StreamFlags } from './engineTypes'
-import { isPlanConfirmEnabled, isUiComposerEnabled } from '../pin-board/chatFirstLayout'
+import { isChatFirstLayout, isPlanConfirmEnabled, isUiComposerEnabled } from '../pin-board/chatFirstLayout'
 
 /** 提交后端
  * 原 ChatAppShell submitImpl 段逐字迁移：render 期重赋值 submitImplRef（语义保留，禁改 useEffect）。
@@ -204,7 +204,7 @@ export function useSubmitImpl(refs: ChatEngineRefs, flags: StreamFlags, ports: C
           activeProposal,
           activeWidgetId: getActiveWidgetId(),
         })
-      })(), { uiComposer: isUiComposerEnabled(), planConfirm: isPlanConfirmEnabled() })
+      })(), { uiComposer: isUiComposerEnabled(), planConfirm: isPlanConfirmEnabled(), canvasEdit: !isChatFirstLayout() })
 
       if (!isStreamStale()) {
         const sid = resolvedSessionId
