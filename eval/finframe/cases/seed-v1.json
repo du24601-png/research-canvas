@@ -3,7 +3,7 @@
   "dataset_id": "finframe-seed-v1",
   "fixture_version": "finframe-synth-v1",
   "as_of": "2026-10-09",
-  "notes": "12 题种子集。题面取自 refactor/phase-0-1 (9a3d5f9) canvas-v2 30 题与简报 Demo A/B/C、S1/S2；只复制题面。数值夹具为合成值，非真实财报。",
+  "notes": "12 题种子集。题面取自 refactor/phase-0-1 (9a3d5f9) canvas-v2 30 题与简报 Demo A/B/C、S1/S2；只复制题面。数值夹具为合成值，非真实财报。 ui_expect（M4）：Composer 评分用，any_of=至少含其一的图表组件，highlight=须带 highlight_largest_change，missing=须含 MissingData，evidence=须含 EvidencePanel；无数据集的题（ff-009、ff-012）不评。",
   "cases": [
     {
       "split": "seed",
@@ -103,6 +103,12 @@
           }
         ],
         "max_decisions": 6
+      },
+      "ui_expect": {
+        "any_of": [
+          "ComparisonView"
+        ],
+        "evidence": true
       }
     },
     {
@@ -178,6 +184,13 @@
           }
         ],
         "max_decisions": 4
+      },
+      "ui_expect": {
+        "any_of": [
+          "ComparisonView",
+          "TrendView"
+        ],
+        "evidence": true
       }
     },
     {
@@ -241,6 +254,13 @@
           }
         ],
         "max_decisions": 4
+      },
+      "ui_expect": {
+        "any_of": [
+          "ComparisonView",
+          "TrendView"
+        ],
+        "evidence": true
       }
     },
     {
@@ -301,6 +321,14 @@
           }
         ],
         "max_decisions": 6
+      },
+      "ui_expect": {
+        "any_of": [
+          "ComparisonView",
+          "TrendView"
+        ],
+        "highlight": true,
+        "evidence": true
       }
     },
     {
@@ -355,6 +383,13 @@
           }
         ],
         "max_decisions": 6
+      },
+      "ui_expect": {
+        "any_of": [
+          "ComparisonView",
+          "TrendView"
+        ],
+        "evidence": true
       }
     },
     {
@@ -442,6 +477,13 @@
           }
         ],
         "max_decisions": 8
+      },
+      "ui_expect": {
+        "any_of": [
+          "ComparisonView",
+          "TrendView"
+        ],
+        "evidence": true
       }
     },
     {
@@ -530,6 +572,13 @@
           }
         ],
         "max_decisions": 3
+      },
+      "ui_expect": {
+        "any_of": [
+          "ComparisonView",
+          "TrendView"
+        ],
+        "evidence": true
       }
     },
     {
@@ -617,6 +666,13 @@
           }
         ],
         "max_decisions": 3
+      },
+      "ui_expect": {
+        "any_of": [
+          "ComparisonView",
+          "TrendView"
+        ],
+        "evidence": true
       }
     },
     {
@@ -714,6 +770,14 @@
           }
         ],
         "max_decisions": 4
+      },
+      "ui_expect": {
+        "any_of": [
+          "ComparisonView",
+          "TrendView"
+        ],
+        "missing": true,
+        "evidence": true
       }
     },
     {
@@ -749,6 +813,13 @@
       "gold": {
         "chain": [],
         "max_decisions": 3
+      },
+      "ui_expect": {
+        "any_of": [
+          "ComparisonView",
+          "TrendView"
+        ],
+        "evidence": true
       }
     },
     {

@@ -51,7 +51,7 @@
     },
     {
       "name": "refine_dataset",
-      "description": "在已有数据集上增删公司或收窄年份，生成派生数据集，不覆盖原集。改指标用 query_data；改图种用 propose_widget。",
+      "description": "在已有数据集上增删公司、收窄年份，或计算相邻年度变化（yoy_delta，用于「变化最大的年份」，差值由代码算），生成派生数据集，不覆盖原集。改指标用 query_data；改图种用 propose_widget。",
       "parameters": {
         "type": "object",
         "additionalProperties": false,
@@ -62,7 +62,7 @@
             "type": "object",
             "required": ["type"],
             "properties": {
-              "type": { "type": "string", "enum": ["remove_entities", "add_entities", "change_period", "aggregate_groups"] },
+              "type": { "type": "string", "enum": ["remove_entities", "add_entities", "change_period", "aggregate_groups", "yoy_delta"] },
               "entities": { "type": "array", "items": { "type": "string" } },
               "start": { "type": "string" },
               "end": { "type": "string" }

@@ -8,6 +8,7 @@ import { buildProductPlanningMessages } from '../agent/prompt/assemble.mjs'
 import { buildFixtureDataset, makeFinframeStub } from './fixtures.mjs'
 import { resolveFixtureEntity } from './fixture-data.mjs'
 import { runScorers } from './scorers/index.mjs'
+import { runComposerForCase } from './composer-eval.mjs'
 
 const DEFAULT_MAX_ROUNDS = 8
 
@@ -74,6 +75,7 @@ export async function runFinframeCase(evalCase, opts) {
   const texts = assistantTexts(trace.messages ?? [], trace.finalText)
   const scores = runScorers({ evalCase, calls: trace.calls ?? [], texts, datasets })
   const applicable = scores.filter((s) => s.applicable)
+  const composer = opts.composerChat ? await runComposerForCase(evalCase, datasets, opts.composerChat).catch(err => ({ error: String(err), score: null })) : null
   return {
     caseId: evalCase.id,
     slice: evalCase.slice,
@@ -88,6 +90,7 @@ export async function runFinframeCase(evalCase, opts) {
     texts,
     datasets: datasets.map((d) => ({ id: d.id, metric: d.metric, entities: d.entities.map((e) => e.name), periods: d.periods, parentDatasetId: d.parentDatasetId ?? null })),
     usage,
+    composer,
     duration_ms: Date.now() - started,
   }
 }

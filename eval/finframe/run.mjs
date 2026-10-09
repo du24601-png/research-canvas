@@ -17,12 +17,13 @@ import { catalogToOpenAiTools } from '../agent/component/tools-openai.mjs'
 import { isDirectRun, MISSING_LLM_MESSAGE } from '../agent/eval-cli.mjs'
 import { FIXTURE_VERSION } from './fixture-data.mjs'
 import { runFinframeCase } from './run-case.mjs'
+import { makeComposerChat } from './composer-eval.mjs'
 
 const DIR = path.dirname(fileURLToPath(import.meta.url))
 const REPO = path.resolve(DIR, '../..')
 const CASE_FILE = 'cases/seed-v1.json'
 const MAX_TOKENS = 2048
-const SOURCE_FILES = [CASE_FILE, 'fixture-data.mjs', 'fixtures.mjs', 'run-case.mjs', 'run.mjs', 'scorers/numbers-grounded.mjs', 'scorers/source-period.mjs', 'scorers/refusal.mjs']
+const SOURCE_FILES = [CASE_FILE, 'composer-eval.mjs', 'snapshot-data.mjs', 'fixture-data.mjs', 'fixtures.mjs', 'run-case.mjs', 'run.mjs', 'scorers/numbers-grounded.mjs', 'scorers/source-period.mjs', 'scorers/refusal.mjs']
 
 export async function loadSeedCases() {
   const pack = JSON.parse(await readFile(path.join(DIR, CASE_FILE), 'utf8'))
@@ -43,6 +44,18 @@ export function tallyScorers(results) {
   return out
 }
 
+/** Composer 单独计分，不并入三个评分器 */
+export function tallyComposer(results) {
+  const rows = results.map(r => r.composer?.score).filter(s => s?.applicable)
+  return {
+    applicable: rows.length,
+    valid: rows.filter(s => s.valid).length,
+    passed: rows.filter(s => s.pass).length,
+    zero_numbers: rows.filter(s => s.valid && s.numbers === 0).length,
+    failed_cases: results.filter(r => r.composer?.score?.applicable && !r.composer.score.pass).map(r => r.caseId),
+  }
+}
+
 function tallyUsage(results) {
   const keys = ['prompt_tokens', 'completion_tokens', 'cache_hit_tokens', 'rounds']
   return Object.fromEntries(keys.map((k) => [k, results.reduce((a, r) => a + (r.usage?.[k] ?? 0), 0)]))
@@ -55,6 +68,7 @@ function buildSummary(results) {
     chain: { passed: results.filter((r) => r.chain.pass).length, judged: results.length },
     scorers: tallyScorers(results),
     all_scorers_passed: results.filter((r) => r.pass_all_scorers).length,
+    composer: tallyComposer(results),
     usage: tallyUsage(results),
   }
 }
@@ -76,13 +90,15 @@ export async function runFinframeEval(opts = {}) {
   const kind = limit > 0 ? 'smoke' : 'official'
   const tools = await catalogToOpenAiTools()
   const complete = ({ messages, tools: t }) => completePlanningRound({ ...llm, messages, tools: t, maxTokens: MAX_TOKENS })
+  const composerChat = process.env.EVAL_COMPOSER === '0' ? null : makeComposerChat(llm)
   const started = Date.now()
   const at = new Date().toISOString()
   console.error(`[eval:finframe] kind=${kind} model=${llm.model} cases=${scoped.length}`)
   const results = []
   for (const evalCase of scoped) {
-    const row = await runFinframeCase(evalCase, { tools, complete })
-    console.error(`[eval:finframe] ${row.caseId} chain=${row.chain.pass ? 'ok' : 'FAIL'} ${row.scores.map((s) => `${s.scorer}=${s.applicable ? (s.pass ? 'ok' : 'FAIL') : 'n/a'}`).join(' ')}`)
+    const row = await runFinframeCase(evalCase, { tools, complete, composerChat })
+    const comp = row.composer?.score
+    console.error(`[eval:finframe] ${row.caseId} chain=${row.chain.pass ? 'ok' : 'FAIL'} ${row.scores.map((s) => `${s.scorer}=${s.applicable ? (s.pass ? 'ok' : 'FAIL') : 'n/a'}`).join(' ')} composer=${comp?.applicable ? (comp.pass ? 'ok' : 'FAIL') : 'n/a'}`)
     results.push(row)
   }
   const record = {
@@ -96,7 +112,7 @@ export async function runFinframeEval(opts = {}) {
     llm: publicLlmMeta(llm),
     params: { temperature: 0, max_tokens: MAX_TOKENS, tool_choice: 'auto', prompt: 'assembleSystemPrompt (production, artifacts off) + turn tail', tools: 'eval/agent/component/tool-catalog.json', clock: '2026-09-14T05:00:00Z' },
     sources: { hashes: await hashEvalSources(DIR, SOURCE_FILES) },
-    notes: 'FinFrame M1 种子集。数值夹具为合成值（非真实财报）；不与 eval:agent 三层分数混合。',
+    notes: 'FinFrame 种子集。三个评分器用合成数值夹具（与 M1 可比）；Composer 评分（M4）的数据集覆盖度用 snapshot-v1 真实快照，单独计分。不与 eval:agent 三层分数混合。',
     summary: buildSummary(results),
     results,
   }

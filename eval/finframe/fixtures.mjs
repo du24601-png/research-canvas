@@ -5,6 +5,7 @@
  */
 import { describeDatasetForModel } from '../../packages/agent/dist/research-query-data.js'
 import { buildResearchFetchPlan } from '../../packages/shared/dist/research-query-plan.js'
+import { yoyDeltaDataset } from '../../packages/shared/dist/research-dataset-delta.js'
 import { stubTool } from '../agent/planning/fixtures.mjs'
 import {
   FIXTURE_FETCHED_AT,
@@ -105,6 +106,7 @@ export function stubRefine(args, state) {
   const parent = state.datasets.get(String(args?.datasetId ?? ''))
   if (!parent) return { error: '找不到该数据集，请先 query_data' }
   const op = args?.operation ?? {}
+  if (op.type === 'yoy_delta') return stubYoyDelta(parent, state)
   let entities = parent.entities
   let periods = parent.periods
   if (op.type === 'change_period') periods = years(op.start, op.end)
@@ -117,6 +119,15 @@ export function stubRefine(args, state) {
   const dataset = buildFixtureDataset(nextId(state), entities, parent.metric, periods, { parentDatasetId: parent.id, transform: op })
   storeDataset(state, dataset)
   return { ok: true, datasetId: dataset.id, parentDatasetId: parent.id, ...describeDatasetForModel(dataset) }
+}
+
+/** 与生产一致：同比变化由 shared 代码计算，派生新数据集 */
+function stubYoyDelta(parent, state) {
+  const body = yoyDeltaDataset(parent)
+  if (body.error) return body
+  const dataset = { ...body, id: nextId(state), parentDatasetId: parent.id, transform: { type: 'yoy_delta' } }
+  storeDataset(state, dataset)
+  return { ok: true, datasetId: dataset.id, parentDatasetId: parent.id, transform: 'yoy_delta', ...describeDatasetForModel(dataset) }
 }
 
 function stubInstrument(name, args) {
