@@ -5,6 +5,7 @@
  */
 import { describeDatasetForModel } from '../../packages/agent/dist/research-query-data.js'
 import { buildResearchFetchPlan } from '../../packages/shared/dist/research-query-plan.js'
+import { resolveResearchMetric } from '../../packages/shared/dist/research-metrics.js'
 import { yoyDeltaDataset } from '../../packages/shared/dist/research-dataset-delta.js'
 import { stubTool } from '../agent/planning/fixtures.mjs'
 import {
@@ -80,7 +81,8 @@ export function stubQueryData(args, state) {
   const resolved = resolveAll(parsed.names)
   if (resolved.error) return resolved
   const { entities } = resolved
-  const plan = buildResearchFetchPlan({ entityNames: entities.map((e) => e.name), metric: args.metric, start: parsed.start, end: parsed.end })
+  // 与生产一致：传指标对象（M1–M4 的种子运行误传字符串，计划文案里指标显示为 undefined）
+  const plan = buildResearchFetchPlan({ entityNames: entities.map((e) => e.name), metric: resolveResearchMetric(args.metric), start: parsed.start, end: parsed.end })
   const confirmed = args.confirmed === true || args.confirmed === 'true'
   if (!confirmed && plan.tier === 'must_confirm') {
     state.lastStatus = 'plan_preview'
@@ -89,7 +91,8 @@ export function stubQueryData(args, state) {
   const dataset = buildFixtureDataset(nextId(state), entities, args.metric, years(parsed.start, parsed.end))
   if (dataset.data.every((p) => p.value == null)) return { error: '当前数据源未能提供该指标，请稍后再试' }
   storeDataset(state, dataset)
-  return { ok: true, datasetId: dataset.id, metric: dataset.metric, entities: entities.length, periods: dataset.periods.length, ...describeDatasetForModel(dataset) }
+  const autoPlan = !confirmed && plan.tier === 'auto' ? { plan, tier: plan.tier, statement: plan.statement } : {}
+  return { ok: true, datasetId: dataset.id, metric: dataset.metric, entities: entities.length, periods: dataset.periods.length, ...describeDatasetForModel(dataset), ...autoPlan }
 }
 
 function refineEntities(parent, op) {
