@@ -12,11 +12,10 @@
   "canvas_mutating": [
     "propose_widget",
     "update_proposal",
-    "refine_dataset",
-    "create_widget",
-    "update_widget",
-    "delete_widget"
+    "refine_dataset"
   ],
+  "retired_tools": ["create_widget", "update_widget", "delete_widget"],
+  "retired_note": "M2-E4（2026-10-09）：改画布三件套移到可选包，默认会话不再提供；用例里的 forbidden 引用保留（禁止一个调不到的工具无副作用）",
   "distractors": ["ask_user", "web_search", "create_canvas", "resolve_industry_universe"],
   "tools": [
     {
@@ -73,7 +72,7 @@
     },
     {
       "name": "propose_widget",
-      "description": "提出研究视图预览，不写入右侧画布。未 Adopt 的预览改图种用本工具；右侧已有组件改图种用 update_widget。",
+      "description": "提出研究视图预览，不写入看板。改图种用本工具再提一张预览，由用户点「钉住」放进看板。",
       "parameters": {
         "type": "object",
         "additionalProperties": false,
@@ -96,45 +95,6 @@
           "proposalId": { "type": "string" },
           "title": { "type": "string" }
         }
-      }
-    },
-    {
-      "name": "create_widget",
-      "description": "仅当用户明确要求直接加入右侧画布时新增组件。比较/看看应走 propose_widget。",
-      "parameters": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["type", "title"],
-        "properties": {
-          "type": { "type": "string" },
-          "title": { "type": "string" },
-          "datasetId": { "type": "string" }
-        }
-      }
-    },
-    {
-      "name": "update_widget",
-      "description": "更新右侧已有组件的类型、标题或样式。用户指右侧已有图改图种/标题时用本工具，不要 propose_widget。",
-      "parameters": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["id"],
-        "properties": {
-          "id": { "type": "string" },
-          "type": { "type": "string" },
-          "title": { "type": "string" },
-          "datasetId": { "type": "string" }
-        }
-      }
-    },
-    {
-      "name": "delete_widget",
-      "description": "按 id 从右侧研究画布移除组件。",
-      "parameters": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["id"],
-        "properties": { "id": { "type": "string" } }
       }
     },
     {

@@ -20,7 +20,8 @@ test('component eval dataset is well-formed', async () => {
   const catalog = await readJson('tool-catalog.json')
   const names = new Set(catalog.tools.map((t) => t.name))
   assert.equal(catalog.id, manifest.default_toolset)
-  assert.equal(catalog.tools.length, 16)
+  assert.equal(catalog.tools.length, 13)
+  const forbidOk = new Set([...names, ...(catalog.retired_tools ?? [])])
 
   const seen = new Set()
   const byFamily = {}
@@ -47,7 +48,7 @@ test('component eval dataset is well-formed', async () => {
         }
       }
       for (const n of c.gold.forbidden ?? []) {
-        if (n !== '*') assert.ok(names.has(n), `${c.id} unknown forbidden ${n}`)
+        if (n !== '*') assert.ok(forbidOk.has(n), `${c.id} unknown forbidden ${n}`)
       }
     }
   }

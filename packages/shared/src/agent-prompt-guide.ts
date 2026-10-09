@@ -2,6 +2,7 @@ import type { InstrumentRef } from './market-data.js'
 import { resolveInstrumentAnalyticsProfile } from './instrument-analytics.js'
 import { crossMarketNewsHints } from './news-source-hints.js'
 import { buildToolPackCatalogPrompt } from './tool-packs.js'
+import { adaptCanvasPlaybookLines, pinOnlyEpistemicLines } from './research-canvas-playbook-pin.js'
 
 /** 投研答复档位：L1 快答+预览 / L2 画布短评 / L3 深度备忘（仅显式要求） */
 export type ResearchTier = 'L1' | 'L2' | 'L3'
@@ -273,8 +274,9 @@ export function buildLocalDataCatalogIndexPrompt(): string {
 }
 
 /** 右侧研究画布组件 — research_canvas pack 始终加载 */
-export function buildResearchCanvasPlaybook(): string {
-  return [
+/** widgetEditing：会话加载了可选包 research_canvas_edit（旧双栏布局的 AI 改画布能力）时为 true */
+export function buildResearchCanvasPlaybook(opts?: { widgetEditing?: boolean }): string {
+  return adaptCanvasPlaybookLines([
     '【右侧研究画布 — 本产品默认交付；resolve_industry_universe / query_data / refine_dataset / propose_widget / create_widget / update_widget / delete_widget】',
     '- 某行业/板块/主题的指标排名或横向对比（尚未点名公司）→ 先 resolve_industry_universe，再 ask_user 确认公司（默认预选 8 家，用户要更全时最多 20 家），确认后 query_data，再按其返回的 view.recommended 选图 propose_widget。禁止口播公司名单，禁止把候选当作完整行业',
     '- 选图规则：query_data 返回 intent、view.recommended、view.candidates、view.suggestedTitle 与 coverage.byPeriod。propose_widget 优先传 intent（走势 trend / 排名 rank / 多年对照 compare），type 与 title 可省略。2–8 家多年对照用 grouped_bar（横轴年份、每年并排柱）；>8 家多年默认 heatmap_table，不要用 bar_chart 冒充 2021–2025。用户明确说排名才 rank+bar_chart，说走势才 trend+line_chart，说分组柱/并排柱才 grouped_bar。bar_chart 标题必须是单一年份（用 suggestedTitle）。若 coverage 显示最新一年缺数较多，正文说明「某年年报多数尚未披露，图按某年」',
@@ -303,7 +305,7 @@ export function buildResearchCanvasPlaybook(): string {
     '- propose_widget / create_widget 传 type、title 与 datasetId；禁止传 id / x / y / w / h',
     '- type 仅 line_chart | bar_chart | grouped_bar | stacked_bar | stacked_bar_percent | combo_bar_line | pie_chart | donut_chart | candlestick | heatmap_table | table | sources',
     '- delete_widget 按 id 删除；本轮数据集与组件清单见尾注',
-  ].join('\n')
+  ], opts?.widgetEditing === true).join('\n')
 }
 
 /** 画布 / 脑图制品 — artifacts pack 已加载时注入 */
@@ -451,9 +453,9 @@ export function buildIndustryAnalysisPlaybook(): string {
 /**
  * 投研认识论常驻薄层 — 准确性/科学性底线（与具体工具名解耦，始终注入）。
  */
-export function buildResearchEpistemicPlaybook(opts?: { artifactsAvailable?: boolean }): string {
+export function buildResearchEpistemicPlaybook(opts?: { artifactsAvailable?: boolean; widgetEditing?: boolean }): string {
   const artifactsAvailable = opts?.artifactsAvailable !== false
-  return [
+  return pinOnlyEpistemicLines([
     '【投研证据纪律 — 始终遵守】',
     '1) 分层：工具返回 = 事实层；你的文字 = 推断层。禁止把推断写成「已证实」。',
     '2) 禁编造：未调用工具或工具报错/空数据时，明确写「数据不可用/未拉取」，禁止用训练记忆补行情、评分、新闻正文或精确数字。',
@@ -490,7 +492,7 @@ export function buildResearchEpistemicPlaybook(opts?: { artifactsAvailable?: boo
     artifactsAvailable
       ? '- 用户可点开制品查看；简单一句问答、只要口头结论 → 不要无脑开完整报告或脑图；完整多章节报告仍按下方 L2/L3「完整可视化报告」边界自感应'
       : '- 未开启时用研究预览或文字；禁止 activate_tool_pack 加载 artifacts',
-  ].join('\n')
+  ], opts?.widgetEditing === true).join('\n')
 }
 
 export type ResearchOutputPlaybookOpts = { artifactsAvailable?: boolean }
@@ -659,7 +661,7 @@ export function buildAgentSystemRules(opts?: AgentSystemRulesOptions): string {
   ]
 
   if (packLoaded(packs, 'research_canvas')) {
-    sections.push(buildResearchCanvasPlaybook())
+    sections.push(buildResearchCanvasPlaybook({ widgetEditing: packLoaded(packs, 'research_canvas_edit') }))
   }
 
   sections.push(
@@ -675,6 +677,7 @@ export function buildAgentSystemRules(opts?: AgentSystemRulesOptions): string {
 
   sections.push(buildResearchEpistemicPlaybook({
     artifactsAvailable: packLoaded(packs, 'artifacts'),
+    widgetEditing: packLoaded(packs, 'research_canvas_edit'),
   }))
 
   sections.push(buildWorkspaceAccessPlaybook())

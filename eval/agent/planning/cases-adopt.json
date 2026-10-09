@@ -14,33 +14,49 @@
           {
             "name": "query_data",
             "args": {
-              "metric": { "eq": "net_income" },
-              "start": { "eq": "2020" },
-              "end": { "eq": "2024" }
+              "metric": {
+                "eq": "net_income"
+              },
+              "start": {
+                "eq": "2020"
+              },
+              "end": {
+                "eq": "2024"
+              }
             }
           },
           {
             "name": "propose_widget"
           }
         ],
-        "optional": ["search_instruments"],
+        "optional": [
+          "search_instruments"
+        ],
         "max_decisions": 4
       },
       "constraints": [
         {
           "id": "no_steal_canvas",
           "type": "forbid_tool",
-          "tools": ["create_widget", "create_canvas", "update_widget"]
+          "tools": [
+            "create_widget",
+            "create_canvas",
+            "update_widget"
+          ]
         },
         {
           "id": "no_web",
           "type": "forbid_tool",
-          "tools": ["web_search"]
+          "tools": [
+            "web_search"
+          ]
         },
         {
           "id": "no_financials",
           "type": "forbid_tool",
-          "tools": ["get_instrument_financials"]
+          "tools": [
+            "get_instrument_financials"
+          ]
         }
       ]
     },
@@ -77,24 +93,27 @@
       },
       "user_script": [],
       "gold": {
-        "chain": [
-          {
-            "name": "create_widget"
-          }
+        "chain": [],
+        "optional": [
+          "propose_widget"
         ],
-        "optional": [],
-        "max_decisions": 2
+        "max_decisions": 1,
+        "note": "M2-E4：看板只由用户钉住；原 gold 为 create_widget"
       },
       "constraints": [
         {
           "id": "no_requery",
           "type": "forbid_tool",
-          "tools": ["query_data"]
+          "tools": [
+            "query_data"
+          ]
         },
         {
           "id": "no_report_canvas",
           "type": "forbid_tool",
-          "tools": ["create_canvas"]
+          "tools": [
+            "create_canvas"
+          ]
         }
       ]
     },
@@ -133,17 +152,34 @@
       "gold": {
         "chain": [
           {
-            "name": "update_widget"
+            "name": "propose_widget",
+            "args": {
+              "datasetId": {
+                "eq": "research-ds-1"
+              }
+            }
           }
         ],
         "optional": [],
-        "max_decisions": 2
+        "max_decisions": 2,
+        "note": "M2-E4：看板里的图换图种 = 同一数据集提新预览供钉住；原 gold 为 update_widget"
       },
       "constraints": [
         {
           "id": "canvas_not_preview",
           "type": "forbid_tool",
-          "tools": ["update_proposal", "create_canvas"]
+          "tools": [
+            "update_proposal",
+            "create_canvas"
+          ]
+        },
+        {
+          "id": "no_requery",
+          "type": "forbid_tool",
+          "tools": [
+            "query_data",
+            "refine_dataset"
+          ]
         }
       ]
     }

@@ -171,10 +171,14 @@ test('L2/L3 output playbooks omit canvas delivery when artifacts unavailable', (
 })
 
 test('canvas playbook splits preview vs adopted chart-type edits', () => {
-  const text = buildResearchCanvasPlaybook()
+  const text = buildResearchCanvasPlaybook({ widgetEditing: true })
   assert.match(text, /未 Adopt.*propose_widget/)
   assert.match(text, /右侧已有组件.*update_widget/)
   assert.doesNotMatch(text, /只改图种或标题（如改成柱状图[\s\S]*不要 update_widget/)
+  const pinOnly = buildResearchCanvasPlaybook()
+  assert.match(pinOnly, /未 Adopt.*propose_widget/)
+  assert.doesNotMatch(pinOnly, /create_widget|update_widget|delete_widget/)
+  assert.match(pinOnly, /点预览上的「钉住」/)
 })
 
 test('canvas playbook fail-closes unsupported query_data metrics', () => {
@@ -182,7 +186,7 @@ test('canvas playbook fail-closes unsupported query_data metrics', () => {
   assert.match(text, /metric 仅限 gross_margin \/ revenue \/ revenue_growth \/ net_income \/ net_margin \/ roe \/ kline/)
   assert.match(text, /净息差/)
   assert.match(text, /做不到/)
-  assert.match(text, /禁止用净利率|不要用净利率/)
+  assert.match(text, /禁止用净利率|不要用净利率|禁止自行改查净利率/)
   assert.doesNotMatch(text, /毛利率、ROE、净资产收益率、净息差、研发投入/)
 })
 

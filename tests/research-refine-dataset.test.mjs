@@ -482,6 +482,7 @@ test('routing: refine vs view change vs metric change', () => {
   assert.ok(resolveToolRoutePlan({ message: '改成柱状图' }).avoidTools.includes('update_widget'))
   assert.ok(!resolveToolRoutePlan({ message: '去掉玲珑' }).preferredTools.includes('update_widget'))
   assert.equal(resolveToolRoutePlan({ message: '改看ROE' }).preferredTools[0], 'query_data')
-  assert.equal(resolveToolRoutePlan({ message: '把排名改成折线图' }).preferredTools[0], 'update_widget')
+  // M2-E4：改看板里已有图默认提新预览由用户钉住（update_widget 在可选包）
+  assert.equal(resolveToolRoutePlan({ message: '把排名改成折线图' }).preferredTools[0], 'propose_widget')
   assert.equal(resolveToolRoutePlan({ message: '删掉排名图' }).preferredTools[0], 'delete_widget')
 })

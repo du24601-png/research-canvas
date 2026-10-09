@@ -20,7 +20,7 @@ import {
 } from '../packages/agent/dist/index.js'
 
 test('artifacts is the only opt-in pack', () => {
-  assert.deepEqual(optInPackIds(), ['artifacts'])
+  assert.deepEqual(optInPackIds(), ['artifacts', 'research_canvas_edit'])
   assert.equal(isOptInToolPack('artifacts'), true)
   assert.equal(isOptInToolPack('news'), false)
   assert.equal(defaultSessionPackIds().includes('artifacts'), false)

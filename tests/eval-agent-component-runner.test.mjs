@@ -9,7 +9,7 @@ import { buildEvalMessages, runComponentSuite } from '../eval/agent/component/ru
 
 test('catalogToOpenAiTools exposes query_data as an OpenAI function', async () => {
   const tools = await catalogToOpenAiTools()
-  assert.equal(tools.length, 16)
+  assert.equal(tools.length, 13)
   const q = tools.find((t) => t.function?.name === 'query_data')
   assert.ok(q)
   assert.equal(q.type, 'function')

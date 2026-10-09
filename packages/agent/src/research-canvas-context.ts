@@ -61,7 +61,7 @@ export function formatResearchCanvasTurnContext(sessionId: string): string {
       const styled = proposal.style ? ' | 已设样式' : ''
       lines.push(`  proposalId=${proposal.id} | ${proposal.type} | ${proposal.title} | ${proposal.datasetId}${styled}`)
     }
-    lines.push('  预览改颜色/图例/轴标题 → update_proposal；已 Adopt → update_widget')
+    lines.push('  预览改颜色/图例/轴标题 → update_proposal；已钉住的图由用户在看板里调整；要换图种就再提一张新预览供他钉住')
   }
   if (!widgets.length) {
     lines.push('- 当前无组件')

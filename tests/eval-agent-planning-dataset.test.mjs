@@ -19,6 +19,8 @@ test('planning eval dataset is well-formed', async () => {
   const manifest = await readJson('manifest.json')
   const catalog = JSON.parse(await readFile(path.join(DIR, '..', 'component', 'tool-catalog.json'), 'utf8'))
   const names = new Set(catalog.tools.map((t) => t.name))
+  // M2-E4：已退役的工具只允许出现在禁止约束里，不能出现在 gold 链
+  const forbidOk = new Set([...names, ...(catalog.retired_tools ?? [])])
   assert.equal(manifest.counts.total, 24)
   const seen = new Set()
   const byFamily = {}
@@ -38,7 +40,7 @@ test('planning eval dataset is well-formed', async () => {
       for (const n of c.gold.optional ?? []) assert.ok(names.has(n), `${c.id} optional ${n}`)
       for (const cons of c.constraints) {
         assert.ok(['forbid_tool', 'forbid_args', 'forbid_tool_until'].includes(cons.type), c.id)
-        for (const t of cons.tools ?? []) assert.ok(names.has(t), `${c.id} ${cons.id} ${t}`)
+        for (const t of cons.tools ?? []) assert.ok(forbidOk.has(t), `${c.id} ${cons.id} ${t}`)
         if (cons.name) assert.ok(names.has(cons.name), `${c.id} ${cons.name}`)
         if (cons.until) assert.ok(names.has(cons.until), `${c.id} ${cons.until}`)
       }

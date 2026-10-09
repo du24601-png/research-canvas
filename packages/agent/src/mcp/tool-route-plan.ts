@@ -584,10 +584,11 @@ const INTENT_RULES: IntentRule[] = [
       /(?:在|往).*(?:研究画布|右侧).*(?:加|添加).*(?:图|表|组件)/,
       /(?:直接)?(?:加入|放进|放到).*(?:右侧|画布)/,
     ],
-    preferredTools: ['create_widget', 'update_widget', 'delete_widget'],
+    // M2-E4：默认会话没有 create_widget（可选包）；加图 = 提一张新预览，由用户钉住
+    preferredTools: ['propose_widget', 'create_widget', 'update_widget'],
     avoidTools: ['create_canvas', 'update_canvas', 'create_web', 'query_data'],
     confidence: 'high',
-    hint: '明确加入右侧研究画布 → create_widget（只传 type/title）；勿用 create_canvas 或正文插图代替',
+    hint: '加一张图 / 放进看板 → propose_widget 提出新预览，请用户点「钉住」；仅当本轮工具含 create_widget 时才直接加入；勿用 create_canvas 或正文插图代替',
   },
   {
     intent: 'research_canvas_proposal_style',
@@ -613,10 +614,10 @@ const INTENT_RULES: IntentRule[] = [
       /(?:把|将).+改名为/,
       /(?:右侧|画布).*(?:颜色|图例|橙色|蓝色)/,
     ],
-    preferredTools: ['update_widget', 'create_widget', 'delete_widget'],
+    preferredTools: ['propose_widget', 'update_widget', 'create_widget'],
     avoidTools: ['create_canvas', 'update_canvas', 'create_web', 'update_proposal'],
     confidence: 'high',
-    hint: '右侧研究画布改类型/样式/改名 → update_widget（按本轮清单 id）；预览未 Adopt 用 update_proposal；改数据范围须先 refine_dataset',
+    hint: '改看板里已有图的类型/标题 → propose_widget 同一 datasetId 提出新预览供用户钉住，或请用户在看板里切换视图；仅当本轮工具含 update_widget 时才直接改；改数据范围须先 refine_dataset',
   },
   {
     intent: 'research_canvas_delete',
@@ -628,7 +629,7 @@ const INTENT_RULES: IntentRule[] = [
     preferredTools: ['delete_widget', 'update_widget', 'create_widget'],
     avoidTools: ['create_canvas', 'update_canvas'],
     confidence: 'high',
-    hint: '右侧研究画布移除组件 → delete_widget（按本轮清单 id）',
+    hint: '看板里的图由用户自己删除：请用户在看板上点删除；仅当本轮工具含 delete_widget 时才代删（按本轮清单 id）',
   },
   {
     intent: 'create_canvas',

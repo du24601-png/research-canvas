@@ -19,6 +19,7 @@ export const TOOL_PACK_IDS = [
   'automation',
   'artifacts',
   'research_canvas',
+  'research_canvas_edit',
 ] as const
 
 export type ToolPackId = (typeof TOOL_PACK_IDS)[number]
@@ -125,10 +126,18 @@ export const TOOL_PACK_DEFS: readonly ToolPackDef[] = [
   {
     id: 'research_canvas',
     title: '研究画布组件',
-    description: '比较公司财务指标、在对话中预览研究视图，或把确认后的图表放到右侧研究画布',
+    description: '比较公司财务指标、在对话中预览研究视图；用户点「钉住」后图表进入看板',
     whenToUse:
-      '比较/看看/分析公司财务指标时先取数再预览；行业或板块的指标对比须先解析并确认公司名单；明确要求加入右侧研究画布时才直接加图；与投研报告画布 create_canvas 不是同一能力',
+      '比较/看看/分析公司财务指标时先取数再预览；行业或板块的指标对比须先解析并确认公司名单；与投研报告画布 create_canvas 不是同一能力',
     alwaysOn: true,
+  },
+  {
+    id: 'research_canvas_edit',
+    title: '研究画布编辑（旧布局）',
+    description: '由 AI 直接在看板 / 右侧画布里新增、修改、删除组件',
+    whenToUse:
+      '旧双栏布局的能力，默认不加载：看板只由用户钉住和编辑。模型与技能不得自行挂上',
+    optIn: true,
   },
 ] as const
 
@@ -308,9 +317,9 @@ export const TOOL_PACK_MEMBERSHIP: Readonly<Record<string, ToolPackId>> = {
   refine_dataset: 'research_canvas',
   propose_widget: 'research_canvas',
   update_proposal: 'research_canvas',
-  create_widget: 'research_canvas',
-  update_widget: 'research_canvas',
-  delete_widget: 'research_canvas',
+  create_widget: 'research_canvas_edit',
+  update_widget: 'research_canvas_edit',
+  delete_widget: 'research_canvas_edit',
 }
 
 export function isToolPackId(value: string): value is ToolPackId {

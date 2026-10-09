@@ -151,11 +151,12 @@ const PRIMARY_CASES = [
   { message: '看一下贵州茅台的K线', expectPrimary: 'query_data', intent: 'research_canvas_query' },
   { message: '改看ROE', expectPrimary: 'query_data', intent: 'research_canvas_query' },
   { message: '再看看2025年毛利率排名', expectPrimary: 'propose_widget', intent: 'research_canvas_propose' },
-  { message: '加一个毛利率趋势图', expectPrimary: 'create_widget', intent: 'research_canvas_create' },
-  { message: '再加一个2025年毛利率排名', expectPrimary: 'create_widget', intent: 'research_canvas_create' },
-  { message: '把排名改成折线图', expectPrimary: 'update_widget', intent: 'research_canvas_update' },
-  { message: '把毛利率趋势改名为五年毛利率趋势', expectPrimary: 'update_widget', intent: 'research_canvas_update' },
-  { message: '删掉排名图', expectPrimary: 'delete_widget', intent: 'research_canvas_delete' },
+  // M2-E4：改画布三件套为可选包；加图 / 改图默认走 propose_widget 预览，由用户钉住
+  { message: '加一个毛利率趋势图', expectPrimary: 'propose_widget', intent: 'research_canvas_create' },
+  { message: '再加一个2025年毛利率排名', expectPrimary: 'propose_widget', intent: 'research_canvas_create' },
+  { message: '把排名改成折线图', expectPrimary: 'propose_widget', intent: 'research_canvas_update' },
+  { message: '把毛利率趋势改名为五年毛利率趋势', expectPrimary: 'propose_widget', intent: 'research_canvas_update' },
+  { message: '删掉排名图', expectPrimary: 'delete_widget', intent: 'research_canvas_delete', skipRecall: true },
   { message: '画个脑图', expectPrimary: 'create_mindmap', intent: 'create_mindmap', skipRecall: true },
   { message: '画个思维导图', expectPrimary: 'create_mindmap', intent: 'create_mindmap', skipRecall: true },
   { message: '帮我做一份思维导图', expectPrimary: 'create_mindmap', intent: 'create_mindmap', skipRecall: true },
@@ -277,17 +278,17 @@ test('D3 confusion pairs — prefer wins over avoid in route plan', () => {
     },
     {
       message: '再加一个2025年毛利率排名',
-      prefer: 'create_widget',
+      prefer: 'propose_widget',
       avoid: 'query_data',
     },
     {
       message: '加一个毛利率趋势图',
-      prefer: 'create_widget',
+      prefer: 'propose_widget',
       avoid: 'create_canvas',
     },
     {
       message: '把排名改成折线图',
-      prefer: 'update_widget',
+      prefer: 'propose_widget',
       avoid: 'create_canvas',
     },
     {
@@ -453,7 +454,8 @@ test('D5 conditional playbooks — unloaded packs omitted from system rules', ()
   assert.match(withResearchCanvas, /query_data/)
   assert.match(withResearchCanvas, /refine_dataset/)
   assert.match(withResearchCanvas, /propose_widget/)
-  assert.match(withResearchCanvas, /create_widget/)
+  assert.doesNotMatch(withResearchCanvas, /create_widget|update_widget|delete_widget/)
+  assert.match(withResearchCanvas, /点预览上的「钉住」/)
   assert.match(withResearchCanvas, /禁止凭印象填写股票代码/)
   assert.ok(!withResearchCanvas.includes('fina_indicator'))
   assert.ok(!withResearchCanvas.includes('n_income_attr_p'))
@@ -472,9 +474,9 @@ test('D6 over-seed suppression on greeting', () => {
   assert.ok(names.includes('query_data'))
   assert.ok(names.includes('refine_dataset'))
   assert.ok(names.includes('propose_widget'))
-  assert.ok(names.includes('create_widget'))
-  assert.ok(names.includes('update_widget'))
-  assert.ok(names.includes('delete_widget'))
+  assert.ok(!names.includes('create_widget'))
+  assert.ok(!names.includes('update_widget'))
+  assert.ok(!names.includes('delete_widget'))
 })
 
 test('D7 orderToolsByPreference puts primary first', () => {
