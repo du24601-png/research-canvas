@@ -227,6 +227,7 @@ import {
 import type { ChatAttachmentMeta } from './media-types.js'
 import { isLibraryIngestKind, isTranscriptExtractKind } from './media-types.js'
 import { buildUserContentParts, chatMessageContentToText } from './content-parts.js'
+import { runResearchUiComposer } from './research-ui-composer-hook.js'
 
 export interface SessionContextUsage {
   usedTokens: number
@@ -2620,6 +2621,15 @@ export class AgentEngine {
           segments: persistedSegments,
         })
       }
+      const uiStep = await runResearchUiComposer({
+        enabled: progress?.researchUiComposer === true && !isEmptyReply,
+        sessionId,
+        task: text,
+        steps: toolSteps,
+        chat: async (messages) => chatMessageContentToText((await llm.chat(messages, undefined, signal, { temperature: 0, maxTokens: 800 })).message.content),
+        emit,
+      }).catch(() => null)
+      if (uiStep) toolSteps.push(uiStep)
       // messages：仅终轮 reasoning（wire 不变）；turns：整轮时间线供历史气泡
       pushAssistant(
         reply,

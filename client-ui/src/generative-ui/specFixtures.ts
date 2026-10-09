@@ -26,7 +26,7 @@ export const NET_MARGIN = build('research-ds-11111111-1111-4111-8111-11111111111
 export const ROE = build('research-ds-22222222-2222-4222-8222-222222222222', 'roe', {
   [A.id]: [28.4, 27.1, 29.6, 31.2, 32.0],
   [B.id]: [null, 23.5, 25.1, 24.0, 20.3],
-}, 'mixed')
+})
 
 function deltaOf(parent: Dataset, id: string): Dataset {
   const body = yoyDeltaDataset(parent)

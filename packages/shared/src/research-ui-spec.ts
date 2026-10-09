@@ -11,7 +11,7 @@ export const RESEARCH_UI_SPEC_VERSION = 1
 export const RESEARCH_UI_COMPONENTS = ['ComparisonView', 'TrendView', 'EvidencePanel', 'MissingData'] as const
 export type ResearchUiComponent = typeof RESEARCH_UI_COMPONENTS[number]
 
-export const RESEARCH_UI_ACTIONS = ['pin', 'open_sources', 'highlight_largest_change'] as const
+export const RESEARCH_UI_ACTIONS = ['pin', 'open_sources', 'highlight_largest_change', 'rerun'] as const
 export type ResearchUiAction = typeof RESEARCH_UI_ACTIONS[number]
 
 export type ResearchUiBlock =
@@ -47,8 +47,8 @@ const FIELDS: Record<ResearchUiComponent, readonly string[]> = {
 }
 
 const ACTIONS_FOR: Record<ResearchUiComponent, readonly ResearchUiAction[]> = {
-  ComparisonView: ['pin', 'open_sources'],
-  TrendView: ['pin', 'open_sources', 'highlight_largest_change'],
+  ComparisonView: ['pin', 'open_sources', 'rerun'],
+  TrendView: ['pin', 'open_sources', 'highlight_largest_change', 'rerun'],
   EvidencePanel: [],
   MissingData: [],
 }
@@ -129,10 +129,8 @@ function parseBlock(raw: unknown, at: string, known: ReadonlyMap<string, Researc
     return { component, datasetIds: checkDatasetIds(raw.datasetIds, `${at}.datasetIds`, known, errors), ...extra }
   }
   const datasetId = checkDatasetId(raw.datasetId, `${at}.datasetId`, known, errors)
+  // 没给 deltaDatasetId 时，前端用 shared 的 yoyDeltaDataset 就地计算（仍是代码算，不是模型给的数）
   const deltaDatasetId = checkDelta(raw.deltaDatasetId, datasetId, at, known, errors)
-  if (actions?.includes('highlight_largest_change') && !deltaDatasetId) {
-    errors.push(`${at} 高亮最大变化需要 deltaDatasetId`)
-  }
   return { component, datasetId, ...(deltaDatasetId ? { deltaDatasetId } : {}), ...extra }
 }
 

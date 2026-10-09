@@ -36,6 +36,7 @@ import {
 } from './toolResultTruncation'
 import ResearchWidgetPreviewCard from './research-canvas/ResearchWidgetPreviewCard'
 import ResearchFetchPlanCard from './research-canvas/ResearchFetchPlanCard'
+import ResearchTurnUi from '../generative-ui/ResearchTurnUi'
 import { fetchPlanFromToolStep } from './research-canvas/fetchPlanFromToolStep'
 import { usePinBoard } from './pin-board/PinBoardContext'
 import ChatStreamReceipt from './ChatStreamReceipt'
@@ -923,7 +924,7 @@ export default function ChatProcessTrace({
   ))
   const planSteps = steps.filter(step => fetchPlanFromToolStep(step) != null)
   const lastPlanId = planSteps[planSteps.length - 1]?.id
-  const otherSteps = steps.filter(step => step.tool !== 'propose_widget')
+  const otherSteps = steps.filter(step => step.tool !== 'propose_widget' && step.tool !== 'compose_research_ui')
   const detailStepCount = countHiddenDetailSteps(steps)
   const showDetailsToggle = detailStepCount > 0 || hasThinking
   const lastPreviewId = previewSteps[previewSteps.length - 1]?.id
@@ -1058,16 +1059,20 @@ export default function ChatProcessTrace({
         />
       ))}
 
-      {showLivePreviews && previewSteps.map(step => (
-        <div
-          key={step.id}
-          className={mergeClasses(
-            live && step.id === lastPreviewId && step.status === 'done' && s.previewEmphasis,
-          )}
-        >
-          <ResearchWidgetPreviewCard step={step} sessionId={sessionId} />
-        </div>
-      ))}
+      {showLivePreviews && (
+        <ResearchTurnUi steps={steps} sessionId={sessionId}>
+          {previewSteps.map(step => (
+            <div
+              key={step.id}
+              className={mergeClasses(
+                live && step.id === lastPreviewId && step.status === 'done' && s.previewEmphasis,
+              )}
+            >
+              <ResearchWidgetPreviewCard step={step} sessionId={sessionId} />
+            </div>
+          ))}
+        </ResearchTurnUi>
+      )}
 
       {!live && planSteps.map(step => (
         <ResearchFetchPlanCard
@@ -1079,9 +1084,13 @@ export default function ChatProcessTrace({
         />
       ))}
 
-      {!live && previewSteps.map(step => (
-        <ResearchWidgetPreviewCard key={step.id} step={step} sessionId={sessionId} />
-      ))}
+      {!live && (
+        <ResearchTurnUi steps={steps} sessionId={sessionId}>
+          {previewSteps.map(step => (
+            <ResearchWidgetPreviewCard key={step.id} step={step} sessionId={sessionId} />
+          ))}
+        </ResearchTurnUi>
+      )}
 
       {showDetailsToggle && (
         <>

@@ -82,7 +82,8 @@ describe('SpecRenderer', () => {
   it('Demo C shows missing cells as gaps and mixed sources as 未标注', () => {
     renderWithProviders(<SpecRenderer spec={SPEC_DEMO_C} datasets={FIXTURE_DATASETS} fallback={FALLBACK} />)
     expect(screen.getByText('示例公司乙：2021 年没有取到')).toBeTruthy()
-    expect(evidenceSourceText(ROE)).toBe('来源未标注')
+    // mixed 来源的数据集在上游已被整份拒绝；这里只验证组件的防御性文案
+    expect(evidenceSourceText({ ...ROE, sources: ROE.sources.map(s => ({ ...s, provider: 'mixed' })) })).toBe('来源未标注')
     expect(screen.getByText('2021–2025 年报')).toBeTruthy()
   })
 })

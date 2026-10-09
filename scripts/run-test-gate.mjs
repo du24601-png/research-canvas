@@ -13,6 +13,7 @@ const GATE = [
   'tests/research-refine-dataset.test.mjs',
   'tests/research-yoy-delta.test.mjs',
   'tests/research-ui-spec.test.mjs',
+  'tests/research-ui-composer.test.mjs',
   'tests/mcp-tool-route-accuracy.test.mjs',
   'tests/session-artifacts-opt-in.test.mjs',
   'tests/session-tools-freeze.test.mjs',

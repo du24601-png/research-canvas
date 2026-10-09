@@ -175,6 +175,11 @@ export function applyChatProgressEvent(
       }
     case 'research_canvas':
       return snapshot
+    case 'research_ui_spec': {
+      const steps = snapshot.liveTrace?.steps ?? []
+      if (steps.some(step => step.id === event.step.id)) return snapshot
+      return { ...snapshot, liveTrace: rebuildLiveTrace(snapshot.liveTrace, { steps: [...steps, event.step] }) }
+    }
     case 'reply': {
       // 终答有 content →「正在整理消息」；仅 estimatedTokens 流式进度则保持思考/工具后整理态
       const hasContent = typeof event.content === 'string' && event.content.length > 0

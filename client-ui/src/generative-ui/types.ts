@@ -14,6 +14,7 @@ export interface BlockProps<B extends ResearchUiBlock> {
 const ACTION_LABELS: Partial<Record<ResearchUiAction, string>> = {
   pin: '钉住',
   open_sources: '查看来源',
+  rerun: '再查一次',
 }
 
 /** 把 Spec 里声明的通用动作变成按钮；highlight_largest_change 由 TrendView 自己处理 */

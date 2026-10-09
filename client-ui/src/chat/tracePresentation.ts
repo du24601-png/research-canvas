@@ -136,5 +136,6 @@ export function buildThinkingSummary(segments: ReasoningSegment[]): {
 }
 
 export function countHiddenDetailSteps(steps: ChatToolStep[]): number {
-  return steps.filter(step => step.tool !== 'propose_widget').length
+  // compose_research_ui 是界面组装的合成步骤，不算工具调用
+  return steps.filter(step => step.tool !== 'propose_widget' && step.tool !== 'compose_research_ui').length
 }

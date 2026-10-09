@@ -22,7 +22,7 @@ test('any violation rejects the whole spec with readable errors', () => {
     { version: 1, blocks: [] },
     { version: 1, blocks: [{ component: 'EvidencePanel', datasetIds: [DS] }], extra: true },
     { version: 1, blocks: [{ component: 'TrendView', datasetId: DS, title: '同比 +3.1' }] },
-    { version: 1, blocks: [{ component: 'TrendView', datasetId: DS, actions: ['highlight_largest_change'] }] },
+    { version: 1, blocks: [{ component: 'EvidencePanel', datasetIds: [DS], actions: ['highlight_largest_change'] }] },
     { version: 1, blocks: [{ component: 'TrendView', datasetId: DELTA, deltaDatasetId: DS }] },
     { version: 1, blocks: [{ component: 'ComparisonView', datasetIds: [DS, DS] }] },
     { version: 1, blocks: [{ component: 'MissingData', datasetId: 'research-ds-unknown' }] },

@@ -236,6 +236,11 @@ export type ChatProgressEvent =
     type: 'research_canvas'
     event: ResearchCanvasEvent
   }
+  /** FinFrame M4：本轮回答的 UI Spec（已校验），以合成步骤 compose_research_ui 携带 */
+  | {
+    type: 'research_ui_spec'
+    step: ChatToolStep
+  }
 
 /**
  * 聊天进度回调选项 — 配置进度推送回调和中断信号。
@@ -262,6 +267,8 @@ export interface ChatProgressOptions {
    * 非法项由 TurnCanvasState 丢弃；不作为画布持久化副本。
    */
   researchCanvasSnapshot?: unknown
+  /** 客户端开启对话优先 + Composer 时为 true：终答前跑一次 UI Spec 组装 */
+  researchUiComposer?: boolean
 }
 
 // ── 工具中文标签映射 ──

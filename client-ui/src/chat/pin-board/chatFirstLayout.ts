@@ -23,3 +23,20 @@ function readStoredOverride(): string | null {
 export function isChatFirstLayout(): boolean {
   return resolveChatFirstLayout(import.meta.env.VITE_FINFRAME_CHAT_FIRST, readStoredOverride())
 }
+
+/** Composer（M4）：仅在对话优先布局下生效，默认开；localStorage `finframe.composer`='0' 关闭 */
+export const COMPOSER_STORAGE_KEY = 'finframe.composer'
+
+export function resolveUiComposer(chatFirst: boolean, storedValue: string | null): boolean {
+  return chatFirst && storedValue !== '0'
+}
+
+export function isUiComposerEnabled(): boolean {
+  let stored: string | null = null
+  try {
+    stored = typeof window === 'undefined' ? null : window.localStorage.getItem(COMPOSER_STORAGE_KEY)
+  } catch {
+    stored = null
+  }
+  return resolveUiComposer(isChatFirstLayout(), stored)
+}

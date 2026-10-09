@@ -80,6 +80,8 @@ export type ChatProgressEvent =
   | { type: 'tool_start'; step: ChatToolStep }
   | { type: 'tool_done'; step: ChatToolStep }
   | { type: 'research_canvas'; event: ResearchCanvasEvent }
+  /** FinFrame M4：本轮 UI Spec，合成步骤 compose_research_ui */
+  | { type: 'research_ui_spec'; step: ChatToolStep }
   | { type: 'user_prompt'; prompt: ChatUserPromptPayload }
   | { type: 'steer_applied'; message: string }
   | {

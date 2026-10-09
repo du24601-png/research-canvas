@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Text } from '@fluentui/react-components'
 import type { ResearchUiBlock } from '@opptrix/shared/research-ui-spec'
-import { largestAbsDelta } from '@opptrix/shared/research-dataset-delta'
+import { largestAbsDelta, yoyDeltaDataset } from '@opptrix/shared/research-dataset-delta'
 import LineChartWidget from '../chat/research-canvas/LineChartWidget'
 import { researchMetricLabel } from '../chat/research-canvas/sourcePresentation'
 import type { Dataset } from '../chat/research-canvas/types'
@@ -19,12 +19,19 @@ export function largestChangeNote(dataset: Dataset, delta: Dataset): string | nu
   return `${name} ${best.period} 年较上年 ${sign}${Math.abs(best.value)} ${delta.unit}，是这组数据里变化最大的一处。`
 }
 
+/** Spec 没给同比变化数据集时就地用同一份 shared 代码计算 */
+function localDelta(dataset: Dataset): Dataset | undefined {
+  const body = yoyDeltaDataset(dataset)
+  if ('error' in body) return undefined
+  return { ...body, id: `${dataset.id}-yoy-local`, parentDatasetId: dataset.id, transform: { type: 'yoy_delta' } }
+}
+
 export default function TrendView({ block, getDataset, onAction }: BlockProps<TrendBlock>) {
   const s = useBlockStyles()
   const [highlight, setHighlight] = useState(false)
   const dataset = getDataset(block.datasetId)
-  const delta = block.deltaDatasetId ? getDataset(block.deltaDatasetId) : undefined
   if (!dataset) return null
+  const delta = block.deltaDatasetId ? getDataset(block.deltaDatasetId) : localDelta(dataset)
   const canHighlight = Boolean(delta && block.actions?.includes('highlight_largest_change'))
   const actions = [
     ...(canHighlight ? [{
