@@ -46,6 +46,8 @@ import {
 import { pickWelcomeVariant } from './chatWelcomeVariants'
 import { DEFAULT_SESSION_DISPLAY_TITLE } from './sessionSidebarPresentation'
 import MessageOutlineRail, { buildOutlineEntries } from './MessageOutlineRail'
+import { ReportFollowupProvider } from '../generative-ui/report-followup/ReportFollowupContext'
+import { recordFollowupOnSubmit } from '../generative-ui/report-followup/reportVersions'
 
 /** 消息区底 padding 初始/下限（ResizeObserver 测 composerInner 后覆盖） */
 const CHAT_COMPOSER_BOTTOM_PAD = 120
@@ -884,6 +886,7 @@ function ChatView({
 
   const handleSubmit = (text?: string, attachmentIds?: string[], attachmentMetas?: ChatAttachmentMeta[]) => {
     stickToBottomRef.current = true
+    recordFollowupOnSubmit(sessionId, contextRef, text)
     onSubmit(text, attachmentIds, attachmentMetas)
   }
 
@@ -1136,6 +1139,7 @@ function ChatView({
                 </Text>
               ) : null}
 
+              <ReportFollowupProvider sessionId={sessionId} messages={messages} quote={collaborationReadonly ? undefined : onQuoteSelection} scrollTo={scrollMessageStartToCenter}>
               {messages.map((m, i) => (
                 <ChatMessageItem
                   key={listRowKey(i, m.at, m.role)}
@@ -1150,6 +1154,7 @@ function ChatView({
                   hiddenPreviewStepIds={livePreviewStepIds}
                 />
               ))}
+              </ReportFollowupProvider>
 
               {!collaborationReadonly && ((loading || wakeWaiting) && liveTrace) && (
                 <div className={s.loadingRow} data-message-role="assistant">

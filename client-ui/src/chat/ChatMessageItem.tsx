@@ -17,6 +17,7 @@ import { opptrixTokens, opptrixCssVars } from '../theme/tokens'
 import { fadeInUp } from '../theme/mixins'
 import { copyTextToClipboard } from '../platform/clipboard'
 import { formatFriendlyTime } from '../utils/formatFriendlyTime'
+import { TurnIndexProvider } from '../generative-ui/report-followup/ReportFollowupContext'
 
 /** 用户气泡编辑区约 3 行可见高度（超出滚动） */
 const USER_BUBBLE_LINE_HEIGHT = 1.65
@@ -499,13 +500,15 @@ function ChatMessageItem({
               || (message.reasoningSegments && message.reasoningSegments.length > 0)
               || (message.toolSteps && message.toolSteps.length > 0)) && (
               <div style={{ marginTop: message.content || attachmentStrip ? 8 : 0 }}>
-                <ChatProcessTrace
-                  steps={message.toolSteps ?? []}
-                  sessionId={sessionId}
-                  thinkingSnippet={message.reasoningContent?.trim() || undefined}
-                  thinkingSegments={message.reasoningSegments}
-                  hiddenPreviewStepIds={hiddenPreviewStepIds}
-                />
+                <TurnIndexProvider index={index}>
+                  <ChatProcessTrace
+                    steps={message.toolSteps ?? []}
+                    sessionId={sessionId}
+                    thinkingSnippet={message.reasoningContent?.trim() || undefined}
+                    thinkingSegments={message.reasoningSegments}
+                    hiddenPreviewStepIds={hiddenPreviewStepIds}
+                  />
+                </TurnIndexProvider>
               </div>
             )}
           </>
