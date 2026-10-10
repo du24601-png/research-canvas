@@ -46,20 +46,44 @@ function normalizeName(value: string): string {
 }
 
 function cnEquityHits(hits: ResearchSearchHit[]): Array<{ ref: InstrumentRef; name: string }> {
+  const seen = new Set<string>()
   const out: Array<{ ref: InstrumentRef; name: string }> = []
   for (const hit of hits) {
     const ref = hit.instrument
     if (!isCnEquityRef(ref)) continue
+    const key = instrumentRefKey(ref)
+    if (seen.has(key)) continue
+    seen.add(key)
     const name = (hit.name ?? '').trim() || tickerOf(ref)
     out.push({ ref, name })
   }
   return out
 }
 
+export interface AmbiguousEntityResult {
+  error: string
+  status: 'ambiguous_entity'
+  candidates: Array<{ name: string; ticker: string }>
+  hint: string
+}
+
+function ambiguousEntityResult(
+  needle: string,
+  candidates: Array<{ ref: InstrumentRef; name: string }>,
+): AmbiguousEntityResult {
+  const list = candidates.map(row => `${row.name}（${row.ref.symbol}）`).join('、')
+  return {
+    error: `「${needle}」对应多家公司：${list}。请先问用户指哪一家，不要自行选择。`,
+    status: 'ambiguous_entity',
+    candidates: candidates.map(row => ({ name: row.name, ticker: row.ref.symbol })),
+    hint: '把候选公司列给用户，请用户回复全称或股票代码后再查询；不要替用户选择，不要用其他工具拼数据',
+  }
+}
+
 export function pickCnEquityHit(
   keyword: string,
   hits: ResearchSearchHit[],
-): { entity: ResearchEntity } | { error: string } {
+): { entity: ResearchEntity } | { error: string } | AmbiguousEntityResult {
   const needle = keyword.trim()
   const rows = cnEquityHits(hits)
   const foreign = rows.length ? null : nonCnMarketOf(hits)
@@ -67,6 +91,10 @@ export function pickCnEquityHit(
   if (!rows.length) return { error: `无法确认「${needle}」对应的上市公司` }
   const needleNorm = normalizeName(needle)
   const exact = rows.filter(row => row.name === needle || normalizeName(row.name) === needleNorm)
+  if (exact.length === 1) return { entity: entityFromRef(exact[0].ref, exact[0].name) }
+  const matches = rows.filter(row => row.name.includes(needle) || normalizeName(row.name).includes(needleNorm))
+  if (matches.length >= 2) return ambiguousEntityResult(needle, matches)
+  if (matches.length === 1) return { entity: entityFromRef(matches[0].ref, matches[0].name) }
   const prefixed = rows.filter(row => (
     row.name.startsWith(needle) || normalizeName(row.name).startsWith(needleNorm)
   ))
