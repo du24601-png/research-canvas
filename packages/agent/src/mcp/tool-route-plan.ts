@@ -59,6 +59,29 @@ interface IntentRule {
  * 意图规则表：从具体到宽泛排序（同 message 取最高 priority 命中）。
  * preferredTools[0] 为「尽可能最正确」的首推工具。
  */
+/** 个股速览：出现这些词说明不是「只点名一家公司、未指定指标」 */
+const OVERVIEW_BLOCK = [
+  '行业', '板块', '概念', '行情', '大盘', '指数', '市场', '沪深', '中证', '上证', '深证', '恒生', '纳斯达克', '标普', '道琼斯',
+  '股价', '现价', '价格', 'K线', '日K', '走势', '涨跌', '估值', '业绩', '财务', '基本面', '情况', '明细', '数值', '数据',
+  '毛利', '营收', '营业收入', '净利', '利润', 'ROE', '净资产', '净息差', '研发', '分红', '派息', '现金流', '资产负债', '财报',
+  '股东', '持股', '评级', '目标价', '公告', '新闻', '资讯', '消息', '成分', '基金', 'ETF', '持仓', '盈亏', '组合', '自选',
+  '计划', '任务', '技能', '账户', '交易', '订阅', '画布', '看板', '附件', '研报', '报告', '文档', '对比', '比较', '好不好',
+  '今天', '明天', '昨天', '最新', '最近', '近期', '今年', '去年', '历史', '方案', '结果', '效果', '原因', '风险', '机会', '代码', '日志', '宏观', '经济',
+  '政策', '利率', '汇率', '黄金', '原油', '港股', '美股', '创业板', '科创板', 'GDP', 'CPI', 'PPI', 'PMI', '一下', '图', '表',
+  '[和与及、，,]',
+].join('|')
+const OVERVIEW_SECTOR_EXACT = '白酒|半导体|新能源|光伏|医药|芯片|汽车|地产|煤炭|有色|军工|消费|科技|石油|银行|保险|证券|券商'
+const OVERVIEW_TAIL = '[。！!？?吧呢]?'
+const OVERVIEW_NAME = '[A-Za-z0-9\u4e00-\u9fa5]{2,10}'
+const OVERVIEW_GUARD =
+  `(?![我这那今本该其你明昨])(?![^。！？!?]*(?:${OVERVIEW_BLOCK}))`
+  + `(?!(?:${OVERVIEW_SECTOR_EXACT})${OVERVIEW_TAIL}$)(?![^。！？!?]*(?:(?<!控)股|[业板债币险率价况据果因])${OVERVIEW_TAIL}$)`
+
+const COMPANY_OVERVIEW_PATTERNS: RegExp[] = [
+  new RegExp(`^(?:请)?(?:帮我)?(?:看看|看一下|看下|速览一下|速览|分析一下|分析)${OVERVIEW_GUARD}${OVERVIEW_NAME}${OVERVIEW_TAIL}$`),
+  new RegExp(`^(?!(?:${OVERVIEW_SECTOR_EXACT})怎么样)${OVERVIEW_GUARD}${OVERVIEW_NAME}怎么样${OVERVIEW_TAIL}$`),
+]
+
 const INTENT_RULES: IntentRule[] = [
   {
     intent: 'run_subagent',
@@ -543,6 +566,15 @@ const INTENT_RULES: IntentRule[] = [
     avoidTools: ['get_instrument_financials', 'create_canvas', 'create_web', 'refine_dataset'],
     confidence: 'high',
     hint: '比较/看看/看一下财务指标或走势 → query_data 再 propose_widget；K 线用 metric=kline + candlestick；勿自动 create_widget，勿用财务摘要或 create_canvas 代替',
+  },
+  {
+    intent: 'research_company_overview',
+    priority: 97,
+    patterns: COMPANY_OVERVIEW_PATTERNS,
+    preferredTools: ['query_data', 'propose_widget'],
+    avoidTools: ['get_instrument_financials', 'get_instrument_snapshot', 'create_canvas', 'create_web', 'refine_dataset'],
+    confidence: 'high',
+    hint: '只点名一家 A 股公司、未指定指标（个股速览）→ 同一轮并行 query_data 取 revenue / revenue_growth / gross_margin / net_margin / roe 近 5 个完整年度，再对最相关的一个数据集 propose_widget 一次；勿口述数字，勿用财务摘要或 create_canvas 代替；研究图表目前仅支持 A 股，港股/美股公司不要发起取数，直接告知暂不支持',
   },
   {
     intent: 'research_canvas_propose',

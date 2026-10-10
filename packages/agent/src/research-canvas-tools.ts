@@ -202,7 +202,7 @@ export function buildResearchCanvasTools(hub?: ResearchDataHub | null): Research
     {
       name: 'query_data',
       category: '研究画布',
-      description: '按公司与指标查询真实财务或日K数据，生成数据集。点名不超过 3 家时直接取数；超过 3 家须先返回 plan_preview，用户确认后再传 confirmed:true。只返回 datasetId、覆盖度、intent 与 view.recommended / suggestedTitle，不返回明细数字。比较/看看/分析后应再调用 propose_widget。K 线用 metric=kline。最多 20 家；行业对比须先经 resolve_industry_universe 并经用户确认。',
+      description: '按公司与指标查询真实财务或日K数据，生成数据集。点名不超过 3 家时直接取数；超过 3 家须先返回 plan_preview，用户确认后再传 confirmed:true。只返回 datasetId、覆盖度、intent 与 view.recommended / suggestedTitle，不返回明细数字。比较/看看/分析后应再调用 propose_widget。K 线用 metric=kline。只点名一家公司且未指定指标（个股速览）时，并行各取 revenue / revenue_growth / gross_margin / net_margin / roe 最近 5 个完整年度。最多 20 家；行业对比须先经 resolve_industry_universe 并经用户确认。',
       parameters: S({
         entities: {
           type: 'array',

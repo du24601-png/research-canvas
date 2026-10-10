@@ -29,6 +29,15 @@ import {
   toolNamesForPacks,
 } from '../packages/agent/dist/mcp/tool-pack-session.js'
 
+/** 个股速览不得误匹配的问句 */
+const NOT_OVERVIEW_MESSAGES = [
+  '分析一下行情', '看看白酒行业', '看看茅台股价', '看看茅台的毛利率', '看看茅台和五粮液',
+  '招商银行股价怎么样', '招商银行现价怎么样', '宁德时代毛利率怎么样', '茅台营收怎么样', '茅台走势怎么样', '茅台分红怎么样', '茅台今天怎么样',
+  '看看结果', '看看效果', '看看代码', '看看日志', '分析一下原因', '分析一下数据', '分析一下风险', '分析一下宏观经济', '看看机会',
+  '你觉得怎么样', '方案二怎么样', '明天怎么样', '写一份报告怎么样', '白酒怎么样', '看看半导体', '看看创业板', '看看港股', '看看美股',
+  '看看科技股', '看看黄金价格', '看看明细', '看看数值', '看看宁德时代最新消息', '比亚迪最近怎么样',
+]
+
 /** D1 黄金用例：用户问句 → 必须命中的首推工具 */
 const PRIMARY_CASES = [
   { message: '帮我建一个工作流技能', expectPrimary: 'activate_agent_skill', intent: 'create_skill' },
@@ -140,6 +149,15 @@ const PRIMARY_CASES = [
   { message: '看一下贵州茅台的净资产收益率走势', expectPrimary: 'query_data', intent: 'research_canvas_query' },
   { message: '对比宁德时代和比亚迪近五年毛利率', expectPrimary: 'query_data', intent: 'research_canvas_query' },
   { message: '比较几家银行龙头的净息差', expectPrimary: 'query_data', intent: 'research_canvas_query' },
+  { message: '看看宁德时代', expectPrimary: 'query_data', intent: 'research_company_overview' },
+  { message: '贵州茅台怎么样', expectPrimary: 'query_data', intent: 'research_company_overview' },
+  { message: '速览比亚迪', expectPrimary: 'query_data', intent: 'research_company_overview' },
+  { message: '分析一下招商银行', expectPrimary: 'query_data', intent: 'research_company_overview' },
+  { message: '看看英伟达', expectPrimary: 'query_data', intent: 'research_company_overview' },
+  { message: '看看腾讯控股', expectPrimary: 'query_data', intent: 'research_company_overview' },
+  { message: '看看TCL中环', expectPrimary: 'query_data', intent: 'research_company_overview' },
+  { message: '看看京东方A', expectPrimary: 'query_data', intent: 'research_company_overview' },
+  { message: '600519怎么样', expectPrimary: 'query_data', intent: 'research_company_overview' },
   { message: '去掉玲珑', expectPrimary: 'refine_dataset', intent: 'research_canvas_refine' },
   { message: '只看2023–2025', expectPrimary: 'refine_dataset', intent: 'research_canvas_refine' },
   { message: '再加贵州轮胎', expectPrimary: 'refine_dataset', intent: 'research_canvas_refine' },
@@ -589,4 +607,11 @@ test('system rules require opptrix_run when loaded', () => {
   assert.match(rules, /http_fetch/)
   assert.match(rules, /方案 1|Cursor 式|工具收敛/)
   assert.match(rules, /background/)
+})
+
+test('个股速览：行业/行情/股价/指定指标/多公司问句不命中 research_company_overview', () => {
+  for (const message of NOT_OVERVIEW_MESSAGES) {
+    const plan = resolveToolRoutePlan({ message })
+    assert.notEqual(plan.intent, 'research_company_overview', message)
+  }
 })

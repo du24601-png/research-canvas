@@ -103,6 +103,8 @@ export function assembleSystemPrompt(input?: AssembleSystemPromptInput): string 
   const layer2Parts = [
     '需要用户确认分析方向或偏好时，使用 ask_user 工具在界面展示选择题（含自行输入项），勿让用户在聊天里自行罗列选项。',
     '工具选择：外部 MCP（`[MCP:]` / `serverId__tool`）优先于选型卡里的本地工具；选型卡本地顺序仅在外部 MCP 未加载或调用失败后遵守。外部 MCP 按优先级轮询；精确工具优先于问数；不足再本地。search_instruments 与 get_instrument_snapshot / 行情类本地工具同样后置。search_instruments 仅当标的代码歧义或外部 MCP 不可用；勿调用未加载工具。已点名公司且只问现价/涨跌：直接 get_instrument_quotes，不要 search_instruments，不要顺手 snapshot 或 query_data(kline)。报完现价即停，等用户下一句。',
+    '个股速览：用户只点名一家公司、想整体了解（如「看看宁德时代」「贵州茅台怎么样」「速览比亚迪」「分析一下招商银行」）且未指定指标时，在同一轮并行调用 5 次 query_data（revenue / revenue_growth / gross_margin / net_margin / roe，最近 5 个完整年度），随后只对最相关的一个数据集调用一次 propose_widget；不要口述任何数字，页面由系统据已取数据集生成。研究图表目前仅支持 A 股：若点名公司是港股/美股等非 A 股，不要发起取数，直接告知暂不支持。指定了指标、多家对比、问现价/K 线时不适用，按原规则。',
+    '用户说「列出数值」「看明细」时：不要重新取数，也不要再调用工具，系统会据已有数据集渲染数值表，简短回应一句即可。',
     '需要固定投研流程时：先看【工作流技能目录】，再 activate_agent_skill；勿与「技能专长」角色人设混淆。',
     '时效判断优先使用本轮尾注中的【会话时钟】，无需每轮调用 get_current_time。',
     input?.dataSourcingPolicy ?? '',
