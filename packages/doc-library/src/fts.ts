@@ -1,5 +1,7 @@
 import type Database from 'better-sqlite3'
 import type { ChunkRow, DocSearchScope, DocumentSourceType } from './types.js'
+import { replaceTrigramForDocument } from './fts-trigram.js'
+import { hasCjk, searchCjkChunks, splitQueryTerms } from './fts-cjk.js'
 
 export function ftsQuery(raw: string): string {
   const tokens = raw
@@ -20,6 +22,7 @@ export function replaceFtsForDocument(db: Database.Database, documentId: string,
     for (const row of rows) {
       insert.run(row.id, row.document_id, row.text)
     }
+    replaceTrigramForDocument(db, documentId, rows)
   })
   tx(chunks)
 }
@@ -50,6 +53,9 @@ export function searchFtsChunks(
   const q = ftsQuery(query)
   if (!q) return []
   const limit = Math.min(Math.max(opts.limit ?? 8, 1), 20)
+  // 中文等 CJK：unicode61 不切词，改走 trigram + 短词逐字匹配
+  const terms = splitQueryTerms(query)
+  if (terms.some(hasCjk)) return searchCjkChunks(db, terms, limit, opts)
   const scope = opts.scope ?? 'session'
 
   if (scope === 'library') {

@@ -7,7 +7,9 @@ import {
   MIGRATION_V4_SQL,
   MIGRATION_V5_SQL,
   MIGRATION_V6_SQL,
+  MIGRATION_V7_SQL,
 } from './schema.js'
+import { scheduleTrigramBackfill } from './fts-trigram.js'
 
 export interface SchemaMigrationStep {
   version: number
@@ -103,6 +105,13 @@ function isV5Applied(db: Database.Database): boolean {
 /** v6：documents.llm_graph_at 已去掉 */
 function isV6Applied(db: Database.Database): boolean {
   return isV5Applied(db) && !columnExists(db, 'documents', 'llm_graph_at')
+}
+
+/** v7：trigram FTS 表与回填进度表均存在 */
+function isV7Applied(db: Database.Database): boolean {
+  return isV6Applied(db)
+    && tableExists(db, 'fts_chunks_tri')
+    && tableExists(db, 'fts_tri_backfill')
 }
 
 /** 优先 DROP COLUMN；SQLite 过旧或不支持时重建 documents 表 */
@@ -214,6 +223,14 @@ export const MIGRATION_STEPS: SchemaMigrationStep[] = [
       dropLlmGraphAtColumn(db)
     },
   },
+  {
+    version: 7,
+    description: 'fts_chunks_tri (trigram, CJK keyword search) + fts_tri_backfill progress',
+    isApplied: isV7Applied,
+    up(db) {
+      db.exec(MIGRATION_V7_SQL)
+    },
+  },
 ]
 
 if (MIGRATION_STEPS.length !== DOC_LIBRARY_SCHEMA_VERSION) {
@@ -244,5 +261,7 @@ export function migrateDocLibrarySchema(db: Database.Database): number {
       ON CONFLICT(version) DO UPDATE SET applied_at = excluded.applied_at
     `).run(step.version, new Date().toISOString())
   }
+  // 既有 chunks → trigram 索引：首片同步、余下后台分批，失败写入 fts_tri_backfill.last_error
+  scheduleTrigramBackfill(db)
   return detectAppliedSchemaVersion(db)
 }

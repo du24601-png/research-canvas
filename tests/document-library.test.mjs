@@ -62,7 +62,7 @@ function listGraphTables(db) {
 describe('doc-library schema', () => {
   it('MIGRATION_STEPS length matches DOC_LIBRARY_SCHEMA_VERSION', () => {
     assert.equal(MIGRATION_STEPS.length, DOC_LIBRARY_SCHEMA_VERSION)
-    assert.equal(DOC_LIBRARY_SCHEMA_VERSION, 6)
+    assert.equal(DOC_LIBRARY_SCHEMA_VERSION, 7)
   })
 
   it('migrate is idempotent', () => {
@@ -208,10 +208,10 @@ describe('doc-library schema', () => {
     assert.ok(db.prepare('PRAGMA table_info(documents)').all().some(c => c.name === 'llm_graph_at'))
     assert.equal(detectAppliedSchemaVersion(db), 5)
     migrateDocLibrarySchema(db)
-    assert.equal(detectAppliedSchemaVersion(db), 6)
+    assert.equal(detectAppliedSchemaVersion(db), DOC_LIBRARY_SCHEMA_VERSION)
     assert.ok(!db.prepare('PRAGMA table_info(documents)').all().some(c => c.name === 'llm_graph_at'))
     migrateDocLibrarySchema(db)
-    assert.equal(detectAppliedSchemaVersion(db), 6)
+    assert.equal(detectAppliedSchemaVersion(db), DOC_LIBRARY_SCHEMA_VERSION)
     db.close()
     fs.rmSync(dir, { recursive: true, force: true })
   })

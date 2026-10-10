@@ -13,6 +13,7 @@ import type {
 } from './types.js'
 import { blobPathForSha, markdownPathForDocument } from './paths.js'
 import { replaceFtsForDocument } from './fts.js'
+import { deleteTrigramForDocument } from './fts-trigram.js'
 
 export class DocLibraryRepository {
   constructor(private readonly db: Database.Database) {}
@@ -442,6 +443,7 @@ export class DocLibraryRepository {
 
     const tx = this.db.transaction(() => {
       this.db.prepare('DELETE FROM fts_chunks WHERE document_id = ?').run(documentId)
+      deleteTrigramForDocument(this.db, documentId)
       this.db.prepare('DELETE FROM documents WHERE id = ?').run(documentId)
     })
     tx()

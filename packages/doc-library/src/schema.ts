@@ -1,5 +1,5 @@
 /** doc-library.db schema 版本；与 MIGRATION_STEPS 步数一致 */
-export const DOC_LIBRARY_SCHEMA_VERSION = 6
+export const DOC_LIBRARY_SCHEMA_VERSION = 7
 
 export const MIGRATION_V1_SQL = `
   CREATE TABLE IF NOT EXISTS schema_meta (
@@ -106,4 +106,28 @@ export const MIGRATION_V5_SQL = `
  */
 export const MIGRATION_V6_SQL = `
   ALTER TABLE documents DROP COLUMN llm_graph_at;
+`
+
+/**
+ * v7：中文可检索的 trigram 全文索引（与 fts_chunks 并存，旧表保留兼容）。
+ * fts_tri_backfill 记录启动后分批回填进度（按 documents.id 游标，可断点续跑）。
+ */
+export const MIGRATION_V7_SQL = `
+  CREATE VIRTUAL TABLE IF NOT EXISTS fts_chunks_tri USING fts5(
+    chunk_id UNINDEXED,
+    document_id UNINDEXED,
+    text,
+    tokenize = 'trigram'
+  );
+
+  CREATE TABLE IF NOT EXISTS fts_tri_backfill (
+    id INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
+    cursor TEXT NOT NULL DEFAULT '',
+    done_at TEXT,
+    last_error TEXT,
+    updated_at TEXT NOT NULL
+  );
+
+  INSERT OR IGNORE INTO fts_tri_backfill(id, cursor, done_at, last_error, updated_at)
+  VALUES (1, '', NULL, NULL, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
 `
