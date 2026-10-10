@@ -7,7 +7,8 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
-import { lanceDbDir, EMBEDDING_DIM } from './paths.js'
+import { lanceDbDir, activeEmbeddingDim } from './paths.js'
+import { lanceTableNameFor, resolveEmbeddingModelSpec } from './embedding-models.js'
 
 export interface VectorChunkRow {
   chunk_id: string
@@ -61,7 +62,11 @@ type LanceTable = {
   }
 }
 
-const TABLE_NAME = 'doc_chunks'
+/** e5 沿用 `doc_chunks`；其它模型带 id+dim 后缀，切换模型不混向量 */
+function currentTableName(): string {
+  return lanceTableNameFor(resolveEmbeddingModelSpec())
+}
+
 /**
  * `_versions` 文件数超过此阈值视为版本爆炸，触发安全重建。
  * 运行时可用 `OPPTRIX_LANCE_PATHOLOGY_MAX_VERSIONS` 覆盖（默认仍为 500）。
@@ -156,9 +161,9 @@ function escapeSqlString(value: string): string {
   return value.replace(/'/g, "''")
 }
 
-/** 校验 embedding 向量：长度=EMBEDDING_DIM 且全部有限数 */
+/** 校验 embedding 向量：长度=当前模型维度 且全部有限数 */
 export function isValidEmbeddingVector(vector: unknown): vector is number[] {
-  if (!Array.isArray(vector) || vector.length !== EMBEDDING_DIM) return false
+  if (!Array.isArray(vector) || vector.length !== activeEmbeddingDim()) return false
   for (const v of vector) {
     if (typeof v !== 'number' || !Number.isFinite(v)) return false
   }
@@ -184,7 +189,7 @@ export function filterValidUpsertRows(rows: VectorChunkRow[]): {
 
 /** `~/.opptrix/lancedb/doc_chunks/doc_chunks.lance` */
 export function lanceTableDatasetDir(lanceRoot: string): string {
-  return path.join(lanceRoot, `${TABLE_NAME}.lance`)
+  return path.join(lanceRoot, `${currentTableName()}.lance`)
 }
 
 export interface LancePathologyResult {
@@ -483,9 +488,9 @@ export class LanceVectorStore implements VectorStore {
         chunk_id: '__init__',
         document_id: '__init__',
         text: '',
-        vector: new Array<number>(EMBEDDING_DIM).fill(0),
+        vector: new Array<number>(activeEmbeddingDim()).fill(0),
       }
-      this.table = await db.createTable(TABLE_NAME, [placeholder], { mode: 'overwrite' })
+      this.table = await db.createTable(currentTableName(), [placeholder], { mode: 'overwrite' })
       await this.table.delete(`chunk_id = '${escapeSqlString('__init__')}'`)
       this.initFailed = false
       this.writesSinceOptimize = 0
@@ -514,16 +519,16 @@ export class LanceVectorStore implements VectorStore {
     try {
       const db = await this.connectUnlocked()
       const names = await db.tableNames()
-      if (names.includes(TABLE_NAME)) {
-        this.table = await db.openTable(TABLE_NAME)
+      if (names.includes(currentTableName())) {
+        this.table = await db.openTable(currentTableName())
       } else {
         const placeholder: Record<string, unknown> = {
           chunk_id: '__init__',
           document_id: '__init__',
           text: '',
-          vector: new Array<number>(EMBEDDING_DIM).fill(0),
+          vector: new Array<number>(activeEmbeddingDim()).fill(0),
         }
-        this.table = await db.createTable(TABLE_NAME, [placeholder])
+        this.table = await db.createTable(currentTableName(), [placeholder])
         await this.table.delete(`chunk_id = '${escapeSqlString('__init__')}'`)
       }
       return this.table

@@ -5,12 +5,17 @@ import { fileURLToPath } from 'node:url'
 import Database from 'better-sqlite3'
 import { applySqliteMemoryPragmas, resolveUserDataRoot } from '@opptrix/shared'
 import { migrateDocLibrarySchema } from './schema-migrate.js'
+import {
+  DEFAULT_EMBEDDING_MODEL_ID,
+  resolveEmbeddingModelSpec,
+  resolveModelsDirOverride,
+} from './embedding-models.js'
 
 const DB_FILE = 'doc-library.db'
 const BLOBS_DIR = 'blobs'
 const MARKDOWN_DIR = 'markdown'
 
-/** 与 Architect 契约一致：e5-small / dim=384 */
+/** 默认模型（e5-small / dim=384）；当前选中模型见 activeEmbeddingModelId() */
 export const EMBEDDING_MODEL_ID = 'multilingual-e5-small'
 export const EMBEDDING_DIM = 384
 
@@ -40,8 +45,22 @@ export function legacyEmbeddingModelsRoot(): string {
   return path.join(resolveUserDataRoot(), 'models')
 }
 
+/** 当前选中的嵌入模型 id（env DOC_LIBRARY_EMBEDDING_MODEL，默认 e5） */
+export function activeEmbeddingModelId(): string {
+  return resolveEmbeddingModelSpec().id
+}
+
+/** 当前选中模型的向量维度 */
+export function activeEmbeddingDim(): number {
+  return resolveEmbeddingModelSpec().dimension
+}
+
+/** 当前选中模型的用户目录；DOC_LIBRARY_MODELS_DIR 优先 */
 export function embeddingModelDir(): string {
-  return path.join(embeddingModelsRoot(), EMBEDDING_MODEL_ID)
+  const id = activeEmbeddingModelId()
+  const override = resolveModelsDirOverride()
+  if (override) return path.join(path.resolve(override), id)
+  return path.join(embeddingModelsRoot(), id)
 }
 
 export type EmbeddingModelSource = 'bundled' | 'user' | 'missing'
@@ -111,13 +130,18 @@ export function getBundledEmbeddingModelDir(repoRoot?: string): string | null {
  */
 export function listEmbeddingModelSearchDirs(repoRoot?: string): string[] {
   const dirs: string[] = []
-  const bundled = getBundledEmbeddingModelDir(repoRoot)
-  if (bundled) pushUniqueResolved(dirs, bundled)
-  for (const dir of listDevLlmModelDirs(EMBEDDING_MODEL_ID, repoRoot)) {
+  const id = activeEmbeddingModelId()
+  const override = resolveModelsDirOverride()
+  if (override) pushUniqueResolved(dirs, path.join(path.resolve(override), id))
+  if (id === DEFAULT_EMBEDDING_MODEL_ID) {
+    const bundled = getBundledEmbeddingModelDir(repoRoot)
+    if (bundled) pushUniqueResolved(dirs, bundled)
+  }
+  for (const dir of listDevLlmModelDirs(id, repoRoot)) {
     pushUniqueResolved(dirs, dir)
   }
   pushUniqueResolved(dirs, embeddingModelDir())
-  pushUniqueResolved(dirs, path.join(legacyEmbeddingModelsRoot(), EMBEDDING_MODEL_ID))
+  pushUniqueResolved(dirs, path.join(legacyEmbeddingModelsRoot(), id))
   return dirs
 }
 

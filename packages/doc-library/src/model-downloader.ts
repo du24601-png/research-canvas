@@ -9,11 +9,13 @@ import path from 'node:path'
 import { finished } from 'node:stream/promises'
 import {
   embeddingModelDir,
+  activeEmbeddingModelId,
   EMBEDDING_MODEL_ID,
   getBundledEmbeddingModelDir,
   listEmbeddingModelSearchDirs,
   type EmbeddingModelSource,
 } from './paths.js'
+import { resolveEmbeddingModelSpec } from './embedding-models.js'
 
 const DOWNLOAD_USER_AGENT = 'Opptrix-Desktop/1.0'
 const DEFAULT_TIMEOUT_MS = 120_000
@@ -82,7 +84,9 @@ function sourcesFor(filename: string): Array<{ label: string; url: string }> {
 
 function missingRequiredFiles(modelDir: string): string[] {
   const missingFiles: string[] = []
-  for (const file of E5_MODEL_FILES) {
+  const spec = resolveEmbeddingModelSpec()
+  const files: readonly string[] = spec.id === EMBEDDING_MODEL_ID ? E5_MODEL_FILES : spec.requiredFiles
+  for (const file of files) {
     if (OPTIONAL_FILES.has(file)) continue
     if (!fs.existsSync(path.join(modelDir, file))) missingFiles.push(file)
   }
@@ -121,7 +125,7 @@ export function getEmbeddingModelStatus(modelDir?: string): EmbeddingModelStatus
     const missingFiles = missingRequiredFiles(modelDir)
     return {
       installed: missingFiles.length === 0,
-      modelId: EMBEDDING_MODEL_ID,
+      modelId: activeEmbeddingModelId(),
       dir: modelDir,
       missingFiles,
       source: missingFiles.length === 0 ? sourceForDir(modelDir) : 'missing',
@@ -131,7 +135,7 @@ export function getEmbeddingModelStatus(modelDir?: string): EmbeddingModelStatus
   const resolved = resolveEmbeddingModelDir()
   return {
     installed: resolved.source !== 'missing',
-    modelId: EMBEDDING_MODEL_ID,
+    modelId: activeEmbeddingModelId(),
     dir: resolved.dir,
     missingFiles: resolved.missingFiles,
     source: resolved.source,
@@ -265,6 +269,9 @@ export async function downloadEmbeddingModel(opts: {
   timeoutMs?: number
   onProgress?: (p: DownloadProgress) => void
 } = {}): Promise<EmbeddingModelStatus> {
+  if (!opts.modelDir && activeEmbeddingModelId() !== EMBEDDING_MODEL_ID) {
+    throw new Error('当前选择的语义模型需用 scripts/download-embedding-models.mjs 预先下载')
+  }
   // 下载始终写入用户目录；bundled 已就绪时直接返回
   if (!opts.modelDir && isEmbeddingModelInstalled()) {
     return getEmbeddingModelStatus()

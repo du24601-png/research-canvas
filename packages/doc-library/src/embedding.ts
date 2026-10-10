@@ -3,7 +3,8 @@
  * 成功 embed 后按空闲超时卸下内存中的模型（磁盘「已安装」保留），下次检索可再 ensureLoaded。
  */
 import path from 'node:path'
-import { EMBEDDING_DIM, EMBEDDING_MODEL_ID } from './paths.js'
+import { activeEmbeddingDim } from './paths.js'
+import { resolveEmbeddingModelSpec, type EmbeddingModelSpec } from './embedding-models.js'
 import { isEmbeddingModelInstalled, resolveEmbeddingModelDir } from './model-downloader.js'
 
 export interface EmbeddingBackend {
@@ -16,7 +17,7 @@ export interface EmbeddingBackend {
 
 type FeaturePipeline = ((
   text: string | string[],
-  opts: { pooling: 'mean'; normalize: boolean },
+  opts: { pooling: 'mean' | 'cls' | 'last_token'; normalize: boolean },
 ) => Promise<{ data: Float32Array | number[] }>) & {
   dispose?: () => void | Promise<void>
   close?: () => void | Promise<void>
@@ -115,7 +116,7 @@ function splitBatchVectors(
 
 /** 可注入的假后端（测试） */
 export class MockEmbeddingBackend implements EmbeddingBackend {
-  readonly dimensions = EMBEDDING_DIM
+  readonly dimensions = activeEmbeddingDim()
   private ready: boolean
 
   constructor(ready = true) {
@@ -147,7 +148,8 @@ export class MockEmbeddingBackend implements EmbeddingBackend {
     const out = new Array<number>(this.dimensions).fill(0)
     for (let i = 0; i < text.length; i++) {
       const code = text.charCodeAt(i)
-      out[i % this.dimensions]! += ((code % 31) + 1) / 32
+      const idx = i % this.dimensions
+      out[idx] = (out[idx] ?? 0) + ((code % 31) + 1) / 32
     }
     let norm = 0
     for (const v of out) norm += v * v
@@ -157,12 +159,15 @@ export class MockEmbeddingBackend implements EmbeddingBackend {
 }
 
 export class TransformersE5Backend implements EmbeddingBackend {
-  readonly dimensions = EMBEDDING_DIM
+  readonly dimensions: number
+  private readonly spec: EmbeddingModelSpec
   private pipe: FeaturePipeline | null = null
   private loadPromise: Promise<void> | null = null
   private readonly modelDir: string
 
-  constructor(modelDir?: string) {
+  constructor(modelDir?: string, spec: EmbeddingModelSpec = resolveEmbeddingModelSpec()) {
+    this.spec = spec
+    this.dimensions = spec.dimension
     this.modelDir = modelDir ?? resolveEmbeddingModelDir().dir
   }
 
@@ -196,9 +201,9 @@ export class TransformersE5Backend implements EmbeddingBackend {
     env.allowRemoteModels = false
     env.allowLocalModels = true
 
-    const extractor = await pipeline('feature-extraction', EMBEDDING_MODEL_ID, {
+    const extractor = await pipeline('feature-extraction', this.spec.id, {
       local_files_only: true,
-      dtype: 'q8',
+      dtype: this.spec.dtype,
     })
     this.pipe = extractor as unknown as FeaturePipeline
   }
@@ -206,8 +211,8 @@ export class TransformersE5Backend implements EmbeddingBackend {
   async embedQuery(text: string): Promise<number[]> {
     const ok = await this.ensureLoaded()
     if (!ok || !this.pipe) throw new Error('embedding model not ready')
-    const prefixed = `query: ${text.trim()}`
-    const out = await this.pipe(prefixed, { pooling: 'mean', normalize: true })
+    const prefixed = `${this.spec.queryPrefix}${text.trim()}`
+    const out = await this.pipe(prefixed, this.poolOpts())
     return asNumberVector(out.data, this.dimensions)
   }
 
@@ -218,24 +223,29 @@ export class TransformersE5Backend implements EmbeddingBackend {
 
     const pipe = this.pipe
     const dim = this.dimensions
-    const batchSize = resolveEmbedBatchSize()
+    // last_token 池化依赖 padding 侧，逐条推理最稳妥
+    const batchSize = this.spec.pooling === 'last_token' ? 1 : resolveEmbedBatchSize()
     const results: number[][] = []
 
     for (let i = 0; i < texts.length; i += batchSize) {
       const slice = texts.slice(i, i + batchSize)
-      const prefixed = slice.map(t => `passage: ${t.trim()}`)
+      const prefixed = slice.map(t => `${this.spec.passagePrefix}${t.trim()}`)
       try {
-        const out = await pipe(prefixed, { pooling: 'mean', normalize: true })
+        const out = await pipe(prefixed, this.poolOpts())
         results.push(...splitBatchVectors(out.data, prefixed.length, dim))
       } catch {
         // 批推理失败则回退逐条，保持语义与维数契约
         for (const p of prefixed) {
-          const out = await pipe(p, { pooling: 'mean', normalize: true })
+          const out = await pipe(p, this.poolOpts())
           results.push(asNumberVector(out.data, dim))
         }
       }
     }
     return results
+  }
+
+  private poolOpts(): { pooling: EmbeddingModelSpec['pooling']; normalize: boolean } {
+    return { pooling: this.spec.pooling, normalize: this.spec.normalize }
   }
 
   /** 卸下内存中的 pipeline；磁盘模型仍视为已安装，下次 ensureLoaded 可再加载 */
