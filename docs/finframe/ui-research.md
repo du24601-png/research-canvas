@@ -136,3 +136,12 @@
 - Univer Pro 限制：[Univer: Upgrade to Pro](https://docs.univer.ai/guides/sheets/getting-started/pro)。
 - streamdown：[vercel/streamdown](https://github.com/vercel/streamdown)；json-render：[vercel-labs/json-render](https://github.com/vercel-labs/json-render)；A2UI：[a2ui.org](https://a2ui.org/)。
 - 早前项目资料：Sheet 主界面 mock（Observable Plot + 点击格式化）、竞品调研、FinFrame LUI demo v2（项目内 Artifact，2026-10-06）。
+
+## 6. 补充（2026-10-10）：Quinn 反馈「ECharts 不够好看，只有图表不够通用」
+
+据此调整第 1、3 条建议：不再推荐「保留 ECharts 重做主题」作为终点，改为**图表语法 + 通用组件目录**两层：
+
+1. **组件目录（通用）**：Spec 里的组件不再只有图。新增 KpiRow（指标卡）、NumberSentence（模型写句式、代码填数并挂来源）、MetricTable（热力表格 + 迷你走势）、EventTimeline（公告 / 事件）、MissingData（缺失说明）等。所有数字仍由代码从 Dataset 计算，Spec 不含数字。渲染层可自研，或用 json-render 的 catalog（需 zod 4，禁用 `$computed` / `$template`）。
+2. **图表语法（好看 + 图种不设上限）**：候选 Vega-Lite（BSD-3，JSON 语法，模型最熟，活跃）与 AntV G2 5（MIT，中文排版好，默认观感接近报告，有 K 线示例）。Spec 里只放编码（x / y / color / mark），数据按 datasetId 由代码注入，满足「模型不产出带数字的 option」。Observable Plot 好看但不是 JSON 且 2025-02 后未发版，不选。ECharts 可保留给 K 线等金融专用图过渡。
+
+同数据对比样张（示例数据，非真实财务数字）：https://claude.ai/artifact/EgsCi5sqMNCeUtNP8Xwvt6 。样张未在浏览器里逐张核验渲染效果。
