@@ -282,11 +282,17 @@ export function insertChipAtCaret(
 }
 
 /** 在光标处插入纯文本（语音识别结果等）；无选区时追加到末尾。 */
-export function insertTextAtCaret(root: HTMLElement, text: string): boolean {
+export function insertTextAtCaret(
+  root: HTMLElement,
+  text: string,
+  savedRange?: Range | null,
+): boolean {
   const value = text.trim()
   if (!value) return false
   root.focus()
-  const range = selectionInRoot(root)
+  const range = savedRange && root.contains(savedRange.startContainer)
+    ? savedRange
+    : selectionInRoot(root)
   if (range) {
     range.deleteContents()
     const node = document.createTextNode(value)

@@ -7,6 +7,7 @@ import {
   ChevronRightRegular,
   DocumentTextRegular,
   FolderAddRegular,
+  LibraryRegular,
   SparkleRegular,
 } from '@fluentui/react-icons'
 import { type PublicAgentSkill } from '../api/client'
@@ -16,9 +17,15 @@ import ComposerTooltipMenu, {
   COMPOSER_MENU_WIDTH,
   ComposerTooltipMenuItem,
 } from './ComposerTooltipMenu'
+import LibraryMenuView from './library/LibraryMenuView'
+import { libraryReferenceText } from './library/libraryDisplay'
 import { skillDisplaySummary, skillDisplayTitle } from './skillDisplay'
 
-type MenuView = 'root' | 'skills' | 'starters'
+type MenuView = 'root' | 'skills' | 'starters' | 'library'
+
+const VIEW_TITLES: Record<MenuView, string | undefined> = {
+  root: undefined, skills: '引用技能', starters: '快捷提问', library: '我的资料',
+}
 
 export type ComposerPlusStarter = { label: string; text: string }
 
@@ -32,6 +39,8 @@ interface Props {
   /** 专家快捷提问；空则不显示入口 */
   starters?: ComposerPlusStarter[]
   onSelectStarter?: (text: string) => void
+  /** 点击「我的资料」中的文件：把引用文字（如「根据《名称》，」）插入输入框；不传则不显示入口 */
+  onInsertLibraryRef?: (text: string) => void
   artifactsEnabled?: boolean
   onToggleArtifacts?: (enabled: boolean) => void
 }
@@ -49,6 +58,7 @@ export default function ComposerPlusMenu({
   onSelectSkill,
   starters = [],
   onSelectStarter,
+  onInsertLibraryRef,
   artifactsEnabled = false,
   onToggleArtifacts,
 }: Props) {
@@ -91,13 +101,18 @@ export default function ComposerPlusMenu({
     handleClose()
   }, [handleClose, onSelectStarter])
 
+  const handleLibraryDoc = useCallback((doc: { name: string }) => {
+    onInsertLibraryRef?.(libraryReferenceText(doc.name))
+    handleClose()
+  }, [handleClose, onInsertLibraryRef])
+
   const handleToggleArtifacts = useCallback(() => {
     onToggleArtifacts?.(!artifactsEnabled)
   }, [artifactsEnabled, onToggleArtifacts])
 
-  const subView = view === 'skills' || view === 'starters'
-  const panelTitle = view === 'skills' ? '引用技能' : view === 'starters' ? '快捷提问' : undefined
-  const panelAria = view === 'skills' ? '引用技能' : view === 'starters' ? '快捷提问' : '更多操作'
+  const subView = view !== 'root'
+  const panelTitle = VIEW_TITLES[view]
+  const panelAria = panelTitle ?? '更多操作'
 
   return (
     <>
@@ -124,7 +139,7 @@ export default function ComposerPlusMenu({
         anchorRef={anchorRef}
         align="start"
         width={COMPOSER_MENU_WIDTH.quickTasks}
-        maxHeight={view === 'skills' || view === 'starters' ? 320 : 300}
+        maxHeight={subView ? 320 : 300}
         title={panelTitle}
         ariaLabel={panelAria}
         showClose={subView}
@@ -205,6 +220,18 @@ export default function ComposerPlusMenu({
                 <ChevronRightRegular fontSize={14} className="opptrix-composer-plus-menu__chevron" />
               </span>
             </ComposerTooltipMenuItem>
+            {onInsertLibraryRef && (
+              <ComposerTooltipMenuItem onClick={() => setView('library')}>
+                <span className="opptrix-composer-plus-menu__row">
+                  <LibraryRegular fontSize={16} />
+                  <span className="opptrix-composer-plus-menu__label">
+                    <span className="opptrix-composer-plus-menu__title">我的资料</span>
+                    <span className="opptrix-composer-plus-menu__hint">已上传的年报、研报和纪要</span>
+                  </span>
+                  <ChevronRightRegular fontSize={14} className="opptrix-composer-plus-menu__chevron" />
+                </span>
+              </ComposerTooltipMenuItem>
+            )}
             {showStarters && (
               <ComposerTooltipMenuItem onClick={() => setView('starters')}>
                 <span className="opptrix-composer-plus-menu__row">
@@ -251,6 +278,8 @@ export default function ComposerPlusMenu({
               )
             })}
           </>
+        ) : view === 'library' ? (
+          <LibraryMenuView enabled={open && view === 'library'} onSelect={handleLibraryDoc} />
         ) : (
           <>
             {starters.map((st, index) => (

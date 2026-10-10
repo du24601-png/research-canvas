@@ -272,6 +272,39 @@ export class DocLibraryRepository {
     `).run(sessionId, documentId, attachmentId, new Date().toISOString())
   }
 
+  /** 跨会话资料库列表（仅研报/附件类，按添加时间倒序；limit/offset 由调用方校验） */
+  listLibraryDocuments(limit: number, offset: number): {
+    total: number
+    items: Array<{
+      id: string
+      name: string
+      kind: string
+      status: ParseStatus | null
+      page_count: number | null
+      created_at: string
+    }>
+  } {
+    const total = (this.db.prepare(
+      `SELECT COUNT(*) AS n FROM documents WHERE source_type = 'report'`,
+    ).get() as { n: number }).n
+    const items = this.db.prepare(`
+      SELECT d.id, d.name, d.kind, pa.status, pa.page_count, d.created_at
+      FROM documents d
+      LEFT JOIN parse_artifacts pa ON pa.document_id = d.id
+      WHERE d.source_type = 'report'
+      ORDER BY d.created_at DESC, d.id DESC
+      LIMIT ? OFFSET ?
+    `).all(limit, offset) as Array<{
+      id: string
+      name: string
+      kind: string
+      status: ParseStatus | null
+      page_count: number | null
+      created_at: string
+    }>
+    return { total, items }
+  }
+
   listSessionDocuments(sessionId: string): Array<SessionDocumentRow & {
     name: string
     mime: string

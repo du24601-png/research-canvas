@@ -52,6 +52,7 @@ import {
   registerSessionAttachmentRoutes,
 } from './session-attachment-routes.js'
 import { registerOpptrixVendorRoutes } from './opptrix-vendor-routes.js'
+import { registerLibraryRoutes } from './library-routes.js'
 import { registerResearchBoardRoutes } from './research-board-routes.js'
 import { registerMcpServerRoutes } from './mcp-server-routes.js'
 import { registerAgentSkillRoutes } from './agent-skill-routes.js'
@@ -2790,6 +2791,7 @@ async function bootstrap() {
   await registerAgentSkillRoutes(app)
   registerSearchRoutes(app, hub, agent)
   registerSessionAttachmentRoutes(app, agent)
+  registerLibraryRoutes(app)
   registerOpptrixVendorRoutes(app)
   ensureMediaTranscriptBridge()
   await registerSpeechRoutes(app)

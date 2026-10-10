@@ -1055,6 +1055,15 @@ const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(function 
     setSpeechError('')
   }, [refreshContentState])
 
+  /** 「+ → 我的资料」点选文件：把「根据《文件名》，」插到光标处 */
+  const insertLibraryRef = useCallback((text: string) => {
+    const root = editorRef.current
+    if (!root) return
+    insertTextAtCaret(root, text, caretRangeRef.current)
+    caretRangeRef.current = captureCaretRange(root)
+    refreshContentState()
+  }, [refreshContentState])
+
   const {
     available: speechAvailable,
     phase: speechPhase,
@@ -1492,6 +1501,7 @@ const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(function 
                   onAttach={openFilePicker}
                   onAuthorizeFolders={() => { void handleAuthorizeFolders() }}
                   onSelectSkill={(skill) => insertSkillChip(skill, false)}
+                  onInsertLibraryRef={insertLibraryRef}
                   starters={plusMenuStarters}
                   onSelectStarter={(text) => onSubmit(text)}
                   artifactsEnabled={artifactsEnabled}
@@ -1560,6 +1570,7 @@ const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(function 
                     onAttach={openFilePicker}
                     onAuthorizeFolders={() => { void handleAuthorizeFolders() }}
                     onSelectSkill={(skill) => insertSkillChip(skill, false)}
+                    onInsertLibraryRef={insertLibraryRef}
                     starters={plusMenuStarters}
                     onSelectStarter={(text) => onSubmit(text)}
                     artifactsEnabled={artifactsEnabled}
