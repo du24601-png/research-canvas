@@ -21,3 +21,6 @@ export function pickWelcomeVariant(epoch: number): ChatWelcomeVariant {
   const index = ((epoch % list.length) + list.length) % list.length
   return list[index]!
 }
+
+/** 对话优先布局欢迎页的一行说明 */
+export const WELCOME_NOTE = '可查 A 股公司的财务指标与 K 线 · 每个数字都标明出处，可点开核对'

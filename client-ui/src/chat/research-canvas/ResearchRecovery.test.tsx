@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, screen } from '@testing-library/react'
 import { renderWithProviders } from '../../test/testUtils'
+import { PinBoardProvider } from '../pin-board/PinBoardContext'
 import ResearchRecovery from './ResearchRecovery'
 import { registerResearchAdjustDraftSink, consumePendingAdjustProposal } from './researchPreviewAdjust'
 import { subscribeResearchCanvasEvents } from './researchCanvasBus'
@@ -20,6 +21,12 @@ describe('research recovery and evidence safety', () => {
     expect(canvas).not.toHaveBeenCalled()
     stopDraft()
     stopCanvas()
+  })
+
+  it('shows a compact one-line note without a button in chat-first layout', () => {
+    renderWithProviders(<PinBoardProvider chatFirst sessionId={null}><ResearchRecovery title="毛利率趋势" missingData /></PinBoardProvider>)
+    expect(screen.getByText('「毛利率趋势」的数据在本机读不到')).toBeTruthy()
+    expect(screen.queryByRole('button')).toBeNull()
   })
 
   it('only links safe web sources and does not invent missing timestamps', () => {

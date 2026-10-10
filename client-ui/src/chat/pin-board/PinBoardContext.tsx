@@ -55,6 +55,11 @@ export function PinBoardProvider({ chatFirst, sessionId, children }: {
   const closeBoard = useCallback(() => setOpen(false), [])
   const toggleBoard = useCallback(() => setOpen(prev => !prev), [])
   useEffect(() => setOpen(false), [sessionId])
+  useEffect(() => {
+    if (!chatFirst) return undefined
+    document.body.setAttribute('data-finframe-chat-first', '')
+    return () => document.body.removeAttribute('data-finframe-chat-first')
+  }, [chatFirst])
   const value = useMemo<PinBoardContextValue>(() => ({
     chatFirst, open: chatFirst && open, pinnedCount, openBoard, closeBoard, toggleBoard,
   }), [chatFirst, open, pinnedCount, openBoard, closeBoard, toggleBoard])

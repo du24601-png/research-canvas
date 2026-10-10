@@ -1,12 +1,27 @@
 import { useState } from 'react'
 import OpptrixButton from '../../components/opptrix/OpptrixButton'
 import { requestResearchRecovery } from './researchPreviewAdjust'
+import { usePinBoard } from '../pin-board/PinBoardContext'
 
 export default function ResearchRecovery({ title, missingData = false }: {
   title?: string
   missingData?: boolean
 }) {
   const [prepared, setPrepared] = useState(false)
+  const { chatFirst } = usePinBoard()
+  const name = title || '这张图表'
+  if (chatFirst) {
+    return (
+      <div className="finframe-recovery-note" data-testid="research-recovery-compact">
+        <strong>{missingData ? `「${name}」的数据在本机读不到` : `「${name}」这次没能生成图表`}</strong>
+        <span>
+          {missingData
+            ? '说「重新查一次」会用同样的口径重新取数，原来的结论不变。'
+            : '说「再试一次」即可。'}
+        </span>
+      </div>
+    )
+  }
   return (
     <div style={{ padding: '12px 4px', fontSize: 13, lineHeight: 1.6 }}>
       <strong>{title || '研究视图暂不可用'}</strong>

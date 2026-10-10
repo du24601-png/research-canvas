@@ -4,6 +4,8 @@ import { ArrowUpRegular, DismissRegular, MicFilled, MicRegular, PauseFilled } fr
 import ModelSelector from './ModelSelector'
 import type { SessionLlmParamsPatch } from './ModelSelector'
 import ContextUsageMeter from './ContextUsageMeter'
+import { usePinBoard } from './pin-board/PinBoardContext'
+import { showDeveloperInfo } from './pin-board/debugFlag'
 import ComposerContextRefTag from './ComposerContextRefTag'
 import ComposerActiveWidgetChip from './ComposerActiveWidgetChip'
 import ChatWorkspaceGrants, { type ChatWorkspaceGrantsHandle } from './ChatWorkspaceGrants'
@@ -768,6 +770,8 @@ const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(function 
   streamStatusLabel,
 }, ref) {
   const s = useStyles()
+  const { chatFirst } = usePinBoard()
+  const showDebugInfo = showDeveloperInfo(chatFirst)
   const editorRef = useRef<HTMLDivElement>(null)
   const mentionAnchorRef = useRef<HTMLSpanElement>(null)
   // composingRef: 中文/IME 输入合成期间，跳过 @ 提及检测，避免误触发与卡顿。
@@ -1159,7 +1163,9 @@ const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(function 
     : '按住说话；点按切换为文字输入'
   const editorPlaceholder = loading
     ? (collaborationSteerHint ? '发送补充说明…' : '继续输入…')
-    : '输入问题…'
+    : chatFirst
+      ? (isEmpty ? '输入公司、指标或问题，@ 可选股票' : '接着问，例如「再加一家公司」「列出数值」')
+      : '输入问题…'
   const editorAriaLabel = '输入问题，@ 选择股票，/ 引用技能'
   const useSingleRowEmpty = !hasContent
     && pinned.length === 0
@@ -1362,7 +1368,7 @@ const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(function 
             onSubmit={onUserPromptSubmit}
           />
         )}
-        {focusHintEligible && (
+        {focusHintEligible && !chatFirst && (
           <div
             className={mergeClasses(s.focusHint, showFocusHint && s.focusHintVisible)}
             role="note"
@@ -1649,7 +1655,7 @@ const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(function 
             </div>
           )}
           <div className={mergeClasses(s.footerMetaRow, isMobile && s.footerMetaRowMobile)}>
-            {onModelChange ? (
+            {onModelChange && showDebugInfo ? (
               <div className={s.footerModel}>
                 <ModelSelector
                   models={availableModels}
@@ -1669,7 +1675,7 @@ const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(function 
                 />
               </div>
             ) : null}
-            {contextUsage ? (
+            {contextUsage && showDebugInfo ? (
               <div className={s.footerContextUsage}>
                 <ContextUsageMeter usage={contextUsage} compact />
               </div>

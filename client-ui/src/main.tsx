@@ -16,6 +16,7 @@ import { applyFontScale, readFontScalePreference } from './theme/fontScale'
 import { readBoardSnapshotDeepLink } from './utils/boardSnapshotDeepLink'
 import './styles/fonts.css'
 import './styles/global.css'
+import './styles/finframe-chat-first.css'
 
 applyFontFamily(readFontFamilyPreference())
 applyFontScale(readFontScalePreference())

@@ -1,0 +1,83 @@
+/* FinFrame 对话优先布局：阅读字号放大（12/13/15/17/20/28）。仅在 body[data-finframe-chat-first] 下生效，旧布局不受影响。 */
+body[data-finframe-chat-first] {
+  /* 在用户字号设置（紧凑/默认/较大/超大）基础上相对放大；默认档即 12/13/15/17/20/28 */
+  --opptrix-font-xs: calc(var(--finframe-user-font-xs, 10px) + 2px);
+  --opptrix-font-sm: calc(var(--finframe-user-font-sm, 11px) + 1px);
+  --opptrix-font-lg: calc(var(--finframe-user-font-lg, 14px) + 1px);
+  --opptrix-font-2xl: calc(var(--finframe-user-font-2xl, 16px) + 1px);
+  --opptrix-font-4xl: calc(var(--finframe-user-font-4xl, 24px) + 4px);
+}
+
+body[data-finframe-chat-first] .finframe-answer-body {
+  font-size: var(--opptrix-font-lg);
+  line-height: 1.7;
+}
+
+body[data-finframe-chat-first] .finframe-answer-body .opptrix-md {
+  --opptrix-md-line-height: 1.7;
+}
+
+/* 欢迎页示例问题：纯文字行 */
+.finframe-welcome-starters {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.finframe-welcome-starter {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: var(--opptrix-font-lg);
+  color: var(--opptrix-text-secondary);
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.finframe-welcome-starter:hover,
+.finframe-welcome-starter:focus-visible {
+  color: var(--opptrix-text-primary);
+  background: var(--opptrix-gray-100);
+}
+
+.finframe-welcome-note {
+  pointer-events: auto;
+  font-size: var(--opptrix-font-sm);
+  color: var(--opptrix-text-tertiary);
+  margin-top: 12px;
+}
+
+/* 历史图表数据不在本机：紧凑虚线提示 */
+.finframe-recovery-note {
+  padding: 8px 12px;
+  border: 1px dashed var(--opptrix-border-strong);
+  border-radius: 8px;
+  font-size: var(--opptrix-font-base);
+  line-height: 1.6;
+  color: var(--opptrix-text-secondary);
+}
+
+.finframe-recovery-note strong {
+  color: var(--opptrix-text-primary);
+  margin-right: 8px;
+}
+
+/* 看板空态线框 */
+.finframe-wireframe {
+  width: 100%;
+  height: 100%;
+}
+
+/* 欢迎页：标题、示例、说明与输入框一起垂直居中；发出第一条消息后输入框回到底部 */
+.finframe-dock-centered {
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background-image: none !important;
+}

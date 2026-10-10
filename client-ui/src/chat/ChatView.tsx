@@ -44,6 +44,8 @@ import {
   DESKTOP_TOOL_ICON_SIZE,
 } from '../desktop/constants'
 import { pickWelcomeVariant } from './chatWelcomeVariants'
+import ChatWelcome from './ChatWelcome'
+import { usePinBoard } from './pin-board/PinBoardContext'
 import { DEFAULT_SESSION_DISPLAY_TITLE } from './sessionSidebarPresentation'
 import MessageOutlineRail, { buildOutlineEntries } from './MessageOutlineRail'
 import { ReportFollowupProvider } from '../generative-ui/report-followup/ReportFollowupContext'
@@ -731,12 +733,13 @@ function ChatView({
 
   const isEmpty = messages.length === 0 && !loading && !wakeWaiting && !contextRef
     && !collaborationReadonly && !collaborationChildLoading
+  const { chatFirst } = usePinBoard()
   const welcome = pickWelcomeVariant(welcomeEpoch)
   const starters: ComposerStarterChip[] = welcome.starters
     .map(text => ({ label: text, text }))
     .slice(0, 3)
   const welcomeTitle = welcome.title
-  const welcomeSubtitle = welcome.subtitle
+  const welcomeSubtitle = chatFirst ? '' : welcome.subtitle
   const electronChrome = isElectron() && !isMobile
   const scrollMask = composerScrollMask(composerBottomPad, scrollbarMaskPreserve)
   const showDesktopChromeExtras = !isMobile
@@ -921,6 +924,21 @@ function ChatView({
     }
   }, [])
 
+  const centerWelcome = chatFirst && isEmpty
+  const welcomeNode = isEmpty ? (
+    <ChatWelcome
+      key={welcomeEpoch}
+      title={welcomeTitle}
+      subtitle={welcomeSubtitle}
+      chatFirst={chatFirst}
+      starters={starters}
+      bannerClassName={mergeClasses(s.welcomeBanner, isMobile && s.welcomeBannerMobile)}
+      titleClassName={mergeClasses(s.welcomeTitle, s.welcomeEnter)}
+      subtitleClassName={mergeClasses(s.welcomeSub, s.welcomeEnter)}
+      onPick={handleSubmit}
+    />
+  ) : null
+
   const threadColumnClass = mergeClasses(
     s.threadColumn,
     isMobile && s.threadColumnMobile,
@@ -1058,21 +1076,7 @@ function ChatView({
               )}
               style={{ paddingBottom: composerBottomPad }}
             >
-              {isEmpty && (
-                <div
-                  key={welcomeEpoch}
-                  className={mergeClasses(s.welcomeBanner, isMobile && s.welcomeBannerMobile)}
-                >
-                  <Text className={mergeClasses(s.welcomeTitle, s.welcomeEnter)}>
-                    {welcomeTitle}
-                  </Text>
-                  {welcomeSubtitle ? (
-                    <Text className={mergeClasses(s.welcomeSub, s.welcomeEnter)}>
-                      {welcomeSubtitle}
-                    </Text>
-                  ) : null}
-                </div>
-              )}
+              {isEmpty && !centerWelcome && welcomeNode}
 
               {collaborationReadonly && collaborationChildError ? (
                 <div className={s.collaborationChildErrorActions} role="alert">
@@ -1200,7 +1204,8 @@ function ChatView({
           </div>
         </div>
 
-        <div className={s.composerDock}>
+        <div className={mergeClasses(s.composerDock, centerWelcome && 'finframe-dock-centered')}>
+          {centerWelcome ? welcomeNode : null}
           <div
             ref={composerInnerRef}
             className={mergeClasses(s.composerInner, isMobile && s.composerInnerMobile)}
@@ -1236,7 +1241,7 @@ function ChatView({
               alwaysShowStarters={false}
               isMobile={isMobile}
               contextRef={contextRef}
-              starters={starters}
+              starters={chatFirst ? [] : starters}
               welcomeKey={welcomeEpoch}
               availableModels={availableModels}
               sessionModel={sessionModel}

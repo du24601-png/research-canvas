@@ -26,6 +26,12 @@ export function applyFontScale(name: FontScaleName): void {
   root.style.setProperty('--opptrix-font-3xl', scale['3xl'])
   root.style.setProperty('--opptrix-font-4xl', scale['4xl'])
   root.style.setProperty('--opptrix-font-display', scale.display)
+  // 供对话优先布局在用户字号设置的基础上做相对放大（见 finframe-chat-first.css）
+  root.style.setProperty('--finframe-user-font-xs', scale.xs)
+  root.style.setProperty('--finframe-user-font-sm', scale.sm)
+  root.style.setProperty('--finframe-user-font-lg', scale.lg)
+  root.style.setProperty('--finframe-user-font-2xl', scale.xxl)
+  root.style.setProperty('--finframe-user-font-4xl', scale['4xl'])
 }
 
 export const FONT_SCALE_LABELS: Record<FontScaleName, string> = {

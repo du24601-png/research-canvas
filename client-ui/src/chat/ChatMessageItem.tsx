@@ -8,6 +8,8 @@ import {
 import MarkdownMessage from './MarkdownMessage'
 import ChatProcessTrace from './ChatProcessTrace'
 import MessageTokenLabel from './MessageTokenLabel'
+import { usePinBoard } from './pin-board/PinBoardContext'
+import { showDeveloperInfo } from './pin-board/debugFlag'
 import { MessageAttachmentStrip } from './ComposerAttachmentStrip'
 import MessageInlineRefs from './MessageInlineRefs'
 import MediaPreviewBox from './MediaPreviewBox'
@@ -255,6 +257,7 @@ function ChatMessageItem({
   hiddenPreviewStepIds,
 }: Props) {
   const s = useStyles()
+  const { chatFirst } = usePinBoard()
   const [copied, setCopied] = useState(false)
   /** 仅无右栏预览（如移动端）时走消息内弹层 */
   const [previewAttachment, setPreviewAttachment] = useState<ChatAttachmentMeta | null>(null)
@@ -379,7 +382,7 @@ function ChatMessageItem({
       ) : (
         <>
           {timeNode}
-          {!isUser && message.usage && message.usage.totalTokens > 0 && (
+          {!isUser && showDeveloperInfo(chatFirst) && message.usage && message.usage.totalTokens > 0 && (
             <MessageTokenLabel
               totalTokens={message.usage.totalTokens}
               estimated={message.usageEstimated}
@@ -427,6 +430,26 @@ function ChatMessageItem({
     )
   }
 
+  const hasProcess = Boolean(message.reasoningContent?.trim()
+    || (message.reasoningSegments && message.reasoningSegments.length > 0)
+    || (message.toolSteps && message.toolSteps.length > 0))
+  const traceGap = chatFirst
+    ? { marginBottom: message.content ? 8 : 0 }
+    : { marginTop: message.content || attachmentStrip ? 8 : 0 }
+  const processTrace = hasProcess ? (
+    <div style={traceGap}>
+      <TurnIndexProvider index={index}>
+        <ChatProcessTrace
+          steps={message.toolSteps ?? []}
+          sessionId={sessionId}
+          thinkingSnippet={message.reasoningContent?.trim() || undefined}
+          thinkingSegments={message.reasoningSegments}
+          hiddenPreviewStepIds={hiddenPreviewStepIds}
+        />
+      </TurnIndexProvider>
+    </div>
+  ) : null
+
   return (
     <div
       className={mergeClasses(
@@ -451,6 +474,7 @@ function ChatMessageItem({
               editing && s.userBubbleEditing,
             )
             : s.assistantBubble,
+          !isUser && chatFirst && 'finframe-answer-body',
         )}
         onClick={isUser ? handleBubbleClick : undefined}
         role={canEdit && !editing ? 'button' : undefined}
@@ -490,27 +514,15 @@ function ChatMessageItem({
           )
         ) : (
           <>
+            {/* 对话优先布局：取数摘要与活报告放在正文前（结论先行），与进行中的轮次顺序一致 */}
+            {chatFirst ? processTrace : null}
             <MarkdownMessage content={message.content} sessionId={sessionId} />
             {attachmentStrip ? (
               <div className={s.attachmentBelow}>
                 {attachmentStrip}
               </div>
             ) : null}
-            {(message.reasoningContent?.trim()
-              || (message.reasoningSegments && message.reasoningSegments.length > 0)
-              || (message.toolSteps && message.toolSteps.length > 0)) && (
-              <div style={{ marginTop: message.content || attachmentStrip ? 8 : 0 }}>
-                <TurnIndexProvider index={index}>
-                  <ChatProcessTrace
-                    steps={message.toolSteps ?? []}
-                    sessionId={sessionId}
-                    thinkingSnippet={message.reasoningContent?.trim() || undefined}
-                    thinkingSegments={message.reasoningSegments}
-                    hiddenPreviewStepIds={hiddenPreviewStepIds}
-                  />
-                </TurnIndexProvider>
-              </div>
-            )}
+            {chatFirst ? null : processTrace}
           </>
         )}
         {!message.toolSteps?.length && message.toolsUsed && message.toolsUsed.length > 0 && (
