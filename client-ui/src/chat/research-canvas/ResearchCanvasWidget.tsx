@@ -1,18 +1,7 @@
 import { memo } from 'react'
 import WidgetFrame from './WidgetFrame'
-import BarChartWidget from './BarChartWidget'
-import GroupedBarChartWidget from './GroupedBarChartWidget'
-import HeatmapWidget from './HeatmapWidget'
-import LineChartWidget from './LineChartWidget'
-import SourcesWidget from './SourcesWidget'
-import TableWidget from './TableWidget'
+import PreviewPlot from './PreviewPlot'
 import { ViewSwitcher, type ViewSwitchValue } from './ViewSwitcher'
-import {
-  CandlestickChartWidget,
-  ComboBarLineChartWidget,
-  PieDonutChartWidget,
-  StackedBarChartWidget,
-} from './ExtraChartWidgets'
 import { datasetMetaLine } from './datasetLabels'
 import DatasetEvidence from './DatasetEvidence'
 import ResearchRecovery from './ResearchRecovery'
@@ -28,38 +17,6 @@ interface Props {
   onSelect: (widget: Widget) => void
   onDelete: (widgetId: string) => void
   onChangeView?: (widgetId: string, next: ViewSwitchValue) => void
-}
-
-function renderChartBody(widget: Widget, dataset: Dataset) {
-  const period = widget.view?.period
-  const topN = widget.view?.topN
-  const style = widget.style
-  switch (widget.type) {
-    case 'line_chart':
-      return <LineChartWidget dataset={dataset} topN={topN} style={style} />
-    case 'bar_chart':
-      return <BarChartWidget dataset={dataset} period={period} style={style} />
-    case 'grouped_bar':
-      return <GroupedBarChartWidget dataset={dataset} style={style} />
-    case 'stacked_bar':
-      return <StackedBarChartWidget dataset={dataset} percent={false} />
-    case 'stacked_bar_percent':
-      return <StackedBarChartWidget dataset={dataset} percent />
-    case 'combo_bar_line':
-      return <ComboBarLineChartWidget dataset={dataset} />
-    case 'pie_chart':
-      return <PieDonutChartWidget dataset={dataset} donut={false} period={period} />
-    case 'donut_chart':
-      return <PieDonutChartWidget dataset={dataset} donut period={period} />
-    case 'candlestick':
-      return <CandlestickChartWidget dataset={dataset} />
-    case 'heatmap_table':
-      return <HeatmapWidget dataset={dataset} />
-    case 'table':
-      return <TableWidget dataset={dataset} />
-    case 'sources':
-      return <SourcesWidget dataset={dataset} />
-  }
 }
 
 function ResearchCanvasWidget({
@@ -114,7 +71,13 @@ function ResearchCanvasWidget({
         </>
       )}
     >
-      {renderChartBody(widget, dataset)}
+      <PreviewPlot
+        type={widget.type}
+        dataset={dataset}
+        period={widget.view?.period}
+        topN={widget.view?.topN}
+        style={widget.style}
+      />
     </WidgetFrame>
   )
 }

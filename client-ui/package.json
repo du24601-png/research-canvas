@@ -37,7 +37,10 @@
     "rehype-sanitize": "^6.0.0",
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
-    "sucrase": "^3.35.1"
+    "sucrase": "^3.35.1",
+    "vega": "6.4.0",
+    "vega-interpreter": "2.3.2",
+    "vega-lite": "6.4.3"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^7.0.1",
