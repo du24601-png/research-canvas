@@ -145,3 +145,18 @@
 2. **图表语法（好看 + 图种不设上限）**：候选 Vega-Lite（BSD-3，JSON 语法，模型最熟，活跃）与 AntV G2 5（MIT，中文排版好，默认观感接近报告，有 K 线示例）。Spec 里只放编码（x / y / color / mark），数据按 datasetId 由代码注入，满足「模型不产出带数字的 option」。Observable Plot 好看但不是 JSON 且 2025-02 后未发版，不选。ECharts 可保留给 K 线等金融专用图过渡。
 
 同数据对比样张（示例数据，非真实财务数字）：https://claude.ai/artifact/EgsCi5sqMNCeUtNP8Xwvt6 。样张未在浏览器里逐张核验渲染效果。
+
+## 7. 补充（2026-10-10）：现成的 agent 交互与动效组件
+
+现状：等待只有三点跳动（`components/ThinkingDots.tsx`）；过程是灰条「1 次查询 · 1 张图表」（`chat/ChatProcessTrace.tsx`）；图表加载是 Spinner；弹窗是 Fluent Dialog 无进出场动效（`components/opptrix/OpptrixDialogAlert.tsx`）。
+
+| 组件 | 许可证 / 版本 | 与 Fluent UI 的关系 | 用途 | 建议 |
+|---|---|---|---|---|
+| @fluentui/react-motion-components-preview | MIT · 0.15.9（2026-09） | 同一体系 | 弹窗 / 抽屉 / 折叠 / 列表进出场（Scale、Fade、Blur、Collapse、Slide） | 直接用 |
+| motion（原 framer-motion） | MIT · 14.1（2026-10） | 与样式无关 | 钉住飞入、卡片重排、版本切换 | 直接用（按需加载） |
+| sonner | MIT · 2.0.8（2026-08） | 自带样式，可用 CSS 变量覆盖 | 「已钉住 · 撤销」提示 | 可替代 Fluent Toast |
+| Fluent Copilot（react-latency、react-reference、react-suggestions） | MIT · 0.x，最近正式版 2025-12 | 同一体系 | 等待状态、引用角标、追问建议 | 预览期，可挑个别用 |
+| Vercel AI Elements（Apache-2.0）/ prompt-kit | shadcn 源码复制 | 需 Tailwind + Radix | Shimmer、Chain of Thought、Reasoning、Plan、Confirmation | 不装，照着移植成 Fluent 组件 |
+| Ant Design X | MIT · 2.9（2026-07） | 需整套 antd 6 | ThoughtChain、Think、Bubble | 不引入，只参考交互 |
+
+前后对比样张：https://claude.ai/artifact/6Y8k47AQZFEqGVmUSPJcXa （未在浏览器里逐项核验）。
