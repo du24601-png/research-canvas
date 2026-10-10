@@ -41,6 +41,9 @@ import LivePlanGateCard from './plan-gate/LivePlanGateCard'
 import { fetchPlanFromToolStep } from './research-canvas/fetchPlanFromToolStep'
 import { usePinBoard } from './pin-board/PinBoardContext'
 import ChatStreamReceipt from './ChatStreamReceipt'
+import ProgressCard from './progress/ProgressCard'
+import TraceSummaryLine from './progress/TraceSummaryLine'
+import { resolveProgressActionLabel } from './progress/progressLive'
 import {
   buildThinkingSummary,
   buildTraceReceipt,
@@ -947,7 +950,12 @@ export default function ChatProcessTrace({
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
   }, [live, detailsExpanded, steps.length, segments.length])
 
-  if (live && replyActive) return null
+  if (live && replyActive) {
+    // 对话优先：正文开始流式时，进度卡收成一行摘要
+    return planFirst
+      ? <div className={s.root}><TraceSummaryLine steps={steps} sessionId={sessionId} /></div>
+      : null
+  }
 
   const showLiveStatus = live && statusLabel && !statusDismissed
   const showLiveThinking = live && thinkingSummary && !statusDismissed
@@ -970,9 +978,41 @@ export default function ChatProcessTrace({
       : `分析过程${thinkingSummary.durationSec ? ` · ${thinkingSummary.durationSec} 秒` : ''}`)
     : ''
 
+  const detailsPanel = detailsExpanded && (
+    <div
+      ref={live ? scrollRef : undefined}
+      className={mergeClasses(s.scrollWrapper, 'opptrix-scroll')}
+    >
+      {hasThinking && (
+        <div className={s.stepBody}>
+          <ReasoningTimeline segments={segments} active={false} constrained={false} />
+        </div>
+      )}
+      {otherSteps.length > 0 && (
+        <div className={s.stepList}>
+          {otherSteps.map(step => (
+            <StepRow key={step.id} step={step} live={live} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+
   return (
     <div className={s.root} data-chat-process-trace={live ? 'live' : 'history'}>
-      {showHistoryReceipt && receiptText && (
+      {!live && planFirst && (showHistoryReceipt || showDetailsToggle) && (
+        <>
+          <TraceSummaryLine
+            steps={steps}
+            sessionId={sessionId}
+            onToggle={showDetailsToggle ? () => setDetailsExpanded(v => !v) : undefined}
+            expanded={detailsExpanded}
+          />
+          {detailsPanel}
+        </>
+      )}
+
+      {!planFirst && showHistoryReceipt && receiptText && (
         <ChatStreamReceipt
           text={receiptText}
           onExpand={showDetailsToggle ? () => setDetailsExpanded(true) : undefined}
@@ -984,7 +1024,11 @@ export default function ChatProcessTrace({
         <ResearchFetchPlanCard key={step.id} step={step} sessionId={sessionId} live isLatest={step.id === lastPlanId} />
       ))}
 
-      {showLiveStatus && (
+      {showLiveStatus && planFirst && (
+        <ProgressCard steps={steps} actionLabel={resolveProgressActionLabel({ phaseLabel, steps }) ?? statusLabel ?? ''} />
+      )}
+
+      {showLiveStatus && !planFirst && (
         <div className={s.statusCard}>
           <div className={s.statusHeadRow}>
             <div className={s.statusHeadMain}>
@@ -1023,7 +1067,7 @@ export default function ChatProcessTrace({
         </div>
       )}
 
-      {showLiveThinking && (
+      {showLiveThinking && !planFirst && (
         <>
           <button
             type="button"
@@ -1094,7 +1138,7 @@ export default function ChatProcessTrace({
         </ResearchTurnUi>
       )}
 
-      {showDetailsToggle && (
+      {showDetailsToggle && !planFirst && (
         <>
           <button
             type="button"
@@ -1109,25 +1153,7 @@ export default function ChatProcessTrace({
             </span>
             <Text className={s.summaryLabel} block>{detailsToggleLabel}</Text>
           </button>
-          {detailsExpanded && (
-            <div
-              ref={live ? scrollRef : undefined}
-              className={mergeClasses(s.scrollWrapper, 'opptrix-scroll')}
-            >
-              {hasThinking && (
-                <div className={s.stepBody}>
-                  <ReasoningTimeline segments={segments} active={false} constrained={false} />
-                </div>
-              )}
-              {otherSteps.length > 0 && (
-                <div className={s.stepList}>
-                  {otherSteps.map(step => (
-                    <StepRow key={step.id} step={step} live={live} />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+          {detailsPanel}
         </>
       )}
     </div>
@@ -1143,9 +1169,11 @@ export function ChatStreamReplyShell({
   children: import('react').ReactNode
 }) {
   const s = useStyles()
+  // 对话优先：取数摘要已在上方一行展示，不再重复灰条
+  const { chatFirst } = usePinBoard()
   return (
     <div className={s.replyShell}>
-      {receiptText ? <ChatStreamReceipt text={receiptText} /> : null}
+      {receiptText && !chatFirst ? <ChatStreamReceipt text={receiptText} /> : null}
       {children}
     </div>
   )
