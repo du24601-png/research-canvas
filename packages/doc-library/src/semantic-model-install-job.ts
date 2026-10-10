@@ -12,7 +12,7 @@ import {
   type SemanticModelUiStatus,
 } from './embedding-api.js'
 import type { EmbeddingModelSource } from './paths.js'
-import { E5_MODEL_FILES } from './model-downloader.js'
+import { requiredDownloadFileCount } from './model-downloader.js'
 
 export type SemanticModelInstallPhase =
   | 'idle'
@@ -44,9 +44,7 @@ export interface SemanticModelInstallPipelineDeps {
 
 const IDLE_MESSAGE = '尚未安装语义检索模型。可在设置中一键安装。'
 
-const REQUIRED_FILE_COUNT = E5_MODEL_FILES.filter(
-  f => f !== 'special_tokens_map.json',
-).length
+const requiredFileCount = (): number => requiredDownloadFileCount()
 
 let lastJob: SemanticModelInstallJobSnapshot = createIdleSnapshot()
 let activePromise: Promise<void> | null = null
@@ -144,7 +142,7 @@ function displayFileName(file: string): string {
 
 function overallPercent(fileRatio: number): number {
   const done = filesCompletedThisRun
-  const total = Math.max(1, REQUIRED_FILE_COUNT)
+  const total = Math.max(1, requiredFileCount())
   const base = (done / total) * 90
   const within = (Math.min(1, Math.max(0, fileRatio)) / total) * 90
   return Math.min(90, Math.round(base + within))
@@ -185,7 +183,7 @@ async function runInstallPipeline(): Promise<void> {
     await deps.download({
       onProgress: (p: DownloadProgress) => {
         if (lastFile && p.file !== lastFile) {
-          filesCompletedThisRun = Math.min(REQUIRED_FILE_COUNT, filesCompletedThisRun + 1)
+          filesCompletedThisRun = Math.min(requiredFileCount(), filesCompletedThisRun + 1)
         }
         lastFile = p.file
         const ratio =

@@ -192,6 +192,7 @@ export interface FtsSearchHit {
   page: number
   excerpt: string
   rank: number
+  match?: 'natural'
 }
 
 export interface ChunkReadResult {

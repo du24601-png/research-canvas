@@ -2912,7 +2912,7 @@ async function bootstrap() {
     .then(async (mod) => {
       const r = await mod.ensureBundledRagRuntime()
       console.log(
-        `  RAG runtime: embedding=${r.embedding ? 'installed' : 'skip'} layout=${r.layout ? 'ready' : 'skip'} deep=${r.deep ? 'ready' : 'skip'}`,
+        `  RAG runtime: embedding=${mod.describeEmbeddingSelection()} layout=${r.layout ? 'ready' : 'skip'} deep=${r.deep ? 'ready' : 'skip'}`,
       )
     })
     .catch(() => {

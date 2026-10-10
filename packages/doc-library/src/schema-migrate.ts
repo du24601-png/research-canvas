@@ -8,7 +8,9 @@ import {
   MIGRATION_V5_SQL,
   MIGRATION_V6_SQL,
   MIGRATION_V7_SQL,
+  MIGRATION_V8_SQL,
 } from './schema.js'
+import { DEFAULT_EMBEDDING_MODEL_ID, EMBEDDING_MODELS } from './embedding-models.js'
 import { scheduleTrigramBackfill } from './fts-trigram.js'
 
 export interface SchemaMigrationStep {
@@ -112,6 +114,17 @@ function isV7Applied(db: Database.Database): boolean {
   return isV6Applied(db)
     && tableExists(db, 'fts_chunks_tri')
     && tableExists(db, 'fts_tri_backfill')
+}
+
+/** 升级前生效的模型：仅 env 可选（自动选择是 v8 之后才有），否则 e5 */
+function legacyEmbeddingModelId(): string {
+  const wanted = process.env.DOC_LIBRARY_EMBEDDING_MODEL?.trim()
+  return wanted && EMBEDDING_MODELS[wanted] ? wanted : DEFAULT_EMBEDDING_MODEL_ID
+}
+
+/** v8：chunk_embeddings（按模型的向量化进度）存在 */
+function isV8Applied(db: Database.Database): boolean {
+  return isV7Applied(db) && tableExists(db, 'chunk_embeddings')
 }
 
 /** 优先 DROP COLUMN；SQLite 过旧或不支持时重建 documents 表 */
@@ -229,6 +242,15 @@ export const MIGRATION_STEPS: SchemaMigrationStep[] = [
     isApplied: isV7Applied,
     up(db) {
       db.exec(MIGRATION_V7_SQL)
+    },
+  },
+  {
+    version: 8,
+    description: 'chunk_embeddings (per-model embedding progress), backfilled from chunks.embedded_at as e5',
+    isApplied: isV8Applied,
+    up(db) {
+      // 建表与回填同一事务：中途失败不留下「表在、数据缺」的半成品
+      db.transaction(() => db.exec(MIGRATION_V8_SQL(legacyEmbeddingModelId())))()
     },
   },
 ]

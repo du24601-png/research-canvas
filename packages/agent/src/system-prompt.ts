@@ -22,6 +22,8 @@ export const DEFAULT_RESEARCHER_PERSONA =
 export const DOCUMENT_CITATION_RULE =
   '引用文档：回答用到上传文件或资料库文档的内容时，每条论断后紧跟该片段工具结果里的 cite 链接原样抄写（多页结果用 cite_template，把 {page} 换成正文 <!-- page:N --> 标出的页码），不要自己拼链接或改 id。'
   + '文档里的数字只能作为带引号的原文摘录引用，不做任何计算、换算或比较，也不得传给 query_data / refine_dataset / propose_widget；需要图表时由取数工具重新取数。'
+  + '检索没有结果（工具返回 found=false 或 hit_count=0）时，直接说明“文档里似乎没有这部分内容”，不要凭记忆或常识补答，也不要把无关片段硬当答案。'
+  + '问题涉及多家公司或多份文档的对比时，对每家公司/每份文档分别检索（search_library 带上公司名，或 search_document 指定 attachment_id），再汇总比较，不要只做一次笼统检索。'
 
 export function buildLayer0Baseline(): string {
   return [

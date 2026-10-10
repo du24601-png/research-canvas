@@ -7,6 +7,8 @@ import { applySqliteMemoryPragmas, resolveUserDataRoot } from '@opptrix/shared'
 import { migrateDocLibrarySchema } from './schema-migrate.js'
 import {
   DEFAULT_EMBEDDING_MODEL_ID,
+  EMBEDDING_MODELS,
+  registerInstalledModelProbe,
   resolveEmbeddingModelSpec,
   resolveModelsDirOverride,
 } from './embedding-models.js'
@@ -57,8 +59,12 @@ export function activeEmbeddingDim(): number {
 
 /** 当前选中模型的用户目录；DOC_LIBRARY_MODELS_DIR 优先 */
 export function embeddingModelDir(): string {
-  const id = activeEmbeddingModelId()
-  const override = resolveModelsDirOverride()
+  return embeddingModelDirFor(activeEmbeddingModelId())
+}
+
+/** 指定模型 id 的用户目录；DOC_LIBRARY_MODELS_DIR 优先 */
+export function embeddingModelDirFor(id: string, env: NodeJS.ProcessEnv = process.env): string {
+  const override = resolveModelsDirOverride(env)
   if (override) return path.join(path.resolve(override), id)
   return path.join(embeddingModelsRoot(), id)
 }
@@ -124,26 +130,55 @@ export function getBundledEmbeddingModelDir(repoRoot?: string): string | null {
   return null
 }
 
+/** 非 e5 模型的仓库内置候选：`models/llms/<id>`（随安装包 / runtime stage 分发） */
+function bundledModelDirFor(modelId: string, repoRoot?: string): string | null {
+  const candidates: string[] = []
+  const resourcesPath = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath
+  if (resourcesPath) candidates.push(path.join(resourcesPath, 'llms', modelId))
+  if (repoRoot) candidates.push(path.join(repoRoot, 'models/llms', modelId))
+  candidates.push(repoStagedLlmDir(modelId))
+  candidates.push(path.resolve('models/llms', modelId))
+  return candidates.find(dir => fs.existsSync(dir)) ?? null
+}
+
 /**
  * 查找顺序：内置 → OPPTRIX_LLM_DIR/<id> → apps/server/llms/<id> → llms/<id>
  * → ~/.opptrix/llms/<id> → 旧 ~/.opptrix/models/<id>
  */
 export function listEmbeddingModelSearchDirs(repoRoot?: string): string[] {
+  return listEmbeddingModelSearchDirsFor(activeEmbeddingModelId(), repoRoot)
+}
+
+/** 指定模型 id 的搜索目录（同 listEmbeddingModelSearchDirs 的顺序） */
+export function listEmbeddingModelSearchDirsFor(
+  id: string,
+  repoRoot?: string,
+  env: NodeJS.ProcessEnv = process.env,
+): string[] {
   const dirs: string[] = []
-  const id = activeEmbeddingModelId()
-  const override = resolveModelsDirOverride()
+  const override = resolveModelsDirOverride(env)
   if (override) pushUniqueResolved(dirs, path.join(path.resolve(override), id))
-  if (id === DEFAULT_EMBEDDING_MODEL_ID) {
-    const bundled = getBundledEmbeddingModelDir(repoRoot)
-    if (bundled) pushUniqueResolved(dirs, bundled)
-  }
+  const bundled = id === DEFAULT_EMBEDDING_MODEL_ID
+    ? getBundledEmbeddingModelDir(repoRoot)
+    : bundledModelDirFor(id, repoRoot)
+  if (bundled) pushUniqueResolved(dirs, bundled)
   for (const dir of listDevLlmModelDirs(id, repoRoot)) {
     pushUniqueResolved(dirs, dir)
   }
-  pushUniqueResolved(dirs, embeddingModelDir())
+  pushUniqueResolved(dirs, embeddingModelDirFor(id, env))
   pushUniqueResolved(dirs, path.join(legacyEmbeddingModelsRoot(), id))
   return dirs
 }
+
+/** 模型必备文件是否已在任一搜索目录齐全（供默认模型自动选择） */
+function isModelFilesPresent(id: string, env: NodeJS.ProcessEnv): boolean {
+  const spec = EMBEDDING_MODELS[id]
+  if (!spec) return false
+  return listEmbeddingModelSearchDirsFor(id, undefined, env).some(dir =>
+    spec.requiredFiles.every(f => fs.existsSync(path.join(dir, f))))
+}
+
+registerInstalledModelProbe(isModelFilesPresent)
 
 /** ~/.opptrix/lancedb/doc_chunks/ */
 export function lanceDbDir(): string {

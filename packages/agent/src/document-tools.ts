@@ -138,6 +138,20 @@ function mapHybridHits(
   })
 }
 
+/** 未命中时给模型的提示：如实告知文档里似乎没有，勿凭记忆作答 */
+export const NOT_FOUND_HINT =
+  '文档库里似乎没有与此相关的内容。请如实告诉用户“已检索但文档中未找到相关内容”，不要凭记忆或常识补答；如有必要可换更具体的关键词再检索一次。'
+export const BELOW_FLOOR_HINT =
+  '只找到相关度很低的内容，已被过滤。请如实告诉用户文档中似乎没有直接相关内容，不要凭记忆作答。'
+
+function notFoundFields(reason?: string): { found: false; reason: string; message: string } {
+  return {
+    found: false,
+    reason: reason ?? 'no_match',
+    message: reason === 'below_relevance_floor' ? BELOW_FLOOR_HINT : NOT_FOUND_HINT,
+  }
+}
+
 /** read_document 结果的引用字段：单页给 cite，多页给 cite_template（{page} 待填） */
 function readCiteFields(
   name: string | undefined,
@@ -157,13 +171,22 @@ async function searchLibraryHybrid(
   svc: DocLibrarySvc,
   query: string,
   opts: { sourceType?: DocumentSourceType; limit?: number },
-): Promise<LibraryHit[]> {
-  const hits = await svc.searchHybrid('', query, {
+): Promise<LibrarySearchOutcome> {
+  const res = await svc.searchHybridDetailed('', query, {
     scope: 'library',
     sourceType: opts.sourceType,
     limit: opts.limit,
   })
-  return mapHybridHits(hits, svc, sessionAttachmentByDocument(svc, requireSessionId()))
+  return {
+    hits: mapHybridHits(res.hits, svc, sessionAttachmentByDocument(svc, requireSessionId())),
+    reason: res.found ? undefined : res.reason,
+  }
+}
+
+interface LibrarySearchOutcome {
+  hits: LibraryHit[]
+  /** 未命中时的原因（no_match / below_relevance_floor） */
+  reason?: string
 }
 
 /** 资讯 FTS → 与 search_library hits 同形（document_id = article_id） */
@@ -197,10 +220,10 @@ async function searchLibraryUnified(
   svc: DocLibrarySvc,
   query: string,
   opts: { sourceType?: DocumentSourceType; limit?: number },
-): Promise<LibraryHit[]> {
+): Promise<LibrarySearchOutcome> {
   const limit = opts.limit ?? 8
   if (opts.sourceType === 'news') {
-    return searchNewsLibraryHits(query, limit)
+    return { hits: searchNewsLibraryHits(query, limit) }
   }
   if (opts.sourceType === 'report') {
     return searchLibraryHybrid(svc, query, { sourceType: 'report', limit })
@@ -209,9 +232,10 @@ async function searchLibraryUnified(
     searchLibraryHybrid(svc, query, { sourceType: 'report', limit }),
     Promise.resolve(searchNewsLibraryHits(query, limit)),
   ])
-  return [...reportHits, ...newsHits]
+  const hits = [...reportHits.hits, ...newsHits]
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
+  return { hits, reason: hits.length ? undefined : reportHits.reason }
 }
 
 export function buildDocumentTools(): DocumentToolDef[] {
@@ -284,13 +308,14 @@ export function buildDocumentTools(): DocumentToolDef[] {
         const sourceType = parseSourceType(args.source_type)
 
         const svc = ensureDocLibraryBridge()
-        const hits = await searchLibraryUnified(svc, query, { sourceType, limit })
+        const { hits, reason } = await searchLibraryUnified(svc, query, { sourceType, limit })
         return {
           query,
           source_type: sourceType,
           hits,
           hit_count: hits.length,
           source: sourceType === 'news' ? 'news_fts' as const : 'library' as const,
+          ...(hits.length ? {} : notFoundFields(reason)),
         }
       },
       meta: TOOL_META.search_library,
@@ -313,11 +338,12 @@ export function buildDocumentTools(): DocumentToolDef[] {
         const limit = parseLimit(args.limit)
 
         const svc = ensureDocLibraryBridge()
-        const hybridHits = await svc.searchHybrid(sessionId, query, {
+        const detailed = await svc.searchHybridDetailed(sessionId, query, {
           scope: 'session',
           attachmentId: attachmentId || undefined,
           limit,
         })
+        const hybridHits = detailed.hits
         if (hybridHits.length) {
           const ranked = mapHybridHits(hybridHits, svc, sessionAttachmentByDocument(svc, sessionId))
           return {
@@ -336,7 +362,11 @@ export function buildDocumentTools(): DocumentToolDef[] {
             hits: [] as LibraryHit[],
             hit_count: 0,
             source: 'library' as const,
-            message: '本会话尚无已整理文档或未命中关键词；可 list_session_documents 确认，或改用 search_library 跨库检索',
+            ...notFoundFields(detailed.reason),
+            message: detailed.reason === 'below_relevance_floor'
+              ? BELOW_FLOOR_HINT
+              : '本会话尚无已整理文档或未命中；可 list_session_documents 确认，或改用 search_library 跨库检索。'
+                + '若确认没有，请如实告诉用户文档中未找到，不要凭记忆作答。',
           }
         }
 
@@ -363,6 +393,7 @@ export function buildDocumentTools(): DocumentToolDef[] {
           hits: ranked,
           hit_count: ranked.length,
           source: 'legacy' as const,
+          ...(ranked.length ? {} : notFoundFields()),
         }
       },
       meta: TOOL_META.search_document,

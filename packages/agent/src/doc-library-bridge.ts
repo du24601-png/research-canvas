@@ -8,6 +8,7 @@ import {
   createTextL0Runner,
   createOfficeL0Runner,
   createOcrL2Runner,
+  createPdfiumL0Runner,
   documentKindFromMime,
   enhancePagesWithEmbeddedImageOcr,
   pagesToParseResult,
@@ -71,6 +72,9 @@ function buildParseRouter(): ParseRunner {
     text: createTextL0Runner(),
     office: createOfficeL0Runner(),
     pdf: pdfExtractL0Runner,
+    // 首选抽取丢字 / 乱码（如部分银行年报）→ PDFium 文本层兜底，仍不行再走扫描件识别
+    // 首选 runner 已做过页内嵌图 OCR，兜底不再重复跑
+    pdfFallback: createPdfiumL0Runner({ embeddedImageOcr: false }),
     ocr: createOcrL2Runner(),
   })
 }

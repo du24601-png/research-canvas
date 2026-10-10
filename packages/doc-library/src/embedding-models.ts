@@ -1,6 +1,6 @@
 /**
  * 嵌入模型注册表：维度、池化、查询/段落前缀、权重仓库。
- * 选择：env `DOC_LIBRARY_EMBEDDING_MODEL`（默认 multilingual-e5-small，行为不变）。
+ * 选择：env `DOC_LIBRARY_EMBEDDING_MODEL` 优先；未设则 bge-small-zh-v1.5（文件在）→ e5（文件在）→ 仅关键词。
  * 模型根目录：env `DOC_LIBRARY_MODELS_DIR`（未设置则沿用 paths.ts 的既有查找）。
  */
 import { isAbsolute } from 'node:path'
@@ -77,17 +77,72 @@ export const EMBEDDING_MODELS: Readonly<Record<string, EmbeddingModelSpec>> = {
 let warnedUnknownModel = false
 let warnedRelativeModelsDir = false
 
-/** 解析当前选中的模型；未知 id 回退默认（并保持 e5 行为） */
+/** 选择原因：env 显式指定 / 自动选中首选 / 自动回退 / 无模型（仅关键词检索） */
+export type EmbeddingSelectionReason = 'env' | 'auto-preferred' | 'auto-fallback' | 'none'
+
+export interface EmbeddingModelSelection {
+  spec: EmbeddingModelSpec
+  reason: EmbeddingSelectionReason
+}
+
+/** 自动选择顺序：bge-small-zh 优先，其次 e5；都没有则仅关键词检索 */
+export const AUTO_MODEL_ORDER: readonly string[] = ['bge-small-zh-v1.5', DEFAULT_EMBEDDING_MODEL_ID]
+
+type InstalledProbe = (modelId: string, env: NodeJS.ProcessEnv) => boolean
+let installedProbe: InstalledProbe | null = null
+let selectionCache: { at: number; key: string; value: EmbeddingModelSelection } | null = null
+const SELECTION_CACHE_MS = 2000
+
+/** paths.ts 注册：判断某模型文件是否已在任一搜索目录就绪（避免本文件依赖 paths 形成环） */
+export function registerInstalledModelProbe(probe: InstalledProbe | null): void {
+  installedProbe = probe
+  selectionCache = null
+}
+
+/** 下载完成 / 测试切换目录后丢弃自动选择缓存 */
+export function resetEmbeddingModelSelectionCache(): void {
+  selectionCache = null
+}
+
+function autoSelect(env: NodeJS.ProcessEnv): EmbeddingModelSelection {
+  const fallback = EMBEDDING_MODELS[DEFAULT_EMBEDDING_MODEL_ID]
+  if (!installedProbe) return { spec: fallback, reason: 'none' }
+  for (let i = 0; i < AUTO_MODEL_ORDER.length; i++) {
+    const spec = EMBEDDING_MODELS[AUTO_MODEL_ORDER[i]]
+    if (spec && installedProbe(spec.id, env)) {
+      return { spec, reason: i === 0 ? 'auto-preferred' : 'auto-fallback' }
+    }
+  }
+  return { spec: fallback, reason: 'none' }
+}
+
+/** 解析当前模型及原因：env 优先；未设则按已安装文件自动选；未知 id 回退 e5 */
+export function selectEmbeddingModel(env: NodeJS.ProcessEnv = process.env): EmbeddingModelSelection {
+  const wanted = env.DOC_LIBRARY_EMBEDDING_MODEL?.trim()
+  if (wanted && EMBEDDING_MODELS[wanted]) return { spec: EMBEDDING_MODELS[wanted], reason: 'env' }
+  if (wanted) {
+    if (!warnedUnknownModel) {
+      warnedUnknownModel = true
+      console.warn(`[doc-library] unknown DOC_LIBRARY_EMBEDDING_MODEL "${wanted}", falling back to ${DEFAULT_EMBEDDING_MODEL_ID}`)
+    }
+    return { spec: EMBEDDING_MODELS[DEFAULT_EMBEDDING_MODEL_ID], reason: 'env' }
+  }
+  const key = env.DOC_LIBRARY_MODELS_DIR ?? ''
+  const now = Date.now()
+  if (env === process.env && selectionCache && selectionCache.key === key
+    && now - selectionCache.at < SELECTION_CACHE_MS) {
+    return selectionCache.value
+  }
+  const value = autoSelect(env)
+  if (env === process.env) selectionCache = { at: now, key, value }
+  return value
+}
+
+/** 解析当前选中的模型（见 selectEmbeddingModel） */
 export function resolveEmbeddingModelSpec(
   env: NodeJS.ProcessEnv = process.env,
 ): EmbeddingModelSpec {
-  const wanted = env.DOC_LIBRARY_EMBEDDING_MODEL?.trim()
-  if (wanted && EMBEDDING_MODELS[wanted]) return EMBEDDING_MODELS[wanted]
-  if (wanted && !warnedUnknownModel) {
-    warnedUnknownModel = true
-    console.warn(`[doc-library] unknown DOC_LIBRARY_EMBEDDING_MODEL "${wanted}", falling back to ${DEFAULT_EMBEDDING_MODEL_ID}`)
-  }
-  return EMBEDDING_MODELS[DEFAULT_EMBEDDING_MODEL_ID]
+  return selectEmbeddingModel(env).spec
 }
 
 /** `DOC_LIBRARY_MODELS_DIR` 绝对路径；未设置返回 null */
@@ -107,4 +162,11 @@ export function resolveModelsDirOverride(env: NodeJS.ProcessEnv = process.env): 
 /** LanceDB 表名：e5 保持 `doc_chunks`，其它模型带 id+dim 后缀，避免混向量 */
 export function lanceTableNameFor(spec: EmbeddingModelSpec, base = 'doc_chunks'): string {
   return `${base}${spec.tableSuffix}`
+}
+
+/** 启动日志用：`bge-small-zh-v1.5`、`multilingual-e5-small`，无模型文件时 `keyword-only` */
+export function describeEmbeddingSelection(env: NodeJS.ProcessEnv = process.env): string {
+  const { spec, reason } = selectEmbeddingModel(env)
+  if (reason === 'none') return 'keyword-only'
+  return reason === 'env' ? `${spec.id}(env)` : spec.id
 }

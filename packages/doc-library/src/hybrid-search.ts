@@ -1,9 +1,14 @@
 import type Database from 'better-sqlite3'
 import { searchFtsChunks } from './fts.js'
 import { rrfFuse } from './rrf.js'
+import { resolveEmbeddingModelSpec } from './embedding-models.js'
+import { relevanceFloorFor, scoreToCosine } from './relevance-floor.js'
 import type { EmbeddingService } from './embedding.js'
 import type { VectorStore, VectorSearchHit } from './vector-store.js'
 import type { DocSearchScope, DocumentSourceType, FtsSearchHit } from './types.js'
+
+/** LanceDB 建表时的占位行 id（零向量；正常会被删除，防御性过滤） */
+const VECTOR_PLACEHOLDER_ID = '__init__'
 
 /** library 文档 id 分页大小 — 向量预筛按页聚合，避免一次加载全库 id */
 export const LIBRARY_DOCUMENT_ID_PAGE_SIZE = 256
@@ -17,6 +22,23 @@ export interface HybridSearchChunksOpts {
   limit?: number
   embedding: EmbeddingService
   vectorStore: VectorStore
+  /** 覆盖相关度下限所用的模型 id（缺省取当前选中的嵌入模型）；测试用 */
+  modelId?: string
+  /** 覆盖向量相似度下限（余弦）；测试用 */
+  vectorFloor?: number
+}
+
+/** 未命中原因：no_match = 关键词/向量都没有结果；below_relevance_floor = 仅有的向量结果相关度太低被丢弃 */
+export type HybridNotFoundReason = 'no_match' | 'below_relevance_floor'
+
+export interface HybridSearchResult {
+  hits: FtsSearchHit[]
+  found: boolean
+  reason?: HybridNotFoundReason
+}
+
+function finish(hits: FtsSearchHit[], reason: HybridNotFoundReason = 'no_match'): HybridSearchResult {
+  return hits.length ? { hits, found: true } : { hits, found: false, reason }
 }
 
 export async function searchHybridChunks(
@@ -24,6 +46,15 @@ export async function searchHybridChunks(
   query: string,
   opts: HybridSearchChunksOpts,
 ): Promise<FtsSearchHit[]> {
+  return (await searchHybridDetailed(db, query, opts)).hits
+}
+
+/** 与 searchHybridChunks 同逻辑，额外返回 found / reason（仅新增字段） */
+export async function searchHybridDetailed(
+  db: Database.Database,
+  query: string,
+  opts: HybridSearchChunksOpts,
+): Promise<HybridSearchResult> {
   const limit = Math.min(Math.max(opts.limit ?? 8, 1), 20)
   const scope = opts.scope ?? 'session'
   const ftsHits = searchFtsChunks(db, query, {
@@ -36,44 +67,37 @@ export async function searchHybridChunks(
   })
 
   // 资讯不进 Lance：source_type=news 时仅关键词 FTS
-  if (opts.sourceType === 'news') {
-    return ftsHits
-  }
+  if (opts.sourceType === 'news') return finish(ftsHits)
 
   const embeddingReady = opts.embedding.isReady()
     || await opts.embedding.tryEnableDefaultBackend()
-  if (!embeddingReady) {
-    return ftsHits
-  }
+  if (!embeddingReady) return finish(ftsHits)
 
   const vectorOk = await opts.vectorStore.isAvailable()
-  if (!vectorOk) {
-    return ftsHits
-  }
+  if (!vectorOk) return finish(ftsHits)
 
   const queryVec = await opts.embedding.embedQuery(query)
-  if (!queryVec) {
-    return ftsHits
-  }
+  if (!queryVec) return finish(ftsHits)
 
   let documentIds: string[] | undefined
   if (opts.documentId) {
     documentIds = [opts.documentId]
   } else if (scope === 'session') {
     documentIds = listSessionDocumentIds(db, opts.sessionId, opts.attachmentId)
-    if (!documentIds.length) return ftsHits
+    if (!documentIds.length) return finish(ftsHits)
   }
 
-  const vectorHits = scope === 'library' && !opts.documentId
+  const rawVectorHits = (scope === 'library' && !opts.documentId
     ? await searchLibraryVectorsPaged(db, queryVec, opts.vectorStore, limit, opts.sourceType)
     : await opts.vectorStore.search(queryVec, {
       documentIds,
       limit,
-    })
+    })).filter(h => h.chunk_id !== VECTOR_PLACEHOLDER_ID && h.document_id !== VECTOR_PLACEHOLDER_ID)
 
-  if (!vectorHits.length) {
-    return ftsHits
-  }
+  if (!rawVectorHits.length) return finish(ftsHits)
+
+  const vectorHits = dropLowRelevanceVectorOnly(rawVectorHits, ftsHits, opts)
+  if (!vectorHits.length) return finish(ftsHits, 'below_relevance_floor')
 
   const fusedIds = rrfFuse(
     [
@@ -103,7 +127,22 @@ export async function searchHybridChunks(
     if (!hit) return
     out.push({ ...hit, rank: -(idx + 1) })
   })
-  return out.length ? out : ftsHits
+  return finish(out.length ? out : ftsHits)
+}
+
+/** 丢弃相似度低于模型下限、且关键词也没命中的纯向量结果 */
+function dropLowRelevanceVectorOnly(
+  vectorHits: VectorSearchHit[],
+  ftsHits: FtsSearchHit[],
+  opts: HybridSearchChunksOpts,
+): VectorSearchHit[] {
+  const floor = opts.vectorFloor ?? relevanceFloorFor(opts.modelId ?? resolveEmbeddingModelSpec().id)
+  if (floor === undefined) return vectorHits
+  // 仅精确关键词命中免检；整句 gram 近似命中（match='natural'）不豁免
+  const ftsIds = new Set(ftsHits.filter(h => h.match !== 'natural').map(h => h.chunk_id))
+  return vectorHits.filter(
+    h => ftsIds.has(h.chunk_id) || scoreToCosine(opts.vectorStore, h.score) >= floor,
+  )
 }
 
 function listSessionDocumentIds(

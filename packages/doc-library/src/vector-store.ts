@@ -26,7 +26,8 @@ export interface VectorSearchHit {
 
 export interface VectorStore {
   isAvailable(): Promise<boolean>
-  upsert(rows: VectorChunkRow[]): Promise<void>
+  /** 返回实际写入的 chunk_id（无返回值的旧实现视为全部写入） */
+  upsert(rows: VectorChunkRow[]): Promise<string[] | void>
   deleteByDocument(documentId: string): Promise<void>
   search(
     vector: number[],
@@ -381,6 +382,7 @@ export class LanceVectorStore implements VectorStore {
   private readonly dir: string
   private conn: LanceConnection | null = null
   private table: LanceTable | null = null
+  private openTableName = ''
   private initFailed = false
   /** 读优先互斥队列：write 串行；read 可插队未开始的 write */
   private readonly opScheduler = new LanceOpScheduler()
@@ -508,6 +510,10 @@ export class LanceVectorStore implements VectorStore {
   }
 
   private async ensureTableUnlocked(): Promise<LanceTable | null> {
+    // 运行中切换嵌入模型（如下载完 bge）→ 丢弃指向旧表的句柄，重开新模型的表
+    const wantTable = currentTableName()
+    if (this.table && this.openTableName && this.openTableName !== wantTable) this.table = null
+    this.openTableName = wantTable
     if (this.table) return this.table
     if (this.initFailed) return null
 
@@ -638,8 +644,8 @@ export class LanceVectorStore implements VectorStore {
     })
   }
 
-  async upsert(rows: VectorChunkRow[]): Promise<void> {
-    if (!rows.length) return
+  async upsert(rows: VectorChunkRow[]): Promise<string[]> {
+    if (!rows.length) return []
     return this.scheduleWrite(async () => {
       const { valid, rejected } = filterValidUpsertRows(rows)
       if (rejected > 0) {
@@ -649,10 +655,10 @@ export class LanceVectorStore implements VectorStore {
           totalRejected: this.rejectedVectorCount,
         })
       }
-      if (!valid.length) return
+      if (!valid.length) return []
 
       let table = await this.ensureTableUnlocked()
-      if (!table) return
+      if (!table) return []
 
       const data = valid.map(r => ({
         chunk_id: r.chunk_id,
@@ -694,7 +700,7 @@ export class LanceVectorStore implements VectorStore {
             rows: valid.length,
           })
           table = await this.rebuildEmptyTableUnlocked('add_failed')
-          if (!table) return
+          if (!table) return []
           try {
             await table.add(data)
           } catch (err2) {
@@ -703,7 +709,7 @@ export class LanceVectorStore implements VectorStore {
             })
             this.initFailed = true
             this.table = null
-            return
+            return []
           }
         }
       }
@@ -723,6 +729,7 @@ export class LanceVectorStore implements VectorStore {
           await this.optimizeUnlocked()
         }
       }
+      return valid.map(r => r.chunk_id)
     })
   }
 
@@ -785,7 +792,7 @@ function mapHits(rows: Record<string, unknown>[]): VectorSearchHit[] {
     document_id: String(row.document_id ?? ''),
     text: String(row.text ?? ''),
     score: typeof row._distance === 'number' ? 1 / (1 + row._distance) : 0,
-  })).filter(h => h.chunk_id)
+  })).filter(h => h.chunk_id && h.chunk_id !== '__init__')
 }
 
 /** 内存向量库（测试 / LanceDB 不可用时） */
@@ -796,11 +803,12 @@ export class MemoryVectorStore implements VectorStore {
     return true
   }
 
-  async upsert(rows: VectorChunkRow[]): Promise<void> {
+  async upsert(rows: VectorChunkRow[]): Promise<string[]> {
     const { valid } = filterValidUpsertRows(rows)
     for (const row of valid) {
       this.rows.set(row.chunk_id, row)
     }
+    return valid.map(r => r.chunk_id)
   }
 
   async deleteByDocument(documentId: string): Promise<void> {

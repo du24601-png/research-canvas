@@ -1,6 +1,9 @@
 import type Database from 'better-sqlite3'
 import type { FtsSearchChunksOpts, FtsSearchRow } from './fts.js'
 import { TRIGRAM_FTS_TABLE, readTrigramCoverage } from './fts-trigram.js'
+import {
+  buildNaturalGrams, countMatchedGrams, isNaturalTerm, naturalMatchExpr, naturalMinMatched,
+} from './fts-natural.js'
 
 /**
  * 含中日韩字符的关键词检索：
@@ -9,7 +12,8 @@ import { TRIGRAM_FTS_TABLE, readTrigramCoverage } from './fts-trigram.js'
  * - 全部是 1–2 字词时退化为 instr 逐字匹配：只扫描范围内最新的 INSTR_SCAN_BUDGET 个 chunk
  *   （按 chunks.rowid 倒序），在 SQL 中按出现次数打分排序后再 LIMIT；
  * - 回填进行中：游标以内的文档走 MATCH，其余文档走上面的限额逐字匹配，两路合并；
- * - 多个词之间保持 AND 语义（与 unicode61 路径一致）。
+ * - 多个词之间保持 AND 语义（与 unicode61 路径一致）；
+ * - 整句自然问法（词长 > 6 字）：精确短语结果之后，追加「去虚词 → 3 字 gram → OR + bm25」的结果（见 fts-natural.ts）。
  */
 
 const CJK_RE = /[぀-ヿ㐀-䶿一-鿿가-힯豈-﫿]/
@@ -98,7 +102,8 @@ interface ExtraClause {
 
 function searchTrigram(
   db: Database.Database,
-  plan: CjkQueryPlan,
+  matchExpr: string,
+  instrTerms: string[],
   limit: number,
   opts: FtsSearchChunksOpts,
   extra: ExtraClause | null,
@@ -109,10 +114,10 @@ function searchTrigram(
     `${TRIGRAM_FTS_TABLE} MATCH ?`,
     ...s.clauses,
     ...(extra ? [extra.clause] : []),
-    ...instrClauses('c.text', plan.instrTerms.length),
+    ...instrClauses('c.text', instrTerms.length),
   ]
   const params = [
-    trigramMatchExpr(plan.matchTerms), ...s.params, ...(extra?.params ?? []), ...plan.instrTerms, limit,
+    matchExpr, ...s.params, ...(extra?.params ?? []), ...instrTerms, limit,
   ]
   return db.prepare(`
     SELECT
@@ -208,6 +213,42 @@ function mergeHits(primary: FtsSearchRow[], secondary: FtsSearchRow[], limit: nu
   return out.slice(0, limit)
 }
 
+/** 候选 chunk 的全文（用于统计命中的 gram 数） */
+function loadChunkTexts(db: Database.Database, ids: string[]): Map<string, string> {
+  if (!ids.length) return new Map()
+  const rows = db.prepare(
+    `SELECT id, text FROM chunks WHERE id IN (${ids.map(() => '?').join(', ')})`,
+  ).all(...ids) as Array<{ id: string; text: string }>
+  return new Map(rows.map(r => [r.id, r.text]))
+}
+
+const NATURAL_CANDIDATES = 200
+
+/**
+ * 整句问法：gram OR 召回候选，再要求命中 gram 数 ≥ 门槛（防止一个常见 gram 就算命中），
+ * 按命中 gram 数降序（同数保持 bm25 序），结果标记 match='natural'。
+ */
+function searchNaturalGrams(
+  db: Database.Database,
+  terms: string[],
+  limit: number,
+  opts: FtsSearchChunksOpts,
+  cov: { all: boolean; cursor: string },
+): FtsSearchRow[] {
+  const grams = buildNaturalGrams(terms.filter(isNaturalTerm))
+  if (!grams.length) return []
+  const extra = cov.all ? null : { clause: 'c.document_id <= ?', params: [cov.cursor] }
+  const cands = searchTrigram(db, naturalMatchExpr(grams), [], NATURAL_CANDIDATES, opts, extra)
+  const texts = loadChunkTexts(db, cands.map(c => c.chunk_id))
+  const need = naturalMinMatched(grams.length)
+  return cands
+    .map((c, i) => ({ c, i, n: countMatchedGrams(texts.get(c.chunk_id) ?? '', grams) }))
+    .filter(x => x.n >= need)
+    .sort((a, b) => b.n - a.n || a.i - b.i)
+    .slice(0, limit)
+    .map(x => ({ ...x.c, match: 'natural' as const }))
+}
+
 /** 含 CJK 的查询入口；出错返回空数组（与 unicode61 路径一致） */
 export function searchCjkChunks(
   db: Database.Database,
@@ -218,16 +259,31 @@ export function searchCjkChunks(
 ): FtsSearchRow[] {
   try {
     const cov = readTrigramCoverage(db)
-    const plan = planCjkQuery(terms, cov.available)
-    if (!plan.matchTerms.length) return searchInstrBudgeted(db, terms, limit, opts, budget, null)
-    if (cov.all) return searchTrigram(db, plan, limit, opts, null)
-    const covered = searchTrigram(db, plan, limit, opts, { clause: 'c.document_id <= ?', params: [cov.cursor] })
-    const rest = searchInstrBudgeted(db, terms, limit, opts, budget, {
-      clause: 'c.document_id > ?',
-      params: [cov.cursor],
-    })
-    return mergeHits(covered, rest, limit)
+    const exact = searchCjkExact(db, terms, limit, opts, budget, cov)
+    if (!cov.available || !terms.some(isNaturalTerm)) return exact
+    const natural = searchNaturalGrams(db, terms, limit, opts, cov)
+    return mergeHits(exact, natural, limit)
   } catch {
     return []
   }
+}
+
+function searchCjkExact(
+  db: Database.Database,
+  terms: string[],
+  limit: number,
+  opts: FtsSearchChunksOpts,
+  budget: number,
+  cov: ReturnType<typeof readTrigramCoverage>,
+): FtsSearchRow[] {
+  const plan = planCjkQuery(terms, cov.available)
+  if (!plan.matchTerms.length) return searchInstrBudgeted(db, terms, limit, opts, budget, null)
+  const expr = trigramMatchExpr(plan.matchTerms)
+  if (cov.all) return searchTrigram(db, expr, plan.instrTerms, limit, opts, null)
+  const covered = searchTrigram(db, expr, plan.instrTerms, limit, opts, { clause: 'c.document_id <= ?', params: [cov.cursor] })
+  const rest = searchInstrBudgeted(db, terms, limit, opts, budget, {
+    clause: 'c.document_id > ?',
+    params: [cov.cursor],
+  })
+  return mergeHits(covered, rest, limit)
 }

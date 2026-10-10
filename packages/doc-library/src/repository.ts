@@ -11,7 +11,7 @@ import type {
   ParseStatus,
   SessionDocumentRow,
 } from './types.js'
-import { blobPathForSha, markdownPathForDocument } from './paths.js'
+import { activeEmbeddingModelId, blobPathForSha, markdownPathForDocument } from './paths.js'
 import { replaceFtsForDocument } from './fts.js'
 import { deleteTrigramForDocument } from './fts-trigram.js'
 
@@ -369,48 +369,71 @@ export class DocLibraryRepository {
     return row ?? null
   }
 
-  getChunksNeedingEmbed(documentId: string): ChunkRow[] {
+  /** 指定模型（默认当前激活模型）尚未嵌入的 chunk */
+  getChunksNeedingEmbed(documentId: string, modelId = activeEmbeddingModelId()): ChunkRow[] {
     return this.db.prepare(`
-      SELECT id, document_id, seq, page, offset, text, char_count, embedded_at
-      FROM chunks
-      WHERE document_id = ? AND embedded_at IS NULL
-      ORDER BY seq ASC
-    `).all(documentId) as ChunkRow[]
+      SELECT c.id, c.document_id, c.seq, c.page, c.offset, c.text, c.char_count, c.embedded_at
+      FROM chunks c
+      LEFT JOIN chunk_embeddings ce ON ce.chunk_id = c.id AND ce.model_id = ?
+      WHERE c.document_id = ? AND ce.chunk_id IS NULL
+      ORDER BY c.seq ASC
+    `).all(modelId, documentId) as ChunkRow[]
   }
 
-  markChunksEmbedded(chunkIds: string[], embeddedAt = new Date().toISOString()): void {
+  /** 记录 chunk 已写入某模型的向量表；同时维护旧列 chunks.embedded_at（任一模型已嵌入） */
+  markChunksEmbedded(
+    chunkIds: string[],
+    embeddedAt = new Date().toISOString(),
+    modelId = activeEmbeddingModelId(),
+  ): void {
     if (!chunkIds.length) return
-    const stmt = this.db.prepare(`
-      UPDATE chunks SET embedded_at = ? WHERE id = ?
+    const ins = this.db.prepare(`
+      INSERT INTO chunk_embeddings(chunk_id, model_id, embedded_at) VALUES (?, ?, ?)
+      ON CONFLICT(chunk_id, model_id) DO UPDATE SET embedded_at = excluded.embedded_at
     `)
+    const legacy = this.db.prepare('UPDATE chunks SET embedded_at = ? WHERE id = ?')
     const tx = this.db.transaction((ids: string[]) => {
       for (const id of ids) {
-        stmt.run(embeddedAt, id)
+        ins.run(id, modelId, embeddedAt)
+        legacy.run(embeddedAt, id)
       }
     })
     tx(chunkIds)
   }
 
-  clearChunkEmbeddedAt(documentId: string): void {
+  /** 旧列 = 各模型最近一次嵌入时间；无任何模型记录则 NULL */
+  private syncLegacyEmbeddedAt(whereSql: string, params: unknown[]): void {
     this.db.prepare(`
-      UPDATE chunks SET embedded_at = NULL WHERE document_id = ?
-    `).run(documentId)
+      UPDATE chunks SET embedded_at = (
+        SELECT MAX(ce.embedded_at) FROM chunk_embeddings ce WHERE ce.chunk_id = chunks.id
+      ) WHERE ${whereSql}
+    `).run(...params)
+  }
+
+  /** 清除某文档在指定模型下的嵌入标记（其它模型保留） */
+  clearChunkEmbeddedAt(documentId: string, modelId = activeEmbeddingModelId()): void {
+    this.db.prepare(`
+      DELETE FROM chunk_embeddings WHERE model_id = ?
+        AND chunk_id IN (SELECT id FROM chunks WHERE document_id = ?)
+    `).run(modelId, documentId)
+    this.syncLegacyEmbeddedAt('document_id = ?', [documentId])
   }
 
   /**
-   * Lance 病理重建后：清除可向量化文档的 embedded_at，
-   * 使 embedPendingDocuments 能重新回填（news 不触碰）。
+   * Lance 病理重建后：清除可向量化文档在指定（激活）模型下的标记，
+   * 使 embedPendingDocuments 能重新回填（news 不触碰；其它模型的标记保留）。
    */
-  clearEmbeddedAtForVectorEligible(): number {
-    const result = this.db.prepare(`
-      UPDATE chunks SET embedded_at = NULL
-      WHERE document_id IN (
-        SELECT d.id FROM documents d
-        JOIN parse_artifacts pa ON pa.document_id = d.id
-        WHERE pa.status = 'ready'
-          AND COALESCE(d.source_type, 'report') != 'news'
-      )
-    `).run()
+  clearEmbeddedAtForVectorEligible(modelId = activeEmbeddingModelId()): number {
+    const eligible = `
+      SELECT c.id FROM chunks c
+      JOIN documents d ON d.id = c.document_id
+      JOIN parse_artifacts pa ON pa.document_id = d.id
+      WHERE pa.status = 'ready' AND COALESCE(d.source_type, 'report') != 'news'
+    `
+    const result = this.db.prepare(
+      `DELETE FROM chunk_embeddings WHERE model_id = ? AND chunk_id IN (${eligible})`,
+    ).run(modelId)
+    this.syncLegacyEmbeddedAt(`id IN (${eligible})`, [])
     return Number(result.changes ?? 0)
   }
 

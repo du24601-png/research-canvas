@@ -1,5 +1,5 @@
 /** doc-library.db schema 版本；与 MIGRATION_STEPS 步数一致 */
-export const DOC_LIBRARY_SCHEMA_VERSION = 7
+export const DOC_LIBRARY_SCHEMA_VERSION = 8
 
 export const MIGRATION_V1_SQL = `
   CREATE TABLE IF NOT EXISTS schema_meta (
@@ -130,4 +130,24 @@ export const MIGRATION_V7_SQL = `
 
   INSERT OR IGNORE INTO fts_tri_backfill(id, cursor, done_at, last_error, updated_at)
   VALUES (1, '', NULL, NULL, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+`
+
+/**
+ * v8：按模型记录向量化进度（切换嵌入模型后只对新模型重嵌）。
+ * 旧 chunks.embedded_at 保留（只增不破）；已有标记按「升级前的有效模型」回填：
+ * 升级前只有 env DOC_LIBRARY_EMBEDDING_MODEL 能选模型，未设置即 e5。INSERT OR IGNORE 幂等。
+ */
+export const MIGRATION_V8_SQL = (legacyModelId: string): string => `
+  CREATE TABLE IF NOT EXISTS chunk_embeddings (
+    chunk_id TEXT NOT NULL,
+    model_id TEXT NOT NULL,
+    embedded_at TEXT NOT NULL,
+    PRIMARY KEY (chunk_id, model_id),
+    FOREIGN KEY (chunk_id) REFERENCES chunks(id) ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_chunk_embeddings_model ON chunk_embeddings(model_id);
+
+  INSERT OR IGNORE INTO chunk_embeddings(chunk_id, model_id, embedded_at)
+  SELECT id, '${legacyModelId.replace(/'/g, "''")}', embedded_at FROM chunks WHERE embedded_at IS NOT NULL;
 `

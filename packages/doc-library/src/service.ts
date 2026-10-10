@@ -16,10 +16,10 @@ import type {
 } from './types.js'
 import { DocLibraryRepository } from './repository.js'
 import { searchFtsChunks } from './fts.js'
-import { newDocumentId, sha256Buffer } from './paths.js'
+import { activeEmbeddingModelId, newDocumentId, sha256Buffer } from './paths.js'
 import { EmbeddingService, getEmbeddingService, resolveEmbedBatchSize } from './embedding.js'
 import { getVectorStore, type VectorStore } from './vector-store.js'
-import { searchHybridChunks } from './hybrid-search.js'
+import { searchHybridChunks, searchHybridDetailed, type HybridSearchResult } from './hybrid-search.js'
 import { extractTextL0, TEXT_L0_ENGINE_VERSION } from './engines/text-l0.js'
 import { isPlainTextDocument } from './document-kind.js'
 import { shouldEmbedToVector } from './embed-policy.js'
@@ -527,21 +527,24 @@ export class DocLibraryService {
       const vectorOk = await this.vectorStore.isAvailable()
       if (!vectorOk) return
 
-      const pending = this.repo.getChunksNeedingEmbed(documentId)
+      // 整个回填只认开始时的激活模型；中途切换则停止，下一轮按新模型重来
+      const modelId = activeEmbeddingModelId()
+      const pending = this.repo.getChunksNeedingEmbed(documentId, modelId)
       if (!pending.length) return
 
       // 清旧向量（重解析遗留 chunk_id / 半成品），再全量写入未嵌入块
       await this.vectorStore.deleteByDocument(documentId)
-      this.repo.clearChunkEmbeddedAt(documentId)
+      this.repo.clearChunkEmbeddedAt(documentId, modelId)
       const chunks = this.repo.getChunks(documentId)
       if (!chunks.length) return
 
       const batchSize = resolveEmbedBatchSize()
       for (let i = 0; i < chunks.length; i += batchSize) {
+        if (activeEmbeddingModelId() !== modelId) return
         const batch = chunks.slice(i, i + batchSize)
         const vectors = await this.embedding.embedPassages(batch.map(c => c.text))
-        if (!vectors) return
-        await this.vectorStore.upsert(
+        if (!vectors || activeEmbeddingModelId() !== modelId) return
+        const written = await this.vectorStore.upsert(
           batch.map((c, idx) => ({
             chunk_id: c.id,
             document_id: c.document_id,
@@ -549,11 +552,58 @@ export class DocLibraryService {
             vector: vectors[idx] ?? [],
           })).filter(r => r.vector.length > 0),
         )
-        this.repo.markChunksEmbedded(batch.map(c => c.id))
+        // 只标记确实写入的块（维度不符被拒的不记，下一轮重试）；旧实现无返回值视为全写入
+        const ok = Array.isArray(written) ? new Set(written) : null
+        const ids = batch.map(c => c.id).filter(id => !ok || ok.has(id))
+        this.repo.markChunksEmbedded(ids, undefined, modelId)
       }
     } catch {
       // 向量失败不影响入库 / FTS
     }
+  }
+
+  /** 当前模型尚有未嵌入块的文档 id（按 id 排序，游标 after 之后），排除 news */
+  private pendingDocumentIds(modelId: string, after: string, limit: number): string[] {
+    const rows = this.db.prepare(`
+      SELECT DISTINCT c.document_id AS document_id
+      FROM chunks c
+      JOIN parse_artifacts pa ON pa.document_id = c.document_id
+      JOIN documents d ON d.id = c.document_id
+      LEFT JOIN chunk_embeddings ce ON ce.chunk_id = c.id AND ce.model_id = ?
+      WHERE pa.status = 'ready'
+        AND ce.chunk_id IS NULL
+        AND COALESCE(d.source_type, 'report') != 'news'
+        AND c.document_id > ?
+      ORDER BY c.document_id ASC
+      LIMIT ?
+    `).all(modelId, after, limit) as Array<{ document_id: string }>
+    return rows.map(r => r.document_id)
+  }
+
+  /**
+   * 切换模型后的多轮限速回填：按文档 id 游标分批推进（单个文档失败不会卡住后面的），
+   * 不重置标记（chunk_embeddings 已按模型记录缺口）；轮数有上限；激活模型再变则停止。
+   */
+  async backfillActiveModel(): Promise<number> {
+    const modelId = activeEmbeddingModelId()
+    const opts = resolveLanceRebuildBackfillOptions()
+    const batch = opts.limit ?? 8
+    const maxRounds = Math.max(1, envNonNegInt('OPPTRIX_LANCE_BACKFILL_MAX_ROUNDS', 200))
+    let cursor = ''
+    let done = 0
+    for (let round = 0; round < maxRounds; round++) {
+      const ids = this.pendingDocumentIds(modelId, cursor, batch)
+      if (!ids.length) break
+      for (const id of ids) {
+        if (activeEmbeddingModelId() !== modelId) return done
+        await this.scheduleEmbed(id)
+        done += 1
+      }
+      cursor = ids[ids.length - 1]
+      if (ids.length < batch) break
+      if ((opts.delayMs ?? 0) > 0) await new Promise<void>(r => setTimeout(r, opts.delayMs))
+    }
+    return done
   }
 
   /** 模型安装 / Lance 重建后回填未嵌入文档（排除 news）；可限速 */
@@ -571,16 +621,7 @@ export class DocLibraryService {
       this.repo.clearEmbeddedAtForVectorEligible()
     }
 
-    const rows = this.db.prepare(`
-      SELECT DISTINCT c.document_id
-      FROM chunks c
-      JOIN parse_artifacts pa ON pa.document_id = c.document_id
-      JOIN documents d ON d.id = c.document_id
-      WHERE pa.status = 'ready'
-        AND c.embedded_at IS NULL
-        AND COALESCE(d.source_type, 'report') != 'news'
-      LIMIT ?
-    `).all(limit) as Array<{ document_id: string }>
+    const rows = this.pendingDocumentIds(activeEmbeddingModelId(), '', limit).map(document_id => ({ document_id }))
 
     let n = 0
     if (concurrency <= 1) {
@@ -675,6 +716,24 @@ export class DocLibraryService {
     opts: DocSearchOpts = {},
   ): Promise<FtsSearchHit[]> {
     return searchHybridChunks(this.db, query, {
+      sessionId,
+      scope: opts.scope,
+      sourceType: opts.sourceType,
+      attachmentId: opts.attachmentId,
+      documentId: opts.documentId,
+      limit: opts.limit,
+      embedding: this.embedding,
+      vectorStore: this.vectorStore,
+    })
+  }
+
+  /** 同 searchHybrid，另带 found / reason（未命中的显式信号） */
+  async searchHybridDetailed(
+    sessionId: string,
+    query: string,
+    opts: DocSearchOpts = {},
+  ): Promise<HybridSearchResult> {
+    return searchHybridDetailed(this.db, query, {
       sessionId,
       scope: opts.scope,
       sourceType: opts.sourceType,

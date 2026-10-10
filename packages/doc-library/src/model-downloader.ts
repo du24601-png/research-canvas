@@ -9,13 +9,21 @@ import path from 'node:path'
 import { finished } from 'node:stream/promises'
 import {
   embeddingModelDir,
+  embeddingModelDirFor,
+  listEmbeddingModelSearchDirsFor,
   activeEmbeddingModelId,
   EMBEDDING_MODEL_ID,
   getBundledEmbeddingModelDir,
   listEmbeddingModelSearchDirs,
   type EmbeddingModelSource,
 } from './paths.js'
-import { resolveEmbeddingModelSpec } from './embedding-models.js'
+import {
+  AUTO_MODEL_ORDER,
+  EMBEDDING_MODELS,
+  resetEmbeddingModelSelectionCache,
+  resolveEmbeddingModelSpec,
+  type EmbeddingModelSpec,
+} from './embedding-models.js'
 
 const DOWNLOAD_USER_AGENT = 'Opptrix-Desktop/1.0'
 const DEFAULT_TIMEOUT_MS = 120_000
@@ -31,12 +39,12 @@ export const E5_MODEL_FILES = [
 
 const OPTIONAL_FILES = new Set<string>(['special_tokens_map.json'])
 
-const MODELSCOPE_REPO = String(
-  process.env.OPPTRIX_E5_MODELSCOPE_REPO ?? 'Xenova/multilingual-e5-small',
-).replace(/^\/+|\/+$/g, '')
-const HF_REPO = String(
-  process.env.OPPTRIX_E5_HF_REPO ?? 'Xenova/multilingual-e5-small',
-).replace(/^\/+|\/+$/g, '')
+function repoOf(spec: EmbeddingModelSpec, kind: 'modelscope' | 'hf'): string {
+  // e5 保留历史 env 覆盖；其它模型取注册表首个仓库（ModelScope 通常同名镜像）
+  const envKey = kind === 'modelscope' ? 'OPPTRIX_E5_MODELSCOPE_REPO' : 'OPPTRIX_E5_HF_REPO'
+  const fromEnv = spec.id === EMBEDDING_MODEL_ID ? process.env[envKey] : undefined
+  return String(fromEnv ?? spec.hubRepos[0] ?? '').replace(/^\/+|\/+$/g, '')
+}
 
 function modelscopeBase(): string {
   return String(process.env.OPPTRIX_MODELSCOPE_BASE ?? 'https://modelscope.cn').replace(/\/$/, '')
@@ -46,12 +54,12 @@ function hfMirrorBase(): string {
   return String(process.env.OPPTRIX_HF_MIRROR ?? 'https://hf-mirror.com').replace(/\/$/, '')
 }
 
-function buildModelScopeUrl(filename: string): string {
-  return `${modelscopeBase()}/models/${MODELSCOPE_REPO}/resolve/master/${filename}`
+function buildModelScopeUrl(spec: EmbeddingModelSpec, filename: string): string {
+  return `${modelscopeBase()}/models/${repoOf(spec, 'modelscope')}/resolve/master/${filename}`
 }
 
-function buildHfUrl(base: string, filename: string): string {
-  return `${base}/${HF_REPO}/resolve/main/${filename}?download=true`
+function buildHfUrl(base: string, spec: EmbeddingModelSpec, filename: string): string {
+  return `${base}/${repoOf(spec, 'hf')}/resolve/main/${filename}?download=true`
 }
 
 export type DownloadProgress = {
@@ -74,17 +82,16 @@ function looksLikeHtmlBody(head: Uint8Array): boolean {
   return prefix.startsWith('<!doctype') || prefix.startsWith('<html')
 }
 
-function sourcesFor(filename: string): Array<{ label: string; url: string }> {
+function sourcesFor(spec: EmbeddingModelSpec, filename: string): Array<{ label: string; url: string }> {
   return [
-    { label: 'modelscope', url: buildModelScopeUrl(filename) },
-    { label: 'hf-mirror', url: buildHfUrl(hfMirrorBase(), filename) },
-    { label: 'huggingface', url: buildHfUrl('https://huggingface.co', filename) },
+    { label: 'modelscope', url: buildModelScopeUrl(spec, filename) },
+    { label: 'hf-mirror', url: buildHfUrl(hfMirrorBase(), spec, filename) },
+    { label: 'huggingface', url: buildHfUrl('https://huggingface.co', spec, filename) },
   ]
 }
 
-function missingRequiredFiles(modelDir: string): string[] {
+function missingRequiredFiles(modelDir: string, spec: EmbeddingModelSpec = resolveEmbeddingModelSpec()): string[] {
   const missingFiles: string[] = []
-  const spec = resolveEmbeddingModelSpec()
   const files: readonly string[] = spec.id === EMBEDDING_MODEL_ID ? E5_MODEL_FILES : spec.requiredFiles
   for (const file of files) {
     if (OPTIONAL_FILES.has(file)) continue
@@ -212,6 +219,9 @@ async function downloadToFile(
       }
       fileStream.end()
       await finished(fileStream)
+      if (safeTotal !== null && received !== safeTotal) {
+        throw new Error(`incomplete download (${received}/${safeTotal} bytes)`)
+      }
     } catch (err) {
       fileStream.destroy()
       throw err
@@ -221,7 +231,21 @@ async function downloadToFile(
   }
 }
 
+/** 下载后校验：权重文件至少 1MB；JSON 文件必须可解析（挡住错误页 / 截断） */
+async function validateDownloadedFile(filename: string, filePath: string): Promise<void> {
+  const stat = await fs.promises.stat(filePath)
+  if (filename.endsWith('.onnx')) {
+    if (stat.size < 1_000_000) throw new Error(`file too small (${stat.size} bytes)`)
+    return
+  }
+  if (filename.endsWith('.json')) {
+    if (stat.size < 2) throw new Error('empty json')
+    JSON.parse(await fs.promises.readFile(filePath, 'utf8'))
+  }
+}
+
 async function downloadFileFromSources(
+  spec: EmbeddingModelSpec,
   filename: string,
   targetPath: string,
   opts: {
@@ -234,7 +258,7 @@ async function downloadFileFromSources(
   const tempPath = `${targetPath}.download`
   const errors: string[] = []
 
-  for (const source of sourcesFor(filename)) {
+  for (const source of sourcesFor(spec, filename)) {
     try {
       await downloadToFile(source.url, tempPath, {
         timeoutMs: opts.timeoutMs,
@@ -247,6 +271,7 @@ async function downloadFileFromSources(
           })
         },
       })
+      await validateDownloadedFile(filename, tempPath)
       await fs.promises.rename(tempPath, targetPath)
       return
     } catch (err) {
@@ -264,41 +289,75 @@ async function downloadFileFromSources(
   throw new Error(`无法下载语义检索模型文件 ${filename}（${errors.join('; ')}）`)
 }
 
+/** 未指定模型时：env 显式选择优先；否则下载自动选择的首选模型（bge-small-zh） */
+function resolveDownloadSpec(modelId?: string): EmbeddingModelSpec {
+  const byId = modelId ? EMBEDDING_MODELS[modelId] : undefined
+  if (modelId && !byId) throw new Error(`未知的语义检索模型：${modelId}`)
+  if (byId) return byId
+  if (process.env.DOC_LIBRARY_EMBEDDING_MODEL?.trim()) return resolveEmbeddingModelSpec()
+  return EMBEDDING_MODELS[AUTO_MODEL_ORDER[0]]
+}
+
+/** 下载目标模型需要的必备文件数（进度条分母；不含可选文件） */
+export function requiredDownloadFileCount(modelId?: string): number {
+  const spec = resolveDownloadSpec(modelId)
+  const files: readonly string[] = spec.id === EMBEDDING_MODEL_ID ? E5_MODEL_FILES : spec.requiredFiles
+  return files.filter(f => !OPTIONAL_FILES.has(f)).length
+}
+
+/**
+ * 下载语义模型到 DOC_LIBRARY_MODELS_DIR（或用户 llms 目录）；仅取必备文件。
+ * 不会在启动或测试中自动触发，需由设置页 / 安装任务显式调用。
+ */
 export async function downloadEmbeddingModel(opts: {
   modelDir?: string
+  modelId?: string
   timeoutMs?: number
   onProgress?: (p: DownloadProgress) => void
 } = {}): Promise<EmbeddingModelStatus> {
-  if (!opts.modelDir && activeEmbeddingModelId() !== EMBEDDING_MODEL_ID) {
-    throw new Error('当前选择的语义模型需用 scripts/download-embedding-models.mjs 预先下载')
+  const spec = resolveDownloadSpec(opts.modelId)
+  const modelDir = opts.modelDir ?? embeddingModelDirFor(spec.id)
+  // 目标模型已在任一搜索目录就绪（含内置）则直接返回
+  if (!opts.modelDir) {
+    const ready = listEmbeddingModelSearchDirsFor(spec.id)
+      .find(dir => missingRequiredFiles(dir, spec).length === 0)
+    if (ready) {
+      resetEmbeddingModelSelectionCache()
+      return statusFor(spec, ready)
+    }
   }
-  // 下载始终写入用户目录；bundled 已就绪时直接返回
-  if (!opts.modelDir && isEmbeddingModelInstalled()) {
-    return getEmbeddingModelStatus()
-  }
-  const modelDir = opts.modelDir ?? embeddingModelDir()
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS
   await fs.promises.mkdir(modelDir, { recursive: true })
 
-  for (const file of E5_MODEL_FILES) {
+  const files: readonly string[] = spec.id === EMBEDDING_MODEL_ID ? E5_MODEL_FILES : spec.requiredFiles
+  for (const file of files) {
     const target = path.join(modelDir, file)
     if (fs.existsSync(target)) continue
     try {
-      await downloadFileFromSources(file, target, {
-        timeoutMs,
-        onProgress: opts.onProgress,
-      })
+      await downloadFileFromSources(spec, file, target, { timeoutMs, onProgress: opts.onProgress })
     } catch (err) {
       if (OPTIONAL_FILES.has(file)) continue
       throw err
     }
   }
 
-  const verified = verifyEmbeddingModel(modelDir)
-  if (!verified.ok) {
-    throw new Error(`语义检索模型校验失败，缺少：${verified.missingFiles.join(', ')}`)
+  const missing = missingRequiredFiles(modelDir, spec)
+  if (missing.length) {
+    throw new Error(`语义检索模型校验失败，缺少：${missing.join(', ')}`)
   }
-  return getEmbeddingModelStatus(modelDir)
+  resetEmbeddingModelSelectionCache()
+  return statusFor(spec, modelDir)
+}
+
+function statusFor(spec: EmbeddingModelSpec, dir: string): EmbeddingModelStatus {
+  const missingFiles = missingRequiredFiles(dir, spec)
+  return {
+    installed: missingFiles.length === 0,
+    modelId: spec.id,
+    dir,
+    missingFiles,
+    source: missingFiles.length === 0 ? sourceForDir(dir) : 'missing',
+  }
 }
 
 /** 仅删除用户目录副本；永不删除安装包内置文件。 */

@@ -50,11 +50,7 @@ function scheduleEmbedPendingAfterEnable(): void {
         if (!emb.isReady()) return
         const svc = mod.getDocLibraryService()
         svc.setEmbeddingService(emb)
-        const opts = mod.resolveLanceRebuildBackfillOptions()
-        await svc.embedPendingDocuments({
-          ...opts,
-          concurrency: 1,
-        })
+        await svc.backfillActiveModel()
       } catch {
         /* background；回填失败不影响检索主路径 */
       }
@@ -164,6 +160,11 @@ export class TransformersE5Backend implements EmbeddingBackend {
   private pipe: FeaturePipeline | null = null
   private loadPromise: Promise<void> | null = null
   private readonly modelDir: string
+
+  /** 本后端绑定的模型 id（运行中切换模型时用于判断是否过期） */
+  get modelId(): string {
+    return (this.spec as EmbeddingModelSpec | undefined)?.id ?? ''
+  }
 
   constructor(modelDir?: string, spec: EmbeddingModelSpec = resolveEmbeddingModelSpec()) {
     this.spec = spec
@@ -289,8 +290,15 @@ export class EmbeddingService {
     return this.backend
   }
 
+  /** 已加载的真实模型后端是否对应非当前激活模型（运行中切换了模型） */
+  private isStale(): boolean {
+    const b = this.backend
+    if (!(b instanceof TransformersE5Backend)) return false
+    return Boolean(b.modelId) && b.modelId !== resolveEmbeddingModelSpec().id
+  }
+
   isReady(): boolean {
-    return this.backend?.isReady() ?? false
+    return (this.backend?.isReady() ?? false) && !this.isStale()
   }
 
   getLastUsedAt(): number {
@@ -303,7 +311,8 @@ export class EmbeddingService {
    * TransformersE5Backend 在 pipe 已卸但实例仍挂着时，允许再 ensureLoaded。
    */
   async tryEnableDefaultBackend(): Promise<boolean> {
-    if (this.backend?.isReady()) return true
+    await this.dropStaleBackend()
+    if (this.isReady()) return true
     // 空闲卸 pipe 后实例仍在：允许再加载，避免 isReady=false 且 if (backend) return false 卡住
     if (this.backend instanceof TransformersE5Backend) {
       const ok = await this.backend.ensureLoaded()
@@ -326,14 +335,27 @@ export class EmbeddingService {
     return true
   }
 
+  /** 激活模型变了（如下载完 bge）：卸掉旧模型后端并允许重新调度回填 */
+  private async dropStaleBackend(): Promise<void> {
+    const b = this.backend
+    if (!(b instanceof TransformersE5Backend)) return
+    if (!b.modelId || b.modelId === resolveEmbeddingModelSpec().id) return
+    await b.dispose().catch(() => undefined)
+    this.backend = null
+    embedPendingAfterEnableScheduled = false
+  }
+
   async embedQuery(text: string): Promise<number[] | null> {
-    if (!this.backend?.isReady()) {
+    if (!this.isReady()) {
       const enabled = await this.tryEnableDefaultBackend()
       if (!enabled || !this.backend) return null
     }
     try {
-      const vec = await this.backend.embedQuery(text)
+      const backend = this.backend
+      if (!backend) return null
+      const vec = await backend.embedQuery(text)
       this.touchLastUsed()
+      if (this.isStale()) return null
       return vec
     } catch {
       return null
@@ -342,13 +364,17 @@ export class EmbeddingService {
 
   async embedPassages(texts: string[]): Promise<number[][] | null> {
     if (!texts.length) return []
-    if (!this.backend?.isReady()) {
+    if (!this.isReady()) {
       const enabled = await this.tryEnableDefaultBackend()
       if (!enabled || !this.backend) return null
     }
     try {
-      const vecs = await this.backend.embedPassages(texts)
+      const backend = this.backend
+      if (!backend) return null
+      const vecs = await backend.embedPassages(texts)
       this.touchLastUsed()
+      // 推理期间激活模型被切换：向量属于旧模型，丢弃
+      if (this.isStale()) return null
       return vecs
     } catch {
       return null

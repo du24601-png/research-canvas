@@ -34,6 +34,8 @@ export interface FtsSearchRow {
   page: number
   excerpt: string
   rank: number
+  /** natural = 整句 gram 近似命中；缺省 = 精确关键词命中 */
+  match?: 'natural'
 }
 
 export interface FtsSearchChunksOpts {

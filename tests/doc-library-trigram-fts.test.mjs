@@ -78,10 +78,10 @@ describe('doc-library trigram FTS migration + backfill', () => {
     delete process.env.OPPTRIX_DATA_DIR
   })
 
-  it('schema version is 7 with fts_chunks kept', () => {
+  it('schema version is 8 with fts_chunks kept', () => {
     const db = openDocLibraryDb(path.join(dir, 'fresh.db'))
-    assert.equal(DOC_LIBRARY_SCHEMA_VERSION, 7)
-    assert.equal(detectAppliedSchemaVersion(db), 7)
+    assert.equal(DOC_LIBRARY_SCHEMA_VERSION, 8)
+    assert.equal(detectAppliedSchemaVersion(db), 8)
     const names = db.prepare("SELECT name FROM sqlite_master WHERE name LIKE 'fts_chunks%'").all().map(r => r.name)
     assert.ok(names.includes('fts_chunks'))
     assert.ok(names.includes('fts_chunks_tri'))
@@ -99,13 +99,13 @@ describe('doc-library trigram FTS migration + backfill', () => {
     db1.close()
 
     const db = openDocLibraryDb(dbPath)
-    assert.equal(detectAppliedSchemaVersion(db), 7)
+    assert.equal(detectAppliedSchemaVersion(db), 8)
     assert.equal(triCount(db), 3)
     assert.ok(readTrigramBackfillState(db)?.doneAt)
     assert.equal(db.prepare('SELECT COUNT(*) AS n FROM fts_chunks').get().n, 3, 'old fts kept')
     migrateDocLibrarySchema(db)
     migrateDocLibrarySchema(db)
-    assert.equal(detectAppliedSchemaVersion(db), 7)
+    assert.equal(detectAppliedSchemaVersion(db), 8)
     assert.equal(triCount(db), 3, 'no duplicate rows after re-migrate')
     const hits = searchFtsChunks(db, '毛利率', { sessionId: 's1' })
     assert.equal(hits.length, 1)

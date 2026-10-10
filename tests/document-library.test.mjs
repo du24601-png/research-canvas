@@ -62,7 +62,7 @@ function listGraphTables(db) {
 describe('doc-library schema', () => {
   it('MIGRATION_STEPS length matches DOC_LIBRARY_SCHEMA_VERSION', () => {
     assert.equal(MIGRATION_STEPS.length, DOC_LIBRARY_SCHEMA_VERSION)
-    assert.equal(DOC_LIBRARY_SCHEMA_VERSION, 7)
+    assert.equal(DOC_LIBRARY_SCHEMA_VERSION, 8)
   })
 
   it('migrate is idempotent', () => {

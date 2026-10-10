@@ -1,5 +1,5 @@
 /**
- * Parse Router：按 kind/mime 选首引擎；PDF：l0 →（弱文本 / deepParse）→ OCR。
+ * Parse Router：按 kind/mime 选首引擎；PDF：l0 →（弱文本/乱码）pdfium 兜底 →（仍弱 / deepParse）→ OCR。
  * 已移除 pdfplumber L1 默认路径；不把 AGPL 链入主进程。
  */
 import type { DocumentKind, ParseEngineId, ParseRunOpts, ParseRunResult, ParseRunner } from './types.js'
@@ -9,6 +9,8 @@ import {
   isWeakText,
   metricsFromParseResult,
   pickBetterResult,
+  pickFallbackResult,
+  shouldTryPdfFallback,
   type ParseQualityMetrics,
 } from './parse-quality.js'
 
@@ -119,6 +121,8 @@ export type ParseRouterDeps = {
   text?: ParseRunner | null
   office?: ParseRunner | null
   pdf: ParseRunner
+  /** PDF 基础整理兜底（PDFium 文本层）；首选结果缺失 / 弱 / 乱码时在 OCR 之前尝试 */
+  pdfFallback?: ParseRunner | null
   ocr?: ParseRunner | null
   /** @deprecated 已忽略 */
   l0?: ParseRunner
@@ -139,6 +143,22 @@ function withUsedEngine(result: ParseRunResult, runner: ParseRunner): ParseRunRe
     ...result,
     usedEngineId: runner.engineId,
     usedEngineVersion: runner.engineVersion,
+  }
+}
+
+type StepOutcome = { result?: ParseRunResult; error?: string }
+
+async function runStep(
+  runner: ParseRunner,
+  blob: Buffer,
+  opts: ParseRunOpts,
+): Promise<StepOutcome> {
+  try {
+    const tagged = withUsedEngine(await runner.run(blob, opts), runner)
+    if (tagged.error && tagged.charCount <= 0) return { error: tagged.error }
+    return { result: tagged, error: tagged.error }
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : '整理失败' }
   }
 }
 
@@ -165,6 +185,19 @@ export class ParseRouter implements ParseRunner {
     if (id === 'pdf-extract-l0') return this.pdfRunner()
     if (isOcrEngineId(id)) return this.deps.ocr ?? this.deps.l2 ?? null
     return null
+  }
+
+  /** 首选 PDF 结果缺失 / 弱 / 乱码 / 文字密度低 → 试 PDFium 文本层（不计入升阶次数） */
+  private async runPdfFallback(
+    blob: Buffer,
+    opts: ParseRunOpts,
+    best: ParseRunResult | null,
+  ): Promise<StepOutcome> {
+    const fallback = this.deps.pdfFallback
+    if (!fallback) return {}
+    if (best && !shouldTryPdfFallback(metricsFromParseResult(best))) return {}
+    if (!(await runnerAvailable(fallback))) return {}
+    return runStep(fallback, blob, opts)
   }
 
   async run(blob: Buffer, opts: ParseRunOpts = {}): Promise<ParseRunResult> {
@@ -213,17 +246,14 @@ export class ParseRouter implements ParseRunner {
       }
       if (!runner) continue
 
-      try {
-        const raw = await runner.run(blob, opts)
-        const tagged = withUsedEngine(raw, runner)
-        if (tagged.error && tagged.charCount <= 0) {
-          lastError = tagged.error
-          continue
-        }
-        best = best ? pickBetterResult(best, tagged) : tagged
-        if (tagged.error) lastError = tagged.error
-      } catch (err) {
-        lastError = err instanceof Error ? err.message : '整理失败'
+      const outcome = await runStep(runner, blob, opts)
+      if (outcome.error) lastError = outcome.error
+      if (outcome.result) best = best ? pickBetterResult(best, outcome.result) : outcome.result
+
+      if (next === 'pdf-extract-l0') {
+        const fb = await this.runPdfFallback(blob, opts, best)
+        if (fb.result) best = best ? pickFallbackResult(best, fb.result) : fb.result
+        else if (fb.error && !best) lastError = fb.error
       }
     }
 

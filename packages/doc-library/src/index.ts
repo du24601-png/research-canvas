@@ -169,8 +169,28 @@ export {
   WEAK_ABS_CHAR_COUNT,
   WEAK_CHARS_PER_PAGE,
   WEAK_EMPTY_PAGE_RATIO,
+  measureTextQuality,
+  isGarbledText,
+  GARBLED_SCORE_THRESHOLD,
+  pickFallbackResult,
+  shouldTryPdfFallback,
 } from './parse-quality.js'
-export type { ParseQualityMetrics } from './parse-quality.js'
+export type { ParseQualityMetrics, TextQuality } from './parse-quality.js'
+export {
+  createPdfiumL0Runner,
+  extractPdfPagesWithPdfium,
+  normalizePdfiumText,
+  PDFIUM_L0_ENGINE_VERSION,
+} from './engines/pdfium-l0.js'
+export type { PdfiumL0Options } from './engines/pdfium-l0.js'
+export {
+  buildPageChunks,
+  rechunkMarkdown,
+  CHUNK_TARGET_CHARS,
+  CHUNK_OVERLAP_RATIO,
+  TABLE_BLOCK_MAX_FACTOR,
+} from './engines/chunk-text.js'
+export type { ChunkOptions } from './engines/chunk-text.js'
 export {
   createTextL0Runner,
   TEXT_L0_ENGINE_VERSION,
@@ -378,3 +398,10 @@ export async function closeDocLibraryService(): Promise<void> {
 export function resetDocLibraryServiceForTests(): void {
   void closeDocLibraryService()
 }
+export {
+  selectEmbeddingModel,
+  describeEmbeddingSelection,
+  resetEmbeddingModelSelectionCache,
+  AUTO_MODEL_ORDER,
+} from './embedding-models.js'
+export type { EmbeddingModelSelection, EmbeddingSelectionReason } from './embedding-models.js'
