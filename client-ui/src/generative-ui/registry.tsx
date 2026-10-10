@@ -8,7 +8,9 @@ import {
 import type { Dataset } from '../chat/research-canvas/types'
 import ComparisonView from './ComparisonView'
 import EvidencePanel from './EvidencePanel'
+import KpiRow from './KpiRow'
 import MissingData from './MissingData'
+import NumberSentence from './NumberSentence'
 import TrendView from './TrendView'
 import type { SpecActionHandler } from './types'
 
@@ -21,12 +23,16 @@ export function renderBlock(
 ): ReactElement {
   if (block.component === 'ComparisonView') return <ComparisonView key={key} block={block} getDataset={getDataset} onAction={onAction} />
   if (block.component === 'TrendView') return <TrendView key={key} block={block} getDataset={getDataset} onAction={onAction} />
+  if (block.component === 'KpiRow') return <KpiRow key={key} block={block} getDataset={getDataset} />
+  if (block.component === 'NumberSentence') return <NumberSentence key={key} block={block} getDataset={getDataset} />
   if (block.component === 'EvidencePanel') return <EvidencePanel key={key} block={block} getDataset={getDataset} />
   return <MissingData key={key} block={block} getDataset={getDataset} />
 }
 
 export function datasetRefs(datasets: readonly Dataset[]): Map<string, ResearchUiDatasetRef> {
   return new Map(datasets.map(dataset => [dataset.id, {
+    entityIds: dataset.entities.map(entity => entity.id),
+    periods: [...dataset.periods],
     ...(dataset.parentDatasetId ? { parentDatasetId: dataset.parentDatasetId } : {}),
     ...(dataset.transform ? { transformType: dataset.transform.type } : {}),
   }]))

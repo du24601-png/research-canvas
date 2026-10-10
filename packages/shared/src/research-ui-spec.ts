@@ -6,9 +6,11 @@
  * 说明：计划用 zod（F2-A），但本机安装依赖被拒，先用手写严格校验，规则与 zod 版一致：
  * 未知字段拒绝、未知组件/动作拒绝、未知 datasetId 拒绝、标题里不许出现年份以外的数字。
  */
+import { checkKpiPeriod, checkNumberSentenceTemplate, type ResearchUiTextDatasetRef } from './research-ui-spec-text.js'
+
 export const RESEARCH_UI_SPEC_VERSION = 1
 
-export const RESEARCH_UI_COMPONENTS = ['ComparisonView', 'TrendView', 'EvidencePanel', 'MissingData'] as const
+export const RESEARCH_UI_COMPONENTS = ['ComparisonView', 'TrendView', 'EvidencePanel', 'MissingData', 'KpiRow', 'NumberSentence'] as const
 export type ResearchUiComponent = typeof RESEARCH_UI_COMPONENTS[number]
 
 export const RESEARCH_UI_ACTIONS = ['pin', 'open_sources', 'highlight_largest_change', 'rerun', 'adjust'] as const
@@ -19,14 +21,18 @@ export type ResearchUiBlock =
   | { component: 'TrendView'; datasetId: string; deltaDatasetId?: string; title?: string; actions?: ResearchUiAction[] }
   | { component: 'EvidencePanel'; datasetIds: string[]; title?: string }
   | { component: 'MissingData'; datasetId: string; title?: string }
+  /** 至多三个大数字：数值与较上年变化都由前端代码从 Dataset 取/算 */
+  | { component: 'KpiRow'; datasetId: string; period?: string; title?: string }
+  /** 一句结论：模板只含占位符，数字由代码填并做成可追溯的引用 */
+  | { component: 'NumberSentence'; datasetId: string; template: string }
 
 export interface ResearchUiSpec {
   version: typeof RESEARCH_UI_SPEC_VERSION
   blocks: ResearchUiBlock[]
 }
 
-/** 校验时需要知道的 Dataset 元信息（不含数值） */
-export interface ResearchUiDatasetRef {
+/** 校验时需要知道的 Dataset 元信息（不含数值）；entityIds / periods 供 KpiRow、NumberSentence 校验 */
+export interface ResearchUiDatasetRef extends ResearchUiTextDatasetRef {
   parentDatasetId?: string
   transformType?: string
 }
@@ -44,6 +50,8 @@ const FIELDS: Record<ResearchUiComponent, readonly string[]> = {
   TrendView: ['component', 'datasetId', 'deltaDatasetId', 'title', 'actions'],
   EvidencePanel: ['component', 'datasetIds', 'title'],
   MissingData: ['component', 'datasetId', 'title'],
+  KpiRow: ['component', 'datasetId', 'period', 'title'],
+  NumberSentence: ['component', 'datasetId', 'template'],
 }
 
 const ACTIONS_FOR: Record<ResearchUiComponent, readonly ResearchUiAction[]> = {
@@ -51,6 +59,8 @@ const ACTIONS_FOR: Record<ResearchUiComponent, readonly ResearchUiAction[]> = {
   TrendView: ['pin', 'open_sources', 'highlight_largest_change', 'rerun', 'adjust'],
   EvidencePanel: [],
   MissingData: [],
+  KpiRow: [],
+  NumberSentence: [],
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -111,6 +121,23 @@ function checkDelta(raw: unknown, parentId: string, at: string, known: ReadonlyM
   return id
 }
 
+function parseTextBlock(
+  raw: Record<string, unknown>,
+  component: 'KpiRow' | 'NumberSentence',
+  at: string,
+  known: ReadonlyMap<string, ResearchUiDatasetRef>,
+  errors: string[],
+): ResearchUiBlock {
+  const datasetId = checkDatasetId(raw.datasetId, `${at}.datasetId`, known, errors)
+  const ref = datasetId ? known.get(datasetId) : undefined
+  if (component === 'NumberSentence') {
+    return { component, datasetId, template: checkNumberSentenceTemplate(raw.template, ref, at, errors) }
+  }
+  const title = checkTitle(raw.title, at, errors)
+  const period = checkKpiPeriod(raw.period, ref, at, errors)
+  return { component, datasetId, ...(period ? { period } : {}), ...(title ? { title } : {}) }
+}
+
 function parseBlock(raw: unknown, at: string, known: ReadonlyMap<string, ResearchUiDatasetRef>, errors: string[]): ResearchUiBlock | null {
   if (!isRecord(raw) || !isComponent(raw.component)) {
     errors.push(`${at} 使用了未注册组件 ${isRecord(raw) ? String(raw.component) : ''}`)
@@ -120,6 +147,7 @@ function parseBlock(raw: unknown, at: string, known: ReadonlyMap<string, Researc
   for (const key of Object.keys(raw)) {
     if (!FIELDS[component].includes(key)) errors.push(`${at} 不允许字段 ${key}`)
   }
+  if (component === 'KpiRow' || component === 'NumberSentence') return parseTextBlock(raw, component, at, known, errors)
   const title = checkTitle(raw.title, at, errors)
   const titled = title ? { title } : {}
   if (component === 'EvidencePanel') return { component, datasetIds: checkDatasetIds(raw.datasetIds, `${at}.datasetIds`, known, errors), ...titled }

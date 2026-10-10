@@ -57,6 +57,15 @@ export const SPEC_DEMO_C = {
   ],
 }
 
+/** Demo D：一句带引用的结论 + 关键数字（数字全部由代码从 NET_MARGIN 取/算） */
+export const SPEC_DEMO_TEXT = {
+  version: 1,
+  blocks: [
+    { component: 'NumberSentence', datasetId: NET_MARGIN.id, template: `{entity:${A.id}} 2025 年净利率 {value:${A.id}@2025}，较上年 {delta:${A.id}@2025}，比 {entity:${B.id}} 高 {gap:${A.id}@${B.id}@2025}。` },
+    { component: 'KpiRow', datasetId: NET_MARGIN.id },
+  ],
+}
+
 /** 必须整份拒绝的 Spec */
 export const INVALID_SPECS: Record<string, unknown> = {
   unknownComponent: { version: 1, blocks: [{ component: 'PieOfDoom', datasetIds: [NET_MARGIN.id] }] },
@@ -65,5 +74,8 @@ export const INVALID_SPECS: Record<string, unknown> = {
   numberInTitle: { version: 1, blocks: [{ component: 'TrendView', datasetId: NET_MARGIN.id, title: '净利率 45% 创新高' }] },
   valueField: { version: 1, blocks: [{ component: 'TrendView', datasetId: NET_MARGIN.id, value: 45 }] },
   wrongDelta: { version: 1, blocks: [{ component: 'TrendView', datasetId: ROE.id, deltaDatasetId: NET_MARGIN_DELTA.id }] },
+  digitInSentence: { version: 1, blocks: [{ component: 'NumberSentence', datasetId: NET_MARGIN.id, template: `{entity:${A.id}} 净利率 45%` }] },
+  unknownEntityInSentence: { version: 1, blocks: [{ component: 'NumberSentence', datasetId: NET_MARGIN.id, template: '{value:CN:SH.000001@2025}' }] },
+  kpiUnknownPeriod: { version: 1, blocks: [{ component: 'KpiRow', datasetId: NET_MARGIN.id, period: '2019' }] },
   partlyBad: { version: 1, blocks: [{ component: 'EvidencePanel', datasetIds: [NET_MARGIN.id] }, { component: 'Nope' }] },
 }

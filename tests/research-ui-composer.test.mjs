@@ -28,7 +28,7 @@ const step = (tool, result) => ({ id: tool, tool, label: tool, status: 'done', s
 
 test('composer input is metadata only: no values reach the model', async () => {
   const meta = datasetMetaForComposer(DS)
-  assert.deepEqual(meta, { id: DS.id, metric: '净利率', entities: ['贵州茅台'], periods: ['2024', '2025'], coverage: '1/2', complete: false })
+  assert.deepEqual(meta, { id: DS.id, metric: '净利率', entities: ['贵州茅台'], entityIds: [A.id], periods: ['2024', '2025'], coverage: '1/2', complete: false })
   let seen = ''
   await composeResearchUi({ task: '看茅台净利率', datasets: [DS], chat: async (messages) => { seen = JSON.stringify(messages); return JSON.stringify(GOOD) } })
   assert.equal(seen.includes('52.27'), false)
@@ -50,6 +50,16 @@ test('valid model output becomes a spec; bad output fails closed', async () => {
   assert.ok((await composeResearchUi({ task: 't', datasets: [DS], chat: async () => { throw new Error('timeout') } })).error)
   assert.ok((await composeResearchUi({ task: 't', datasets: [], chat: async () => JSON.stringify(GOOD) })).error)
   assert.equal(extractJsonObject('no braces'), null)
+})
+
+test('composer accepts NumberSentence + KpiRow first and rejects digit leaks', async () => {
+  const lead = { version: 1, blocks: [{ component: 'NumberSentence', datasetId: DS.id, template: `{entity:${A.id}} 2024 年净利率 {value:${A.id}@2024}` }, { component: 'KpiRow', datasetId: DS.id }, ...GOOD.blocks] }
+  let system = ''
+  const ok = await composeResearchUi({ task: 't', datasets: [DS], chat: async (messages) => { system = messages[0].content; return JSON.stringify(lead) } })
+  assert.deepEqual(ok.spec, lead)
+  assert.ok(system.includes('NumberSentence') && system.includes('KpiRow'))
+  const leak = { version: 1, blocks: [{ component: 'NumberSentence', datasetId: DS.id, template: `{entity:${A.id}} 净利率 52.27%` }] }
+  assert.ok((await composeResearchUi({ task: 't', datasets: [DS], chat: async () => JSON.stringify(leak) })).error)
 })
 
 test('turnDatasetIds reads this turn\'s query_data / refine_dataset results only', () => {

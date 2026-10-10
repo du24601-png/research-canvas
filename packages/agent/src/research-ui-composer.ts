@@ -26,6 +26,10 @@ const SYSTEM = [
   '- TrendView {"component":"TrendView","datasetId":id,"actions":[...]}：单个数据集随年份的走势。用户问「哪年变化最大 / 变化明显」时加 "highlight_largest_change"。',
   '- MissingData {"component":"MissingData","datasetId":id}：数据集覆盖不完整时放一个。',
   '- EvidencePanel {"component":"EvidencePanel","datasetIds":[...]}：来源与口径，放在最后，列出用到的数据集。',
+  '- NumberSentence {"component":"NumberSentence","datasetId":id,"template":"..."}：一句结论（≤120 字）。数字一律用占位符，由代码填入：{value:实体id@年份}（该年数值）、{delta:实体id@年份}（较上一年变化，不能用第一个年份）、{gap:实体id@实体id@年份}（前者减后者）、{largestChange}（变化最大的一处）、{entity:实体id}（公司名）。实体id 用下面 entityIds 里的值，年份用 periods 里的值。',
+  '  模板里除 periods 里的年份（须写成「2025 年」或「2023–2025」）外不许出现任何数字：全角数字、百分号、中文数字（三家、近三年、上百、过半、翻番等）都不行，否则整份作废。例：{entity:X}{value:X@2025} 的净利率比 {entity:Y} 高 {gap:X@Y@2025}，{largestChange}。',
+  '- KpiRow {"component":"KpiRow","datasetId":id,"period":"年份(可选)"}：最多三个大数字及较上年变化，数值由代码取。',
+  '只要某个数据集至少有一个实体有数值（coverage 不是 0/…），blocks 先放 NumberSentence，再放 KpiRow，然后才是图表等其它组件。NumberSentence、KpiRow 不带 actions。',
   'actions 只能用 "pin"（钉住）、"open_sources"（查看来源）、"rerun"（再查一次）、"adjust"（让用户说明怎么调整这张图）、"highlight_largest_change"（仅 TrendView）。',
   '只能引用下面列出的 datasetId。可选 "title"，须为中文短语，不得包含数字（年份除外）。你看不到数值，也不得写任何数值。',
 ].join('\n')
@@ -50,6 +54,7 @@ export function datasetMetaForComposer(dataset: ResearchDataset): Record<string,
     id: dataset.id,
     metric: resolveResearchMetric(dataset.metric)?.name ?? dataset.metric,
     entities: dataset.entities.map(entity => entity.name),
+    entityIds: dataset.entities.map(entity => entity.id),
     periods: dataset.periods,
     coverage: `${shape.filled}/${shape.total}`,
     complete: shape.filled === shape.total,
@@ -59,6 +64,8 @@ export function datasetMetaForComposer(dataset: ResearchDataset): Record<string,
 
 function datasetRefs(datasets: readonly ResearchDataset[]): Map<string, ResearchUiDatasetRef> {
   return new Map(datasets.map(dataset => [dataset.id, {
+    entityIds: dataset.entities.map(entity => entity.id),
+    periods: [...dataset.periods],
     ...(dataset.parentDatasetId ? { parentDatasetId: dataset.parentDatasetId } : {}),
     ...(dataset.transform ? { transformType: dataset.transform.type } : {}),
   }]))

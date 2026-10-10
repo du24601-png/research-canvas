@@ -142,6 +142,7 @@ export function describeBlockForQuote(block: ResearchUiBlock, getDataset: (id: s
     .map(getDataset)
     .filter((dataset): dataset is Dataset => Boolean(dataset))
     .map(dataset => `${dataset.entities.map(entity => entity.name).join('、')} ${researchMetricLabel(dataset.metric)}（${periodRange(dataset)}）`)
-  const head = block.title ? `「${block.title}」` : '这部分图表'
+  const title = 'title' in block ? block.title : undefined
+  const head = title ? `「${title}」` : '这部分图表'
   return parts.length ? `${head}：${parts.join('；')}` : head
 }
