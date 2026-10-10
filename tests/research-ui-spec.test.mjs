@@ -130,7 +130,7 @@ test('years in context and non-quantity CJK words are allowed', () => {
   }
 })
 
-test('MetricTable and KeyPoints validate strictly (no actions, known ids, 1–4 datasets)', () => {
+test('MetricTable and KeyPoints validate strictly (no actions, known ids, 1–6 datasets)', () => {
   const raw = { version: 1, blocks: [{ component: 'KeyPoints', datasetIds: [DS] }, { component: 'MetricTable', datasetIds: [DS, DELTA], title: '2023–2025 数值明细' }, { component: 'MetricTable', datasetIds: [DS] }] }
   const result = parseResearchUiSpec(raw, known)
   assert.equal(result.ok, true, JSON.stringify(result.errors))
@@ -169,4 +169,16 @@ test('block limit is 10: a full 个股速览 layout fits, 11 blocks reject', () 
   ]
   assert.equal(parseResearchUiSpec({ version: 1, blocks: ten }, known).ok, true)
   assert.equal(parseResearchUiSpec({ version: 1, blocks: [...ten, { component: 'MissingData', datasetId: DELTA }] }, known).ok, false)
+})
+
+test('list components take up to 6 datasets; ComparisonView stays at 4', () => {
+  const ids = Array.from({ length: 7 }, (_, i) => `research-ds-${String(i).repeat(8)}-0000-4000-8000-000000000000`)
+  const many = new Map(ids.map(id => [id, {}]))
+  const six = ids.slice(0, 6)
+  for (const component of ['MetricTable', 'KeyPoints', 'EvidencePanel']) {
+    assert.equal(parseResearchUiSpec({ version: 1, blocks: [{ component, datasetIds: six }] }, many).ok, true, component)
+    assert.equal(parseResearchUiSpec({ version: 1, blocks: [{ component, datasetIds: ids }] }, many).ok, false, `${component} with 7`)
+  }
+  assert.equal(parseResearchUiSpec({ version: 1, blocks: [{ component: 'ComparisonView', datasetIds: ids.slice(0, 4) }] }, many).ok, true)
+  assert.equal(parseResearchUiSpec({ version: 1, blocks: [{ component: 'ComparisonView', datasetIds: ids.slice(0, 5) }] }, many).ok, false)
 })

@@ -227,7 +227,7 @@ import {
 import type { ChatAttachmentMeta } from './media-types.js'
 import { isLibraryIngestKind, isTranscriptExtractKind } from './media-types.js'
 import { buildUserContentParts, chatMessageContentToText } from './content-parts.js'
-import { runResearchUiComposer } from './research-ui-composer-hook.js'
+import { COMPOSER_MAX_TOKENS, runResearchUiComposer } from './research-ui-composer-hook.js'
 import { runPlanGate } from './research-plan-gate.js'
 
 export interface SessionContextUsage {
@@ -2635,7 +2635,7 @@ export class AgentEngine {
         sessionId,
         task: text,
         steps: toolSteps,
-        chat: async (messages) => chatMessageContentToText((await llm.chat(messages, undefined, signal, { temperature: 0, maxTokens: 800 })).message.content),
+        chat: async (messages) => chatMessageContentToText((await llm.chat(messages, undefined, signal, { temperature: 0, maxTokens: COMPOSER_MAX_TOKENS })).message.content),
         emit,
       }).catch(() => null)
       if (uiStep) toolSteps.push(uiStep)

@@ -115,3 +115,26 @@ test('composer describes MetricTable / KeyPoints / 个股速览 and accepts the 
   const withPoints = { version: 1, blocks: [{ component: 'KeyPoints', datasetIds: [ids[0]], points: ['营收创新高'] }] }
   assert.ok((await composeResearchUi({ task: 't', datasets: sets, chat: async () => JSON.stringify(withPoints) })).error)
 })
+
+test('composer retries once with validator errors, then fails closed', async () => {
+  const calls = []
+  const fixed = await composeResearchUi({
+    task: 't',
+    datasets: [DS],
+    chat: async (messages) => { calls.push(messages); return calls.length === 1 ? 'not json' : JSON.stringify(GOOD) },
+  })
+  assert.ok(fixed.spec, 'second attempt is accepted')
+  assert.equal(calls.length, 2)
+  assert.equal(calls[1].at(-2).role, 'assistant')
+  assert.match(calls[1].at(-1).content, /没通过校验/)
+
+  let n = 0
+  const failed = await composeResearchUi({ task: 't', datasets: [DS], chat: async () => { n += 1; return 'still not json' } })
+  assert.ok(failed.error)
+  assert.equal(n, 2, 'at most one retry')
+
+  let m = 0
+  const thrown = await composeResearchUi({ task: 't', datasets: [DS], chat: async () => { m += 1; throw new Error('timeout') } })
+  assert.ok(thrown.error)
+  assert.equal(m, 1, 'no retry when the model call itself fails')
+})

@@ -12,7 +12,7 @@ export function makeComposerChat(llm) {
     const resp = await fetch(joinCompletionsUrl(llm.baseUrl), {
       method: 'POST',
       headers: { Authorization: `Bearer ${llm.apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: llm.model, messages, temperature: 0, max_tokens: 800 }),
+      body: JSON.stringify({ model: llm.model, messages, temperature: 0, max_tokens: 2400 }),
       signal: AbortSignal.timeout(60_000),
     })
     if (!resp.ok) throw new Error(`LLM HTTP ${resp.status}`)

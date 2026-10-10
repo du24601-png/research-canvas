@@ -45,7 +45,9 @@ export type ResearchUiSpecResult = { ok: true; spec: ResearchUiSpec } | { ok: fa
 
 export const RESEARCH_UI_BLOCK_LIMIT = 10
 const BLOCK_LIMIT = RESEARCH_UI_BLOCK_LIMIT
+/** 对比图最多 4 个数据集（再多读不清）；数值表、要点、来源这类列表组件放宽到 6，覆盖个股速览的 5 个指标 */
 const DATASETS_PER_BLOCK = 4
+const DATASETS_PER_LIST_BLOCK = 6
 const TITLE_MAX = 40
 /** 去掉四位年份后还剩数字 → 视为在 Spec 里写了数值 */
 const YEAR_TOKEN = /(?:19|20)\d{2}/g
@@ -98,9 +100,15 @@ function checkDatasetId(raw: unknown, at: string, known: ReadonlyMap<string, Res
   return raw
 }
 
-function checkDatasetIds(raw: unknown, at: string, known: ReadonlyMap<string, ResearchUiDatasetRef>, errors: string[]): string[] {
-  if (!Array.isArray(raw) || raw.length === 0 || raw.length > DATASETS_PER_BLOCK) {
-    errors.push(`${at} 须包含 1–${DATASETS_PER_BLOCK} 个数据集`)
+function checkDatasetIds(
+  raw: unknown,
+  at: string,
+  known: ReadonlyMap<string, ResearchUiDatasetRef>,
+  errors: string[],
+  limit: number = DATASETS_PER_BLOCK,
+): string[] {
+  if (!Array.isArray(raw) || raw.length === 0 || raw.length > limit) {
+    errors.push(`${at} 须包含 1–${limit} 个数据集`)
     return []
   }
   if (new Set(raw).size !== raw.length) errors.push(`${at} 有重复数据集`)
@@ -159,9 +167,9 @@ function parseBlock(raw: unknown, at: string, known: ReadonlyMap<string, Researc
   if (component === 'KpiRow' || component === 'NumberSentence') return parseTextBlock(raw, component, at, known, errors)
   const title = checkTitle(raw.title, at, errors)
   const titled = title ? { title } : {}
-  if (component === 'MetricTable') return { component, datasetIds: checkDatasetIds(raw.datasetIds, `${at}.datasetIds`, known, errors), ...titled }
-  if (component === 'KeyPoints') return { component, datasetIds: checkDatasetIds(raw.datasetIds, `${at}.datasetIds`, known, errors) }
-  if (component === 'EvidencePanel') return { component, datasetIds: checkDatasetIds(raw.datasetIds, `${at}.datasetIds`, known, errors), ...titled }
+  if (component === 'MetricTable') return { component, datasetIds: checkDatasetIds(raw.datasetIds, `${at}.datasetIds`, known, errors, DATASETS_PER_LIST_BLOCK), ...titled }
+  if (component === 'KeyPoints') return { component, datasetIds: checkDatasetIds(raw.datasetIds, `${at}.datasetIds`, known, errors, DATASETS_PER_LIST_BLOCK) }
+  if (component === 'EvidencePanel') return { component, datasetIds: checkDatasetIds(raw.datasetIds, `${at}.datasetIds`, known, errors, DATASETS_PER_LIST_BLOCK), ...titled }
   if (component === 'MissingData') return { component, datasetId: checkDatasetId(raw.datasetId, `${at}.datasetId`, known, errors), ...titled }
   const actions = checkActions(raw.actions, component, at, errors)
   const extra = { ...(title ? { title } : {}), ...(actions ? { actions } : {}) }
