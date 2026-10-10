@@ -76,3 +76,7 @@
 - Apple, WWDC26 设计原则讲座（[链接](https://developer-rno.apple.com/videos/play/wwdc2026/250)，二手摘要，未直接核对 HIG「Generative AI」一节原文）
 
 改版主界面样张（示例数据）：https://claude.ai/artifact/EBTvcciqHDTcQ7CJ2xAu6g
+
+## 补充（2026-10-10）：简洁优先
+
+Quinn 要求不增加过多按钮、以对话为主。上文第 2 节中「追问按钮」「计划卡可勾选」「停止后改口径」等新增控件取消或改为在对话中完成；图上只保留「钉住」。改版样张已同步（第 2 版）。
