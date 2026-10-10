@@ -12,6 +12,7 @@ import {
 } from './chat-attachments.js'
 import { ensureDocLibraryBridge } from './doc-library-bridge.js'
 import { currentToolSessionId } from './mcp/tool-session-context.js'
+import { docCiteMarkdown, docCiteTemplate, type DocCiteRef } from './document-citation.js'
 import type { DocumentSourceType } from '@opptrix/doc-library'
 import { getUserDataStore } from '@opptrix/user-store'
 
@@ -45,6 +46,8 @@ type LibraryHit = {
   page: number
   score: number
   excerpt: string
+  /** 现成页码引用链接，回答引用该片段时原样抄写 */
+  cite?: string
 }
 
 function S(properties: JsonSchema['properties'], required?: string[]): JsonSchema {
@@ -104,19 +107,50 @@ function excerptAround(text: string, query: string, maxLen = 420): string {
   return `${prefix}${text.slice(start, end)}${suffix}`
 }
 
-function mapHybridHits(hits: Awaited<ReturnType<DocLibrarySvc['searchHybrid']>>, svc: DocLibrarySvc): LibraryHit[] {
+/** 本会话 document_id → attachment_id（资料库命中若已链到本会话，引用可直接打开） */
+function sessionAttachmentByDocument(svc: DocLibrarySvc, sessionId: string | null): Map<string, string> {
+  const map = new Map<string, string>()
+  if (!sessionId) return map
+  for (const d of svc.listSessionDocuments(sessionId)) {
+    if (d.attachment_id) map.set(d.document_id, d.attachment_id)
+  }
+  return map
+}
+
+function mapHybridHits(
+  hits: Awaited<ReturnType<DocLibrarySvc['searchHybrid']>>,
+  svc: DocLibrarySvc,
+  attachmentByDoc: Map<string, string> = new Map(),
+): LibraryHit[] {
   return hits.map(h => {
     const doc = svc.getRepository().getDocument(h.document_id)
+    const attachmentId = h.attachment_id ?? attachmentByDoc.get(h.document_id)
     return {
       chunk_id: shortChunkId(h.chunk_id),
       document_id: h.document_id,
       name: doc?.name,
-      attachment_id: h.attachment_id ?? undefined,
+      attachment_id: attachmentId,
       page: h.page,
       score: Math.abs(h.rank),
       excerpt: h.excerpt,
+      cite: docCiteMarkdown(doc?.name, { attachmentId, documentId: h.document_id }, h.page),
     }
   })
+}
+
+/** read_document 结果的引用字段：单页给 cite，多页给 cite_template（{page} 待填） */
+function readCiteFields(
+  name: string | undefined,
+  ref: DocCiteRef,
+  pages: { page?: number; page_from?: number; page_to?: number },
+): { cite?: string; cite_template?: string } {
+  const single = pages.page ?? (pages.page_from === pages.page_to ? pages.page_from : undefined)
+  if (single != null) return { cite: docCiteMarkdown(name, ref, single) }
+  return { cite_template: docCiteTemplate(name, ref) }
+}
+
+function legacyAttachmentName(sessionId: string, attachmentId: string): string | undefined {
+  return listSessionAttachmentMetas(sessionId).find(m => m.id === attachmentId)?.name
 }
 
 async function searchLibraryHybrid(
@@ -129,7 +163,7 @@ async function searchLibraryHybrid(
     sourceType: opts.sourceType,
     limit: opts.limit,
   })
-  return mapHybridHits(hits, svc)
+  return mapHybridHits(hits, svc, sessionAttachmentByDocument(svc, requireSessionId()))
 }
 
 /** 资讯 FTS → 与 search_library hits 同形（document_id = article_id） */
@@ -185,7 +219,7 @@ export function buildDocumentTools(): DocumentToolDef[] {
     {
       name: 'list_session_documents',
       category: '研报',
-      description: '列出本对话已上传并整理的研报 PDF（文件名、页数、整理状态、attachment_id、document_id）',
+      description: '列出本对话已上传并整理的研报 PDF（文件名、页数、整理状态、attachment_id、document_id、引用模板 cite_template）',
       parameters: S({}),
       handler: async () => {
         const sessionId = requireSessionId()
@@ -202,6 +236,7 @@ export function buildDocumentTools(): DocumentToolDef[] {
             page_count: d.page_count ?? undefined,
             char_count: d.char_count ?? undefined,
             error: d.error ?? undefined,
+            cite_template: docCiteTemplate(d.name, { attachmentId: d.attachment_id, documentId: d.document_id }),
           }))
           return { documents: docs, count: docs.length, source: 'library' as const }
         }
@@ -216,6 +251,7 @@ export function buildDocumentTools(): DocumentToolDef[] {
             page_count: m.extract?.pageCount,
             char_count: m.extract?.charCount,
             error: m.extract?.error,
+            cite_template: docCiteTemplate(m.name, { attachmentId: m.id }),
           }))
         return { documents: docs, count: docs.length, source: 'legacy' as const }
       },
@@ -226,7 +262,8 @@ export function buildDocumentTools(): DocumentToolDef[] {
       category: '研报',
       description:
         '在本机研报库与资讯库检索片段（跨会话）。研报走文档库（可混合关键词与语义）；资讯（source_type=news）走本机资讯全文检索（与统一搜索同源、仅关键词、无向量）。'
-        + '查资讯时应用具体关键词（股票代码、公司简称、主题、事件词），可一次带多个词组合；避免空泛「相关报道」式查询。返回标题与摘录；资讯命中以摘录为准。',
+        + '查资讯时应用具体关键词（股票代码、公司简称、主题、事件词），可一次带多个词组合；避免空泛「相关报道」式查询。返回标题与摘录；资讯命中以摘录为准。'
+        + '研报命中带 cite（页码引用链接），回答引用该内容时原样抄写。',
       parameters: S({
         query: {
           type: 'string',
@@ -261,7 +298,7 @@ export function buildDocumentTools(): DocumentToolDef[] {
     {
       name: 'search_document',
       category: '研报',
-      description: '在本会话已链文档中按关键词检索相关片段；可指定 attachment_id，缺省搜全部已链文档',
+      description: '在本会话已链文档中按关键词检索相关片段；可指定 attachment_id，缺省搜全部已链文档。每条命中带 cite（页码引用链接），回答引用时原样抄写',
       parameters: S({
         query: { type: 'string', description: '检索关键词，如评级、目标价、核心观点' },
         attachment_id: { type: 'string', description: '可选：限定单份研报（来自 list_session_documents）' },
@@ -282,7 +319,7 @@ export function buildDocumentTools(): DocumentToolDef[] {
           limit,
         })
         if (hybridHits.length) {
-          const ranked = mapHybridHits(hybridHits, svc)
+          const ranked = mapHybridHits(hybridHits, svc, sessionAttachmentByDocument(svc, sessionId))
           return {
             attachment_id: attachmentId || undefined,
             query,
@@ -307,6 +344,7 @@ export function buildDocumentTools(): DocumentToolDef[] {
         if (!chunks) {
           return { error: '研报尚未整理完成或不存在，请先 list_session_documents 确认状态' }
         }
+        const legacyName = legacyAttachmentName(sessionId, attachmentId)
         const ranked = chunks
           .map((c: ExtractChunkRecord) => ({
             chunk_id: c.id,
@@ -314,6 +352,7 @@ export function buildDocumentTools(): DocumentToolDef[] {
             page: c.page,
             score: scoreChunk(query, c.text),
             excerpt: excerptAround(c.text, query),
+            cite: docCiteMarkdown(legacyName, { attachmentId }, c.page),
           }))
           .filter(r => r.score > 0)
           .sort((a, b) => b.score - a.score)
@@ -331,7 +370,7 @@ export function buildDocumentTools(): DocumentToolDef[] {
     {
       name: 'read_document',
       category: '研报',
-      description: '按 document_id 或 attachment_id 精读已整理文档的 Markdown 片段（页码范围或 chunk）',
+      description: '按 document_id 或 attachment_id 精读已整理文档的 Markdown 片段（页码范围或 chunk）。结果带 cite 或 cite_template（把 {page} 换成正文 <!-- page:N --> 标出的页码），回答引用时照此写链接',
       parameters: S({
         document_id: { type: 'string', description: '文档 id（来自 search_library / search_document）' },
         attachment_id: { type: 'string', description: '可选：本会话附件 id（与 document_id 二选一）' },
@@ -379,6 +418,11 @@ export function buildDocumentTools(): DocumentToolDef[] {
               maxChars,
             })
           if (libResult && !('error' in libResult)) {
+            const citeName = svc.getRepository().getDocument(documentId)?.name
+            const citeRef = {
+              attachmentId: attachmentId || sessionAttachmentByDocument(svc, sessionId).get(documentId),
+              documentId,
+            }
             if ('chunk_id' in libResult) {
               return {
                 attachment_id: attachmentId || undefined,
@@ -388,6 +432,7 @@ export function buildDocumentTools(): DocumentToolDef[] {
                 text: libResult.text,
                 truncated: libResult.truncated,
                 source: 'library' as const,
+                ...readCiteFields(citeName, citeRef, { page: libResult.page }),
               }
             }
             return {
@@ -398,6 +443,7 @@ export function buildDocumentTools(): DocumentToolDef[] {
               text: libResult.text,
               truncated: libResult.truncated,
               source: 'library' as const,
+              ...readCiteFields(citeName, citeRef, libResult),
             }
           }
           if (libResult && 'error' in libResult) {
@@ -413,6 +459,7 @@ export function buildDocumentTools(): DocumentToolDef[] {
         if (!chunks) {
           return { error: '研报尚未整理完成或不存在' }
         }
+        const legacyName = legacyAttachmentName(sessionId, attachmentId)
 
         if (chunkId) {
           const hit = chunks.find(c => c.id === chunkId)
@@ -425,6 +472,7 @@ export function buildDocumentTools(): DocumentToolDef[] {
             text,
             truncated: hit.text.length > maxChars,
             source: 'legacy' as const,
+            ...readCiteFields(legacyName, { attachmentId }, { page: hit.page }),
           }
         }
 
@@ -455,6 +503,7 @@ export function buildDocumentTools(): DocumentToolDef[] {
             text,
             truncated,
             source: 'legacy' as const,
+            ...readCiteFields(legacyName, { attachmentId }, { page_from: pageFrom, page_to: pageTo }),
           }
         }
 
@@ -468,6 +517,7 @@ export function buildDocumentTools(): DocumentToolDef[] {
           text,
           truncated,
           source: 'legacy' as const,
+          ...readCiteFields(legacyName, { attachmentId }, { page_from: pageFrom, page_to: pageTo }),
         }
       },
       meta: TOOL_META.read_document,

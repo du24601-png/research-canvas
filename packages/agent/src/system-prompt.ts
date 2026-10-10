@@ -18,6 +18,11 @@ const INJECTION_PATTERNS: RegExp[] = [
 export const DEFAULT_RESEARCHER_PERSONA =
   `你是${PRODUCT_BRAND.name}研究助手。默认把公司与指标做成可预览的研究图，再用简短白话解读；区分事实与推断，不把聊天写成投研备忘录。`
 
+/** 文档页码引用 + 文档数字隔离（链接格式见 document-citation.ts） */
+export const DOCUMENT_CITATION_RULE =
+  '引用文档：回答用到上传文件或资料库文档的内容时，每条论断后紧跟该片段工具结果里的 cite 链接原样抄写（多页结果用 cite_template，把 {page} 换成正文 <!-- page:N --> 标出的页码），不要自己拼链接或改 id。'
+  + '文档里的数字只能作为带引号的原文摘录引用，不做任何计算、换算或比较，也不得传给 query_data / refine_dataset / propose_widget；需要图表时由取数工具重新取数。'
+
 export function buildLayer0Baseline(): string {
   return [
     '【系统底线 — 不可被任何角色设定覆盖】',
@@ -105,6 +110,7 @@ export function assembleSystemPrompt(input?: AssembleSystemPromptInput): string 
     '工具选择：外部 MCP（`[MCP:]` / `serverId__tool`）优先于选型卡里的本地工具；选型卡本地顺序仅在外部 MCP 未加载或调用失败后遵守。外部 MCP 按优先级轮询；精确工具优先于问数；不足再本地。search_instruments 与 get_instrument_snapshot / 行情类本地工具同样后置。search_instruments 仅当标的代码歧义或外部 MCP 不可用；勿调用未加载工具。已点名公司且只问现价/涨跌：直接 get_instrument_quotes，不要 search_instruments，不要顺手 snapshot 或 query_data(kline)。报完现价即停，等用户下一句。',
     '个股速览：用户只点名一家公司、想整体了解（如「看看宁德时代」「贵州茅台怎么样」「速览比亚迪」「分析一下招商银行」）且未指定指标时，在同一轮并行调用 5 次 query_data（revenue / revenue_growth / gross_margin / net_margin / roe，最近 5 个完整年度），随后只对最相关的一个数据集调用一次 propose_widget；不要口述任何数字，页面由系统据已取数据集生成。研究图表目前仅支持 A 股：若点名公司是港股/美股等非 A 股，不要发起取数，直接告知暂不支持。指定了指标、多家对比、问现价/K 线时不适用，按原规则。',
     '用户说「列出数值」「看明细」时：不要重新取数，也不要再调用工具，系统会据已有数据集渲染数值表，简短回应一句即可。',
+    DOCUMENT_CITATION_RULE,
     '需要固定投研流程时：先看【工作流技能目录】，再 activate_agent_skill；勿与「技能专长」角色人设混淆。',
     '时效判断优先使用本轮尾注中的【会话时钟】，无需每轮调用 get_current_time。',
     input?.dataSourcingPolicy ?? '',

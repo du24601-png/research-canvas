@@ -64,7 +64,8 @@ export const markdownSanitizeSchema: Schema = {
   },
   protocols: {
     ...defaultSchema.protocols,
-    href: [...(defaultSchema.protocols?.href ?? []), 'http', 'https'],
+    /** opptrix-doc：文档页码引用，仅 a[href]；具体格式由 doc-citation/docCitationLink 严格校验 */
+    href: [...(defaultSchema.protocols?.href ?? []), 'http', 'https', 'opptrix-doc'],
     src: [...(defaultSchema.protocols?.src ?? []), 'http', 'https'],
   },
 }

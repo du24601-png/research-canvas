@@ -11,6 +11,7 @@ import '../styles/markdown.css'
 import { createMarkdownComponents } from './markdownComponents'
 import { markdownSanitizeSchema } from './markdownSanitize'
 import { rewriteOpptrixWsUrisInMarkdown } from './opptrixWsMarkdown'
+import { docCitationUrlTransform } from './doc-citation/docCitationLink'
 
 interface Props {
   content: string
@@ -38,6 +39,7 @@ function MarkdownMessage({ content, className, sessionId }: Props) {
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={rehypePlugins as Pluggable[]}
         components={components}
+        urlTransform={docCitationUrlTransform}
       >
         {rendered}
       </ReactMarkdown>

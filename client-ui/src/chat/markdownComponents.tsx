@@ -10,6 +10,8 @@ import {
   workspaceFileBasenameFromUrl,
   workspaceMediaKindFromUrl,
 } from './opptrixWsMarkdown'
+import { parseDocCitationHref } from './doc-citation/docCitationLink'
+import { DocCitationLink } from './doc-citation/DocCitationChip'
 
 function extractCodeText(children: ReactNode): string {
   return String(children).replace(/\n$/, '')
@@ -119,6 +121,12 @@ export function createMarkdownComponents(opts: MarkdownComponentsOpts = {}): Com
       return <img className="opptrix-md-img" src={src} alt={alt ?? ''} loading="lazy" {...omitRef(props)} />
     },
     a({ href, children, ...props }) {
+      // urlTransform 已把非法链接（含格式不对的 opptrix-doc）清空：不渲染成可点的空链接
+      if (!href) return <span>{children}</span>
+      const citation = parseDocCitationHref(href)
+      if (citation) {
+        return <DocCitationLink target={citation} sessionId={opts.sessionId}>{children}</DocCitationLink>
+      }
       if (isOpptrixWsUnavailableHref(href)) {
         return (
           <span className="opptrix-md-media-fallback">

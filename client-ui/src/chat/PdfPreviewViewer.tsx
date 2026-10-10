@@ -47,6 +47,10 @@ interface Props {
   onToggleOutline?: () => void
   /** PDF 预览恒为 true；控制是否显示目录按钮 */
   showOutlineToggle?: boolean
+  /** 打开后跳到指定页（文档引用 chip）；key 变化即重新跳转 */
+  jumpTo?: { page: number; key: number } | null
+  /** 跳页完成（含校正）后回调，供调用方清掉该请求 */
+  onJumpHandled?: (key: number) => void
 }
 
 /** pdf.js outline dest：命名目标、显式数组，或页面 Ref */
@@ -446,6 +450,8 @@ export default function PdfPreviewViewer({
   outlineOpen = false,
   onToggleOutline,
   showOutlineToggle = true,
+  jumpTo = null,
+  onJumpHandled,
 }: Props) {
   const s = useStyles()
   const [phase, setPhase] = useState<LoadPhase>('idle')
@@ -702,6 +708,27 @@ export default function PdfPreviewViewer({
       recomputeActivePages(pageCount)
     }
   }, [phase, pageCount, page, recomputeActivePages])
+
+  const handledJumpKeyRef = useRef<number | null>(null)
+  useEffect(() => {
+    if (phase !== 'ready' || pageCount <= 0 || !jumpTo) return
+    if (handledJumpKeyRef.current === jumpTo.key) return
+    const key = jumpTo.key
+    const target = Math.min(pageCount, Math.max(1, Math.floor(jumpTo.page)))
+    // 等页面占位与宽度测量落定后再跳；稍后再校正一次，抵消渲染后的高度变化
+    const first = window.setTimeout(() => {
+      handledJumpKeyRef.current = key
+      scrollToPage(target)
+    }, 60)
+    const settle = window.setTimeout(() => {
+      pageElsRef.current.get(target)?.scrollIntoView({ block: 'start' })
+      onJumpHandled?.(key)
+    }, 450)
+    return () => {
+      window.clearTimeout(first)
+      window.clearTimeout(settle)
+    }
+  }, [phase, pageCount, jumpTo, scrollToPage, onJumpHandled])
 
   const goPrev = () => {
     if (page <= 1) return

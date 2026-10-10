@@ -21,6 +21,8 @@ import MediaPreviewPlayer from './MediaPreviewPlayer'
 import MindmapPreviewHost from './MindmapPreviewHost'
 import PdfPreviewViewer from './PdfPreviewViewer'
 import FilenameEllipsis from './FilenameEllipsis'
+import { clearDocPageRequest, useDocPageRequest } from './doc-citation/docPageRequest'
+import { libraryFileUrlForAttachment } from './doc-citation/libraryPreview'
 import ChromeToolButton from '../desktop/ChromeToolButton'
 import {
   DESKTOP_CHROME_TOP_OFFSET,
@@ -599,9 +601,11 @@ export default function FilePreviewPanel({
   useEffect(() => {
     if (!attachment) setFileListOpen(false)
   }, [attachment])
+  const pageRequest = useDocPageRequest(sessionId, attachment?.id)
   const hasAttachment = Boolean(attachment)
   const showCenterPicker = !hasAttachment && Boolean(sessionId)
-  const url = attachment && sessionId ? sessionAttachmentUrl(sessionId, attachment.id) : ''
+  const url = libraryFileUrlForAttachment(attachment)
+    ?? (attachment && sessionId ? sessionAttachmentUrl(sessionId, attachment.id) : '')
   const isPdf = attachment?.kind === 'pdf'
   const isImage = attachment?.kind === 'image'
   const isCanvas = attachment?.kind === 'canvas'
@@ -775,6 +779,8 @@ export default function FilePreviewPanel({
                 outlineOpen={outlineOpen}
                 onToggleOutline={toggleOutline}
                 showOutlineToggle
+                jumpTo={pageRequest}
+                onJumpHandled={clearDocPageRequest}
               />
             ) : isCanvas ? (
               <div className={s.artifactHostFlush}>
