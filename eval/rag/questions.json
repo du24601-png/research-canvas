@@ -1,0 +1,3667 @@
+{
+ "version": 1,
+ "note": "gold pages are 1-based PDF page numbers (same as doc-library chunk.page). evidence verified whitespace-insensitively; parse_gap = evidence only found in pdfium reference text, not in the product parser output.",
+ "counts": {
+  "指标定位": 18,
+  "原因解释": 24,
+  "展望与计划": 18,
+  "风险因素": 18,
+  "表格定位": 22,
+  "同义口语": 20,
+  "跨公司": 12,
+  "无答案": 12
+ },
+ "items": [
+  {
+   "id": "moutai-01",
+   "docs": [
+    "moutai"
+   ],
+   "scope": "document",
+   "type": "指标定位",
+   "question": "茅台年报里哪里讲了研发投入的情况？",
+   "query_keywords": "研发投入",
+   "gold": [
+    {
+     "doc": "moutai",
+     "pages": [
+      11
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "moutai",
+     "page": 11,
+     "text": "研发投入合计"
+    }
+   ]
+  },
+  {
+   "id": "moutai-02",
+   "docs": [
+    "moutai"
+   ],
+   "scope": "document",
+   "type": "指标定位",
+   "question": "茅台一共有多少员工，专业构成是怎样的？",
+   "query_keywords": "在职员工 专业构成",
+   "gold": [
+    {
+     "doc": "moutai",
+     "pages": [
+      33
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "moutai",
+     "page": 33,
+     "text": "在职员工的数量合计"
+    }
+   ]
+  },
+  {
+   "id": "moutai-03",
+   "docs": [
+    "moutai"
+   ],
+   "scope": "document",
+   "type": "指标定位",
+   "question": "茅台去年在环保上投了多少钱？",
+   "query_keywords": "环保资金",
+   "gold": [
+    {
+     "doc": "moutai",
+     "pages": [
+      36
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "moutai",
+     "page": 36,
+     "text": "报告期内投入环保资金"
+    }
+   ]
+  },
+  {
+   "id": "moutai-04",
+   "docs": [
+    "moutai"
+   ],
+   "scope": "document",
+   "type": "原因解释",
+   "question": "茅台营业收入增长主要靠什么？",
+   "query_keywords": "营业收入 变动原因",
+   "gold": [
+    {
+     "doc": "moutai",
+     "pages": [
+      8
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "moutai",
+     "page": 8,
+     "text": "营业收入变动原因说明：主要是本期销量增加及茅台酒主要产品销售价格调整"
+    }
+   ]
+  },
+  {
+   "id": "moutai-05",
+   "docs": [
+    "moutai"
+   ],
+   "scope": "document",
+   "type": "原因解释",
+   "question": "茅台的营业成本为什么上升了？",
+   "query_keywords": "营业成本 变动原因",
+   "gold": [
+    {
+     "doc": "moutai",
+     "pages": [
+      8
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "moutai",
+     "page": 8,
+     "text": "营业成本变动原因说明"
+    }
+   ]
+  },
+  {
+   "id": "moutai-06",
+   "docs": [
+    "moutai"
+   ],
+   "scope": "document",
+   "type": "原因解释",
+   "question": "茅台财务费用变化是什么原因造成的？",
+   "query_keywords": "财务费用 变动原因",
+   "gold": [
+    {
+     "doc": "moutai",
+     "pages": [
+      9
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "moutai",
+     "page": 9,
+     "text": "财务费用变动原因说明：主要是本期商业银行存款利率下降"
+    }
+   ]
+  },
+  {
+   "id": "moutai-07",
+   "docs": [
+    "moutai"
+   ],
+   "scope": "document",
+   "type": "原因解释",
+   "question": "茅台的研发费用为什么增加？",
+   "query_keywords": "研发费用 变动原因",
+   "gold": [
+    {
+     "doc": "moutai",
+     "pages": [
+      9
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "moutai",
+     "page": 9,
+     "text": "研发费用变动原因说明：主要是本期研发项目增加"
+    }
+   ]
+  },
+  {
+   "id": "moutai-08",
+   "docs": [
+    "moutai"
+   ],
+   "scope": "document",
+   "type": "展望与计划",
+   "question": "茅台对2025年定了什么经营目标？",
+   "query_keywords": "经营计划 主要目标",
+   "gold": [
+    {
+     "doc": "moutai",
+     "pages": [
+      21
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "moutai",
+     "page": 21,
+     "text": "2025年主要目标是"
+    }
+   ]
+  },
+  {
+   "id": "moutai-09",
+   "docs": [
+    "moutai"
+   ],
+   "scope": "document",
+   "type": "展望与计划",
+   "question": "茅台怎么看白酒行业未来的格局和走势？",
+   "query_keywords": "行业格局 趋势",
+   "gold": [
+    {
+     "doc": "moutai",
+     "pages": [
+      20
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "moutai",
+     "page": 20,
+     "text": "行业格局与趋势"
+    }
+   ]
+  },
+  {
+   "id": "moutai-10",
+   "docs": [
+    "moutai"
+   ],
+   "scope": "document",
+   "type": "展望与计划",
+   "question": "茅台未来几年的分红和回购有什么安排？",
+   "query_keywords": "分红规划 回购",
+   "gold": [
+    {
+     "doc": "moutai",
+     "pages": [
+      8
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "moutai",
+     "page": 8,
+     "text": "三年分红规划"
+    }
+   ]
+  },
+  {
+   "id": "moutai-11",
+   "docs": [
+    "moutai"
+   ],
+   "scope": "document",
+   "type": "风险因素",
+   "question": "茅台提示了自己可能面对哪些风险？",
+   "query_keywords": "可能面对的风险",
+   "gold": [
+    {
+     "doc": "moutai",
+     "pages": [
+      22
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "moutai",
+     "page": 22,
+     "text": "一是宏观经济风险"
+    }
+   ]
+  },
+  {
+   "id": "moutai-12",
+   "docs": [
+    "moutai"
+   ],
+   "scope": "document",
+   "type": "风险因素",
+   "question": "茅台有没有提示存货减值方面的风险？",
+   "query_keywords": "存货减值风险",
+   "gold": [
+    {
+     "doc": "moutai",
+     "pages": [
+      14
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "moutai",
+     "page": 14,
+     "text": "存货减值风险提示"
+    }
+   ]
+  },
+  {
+   "id": "moutai-13",
+   "docs": [
+    "moutai"
+   ],
+   "scope": "document",
+   "type": "风险因素",
+   "question": "茅台的污染物排放有没有超标的问题？",
+   "query_keywords": "污染物 排放 许可",
+   "gold": [
+    {
+     "doc": "moutai",
+     "pages": [
+      38
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "moutai",
+     "page": 38,
+     "text": "排放符合法律法规要求"
+    }
+   ]
+  },
+  {
+   "id": "moutai-14",
+   "docs": [
+    "moutai"
+   ],
+   "scope": "document",
+   "type": "表格定位",
+   "question": "茅台前五大客户占了多少销售额？",
+   "query_keywords": "前五名客户 销售额",
+   "gold": [
+    {
+     "doc": "moutai",
+     "pages": [
+      10
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "moutai",
+     "page": 10,
+     "text": "前五名客户销售额"
+    }
+   ]
+  },
+  {
+   "id": "moutai-15",
+   "docs": [
+    "moutai"
+   ],
+   "scope": "document",
+   "type": "表格定位",
+   "question": "茅台前五大供应商的采购占比是多少？",
+   "query_keywords": "前五名供应商 采购额",
+   "gold": [
+    {
+     "doc": "moutai",
+     "pages": [
+      10
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "moutai",
+     "page": 10,
+     "text": "前五名供应商采购额"
+    }
+   ]
+  },
+  {
+   "id": "moutai-16",
+   "docs": [
+    "moutai"
+   ],
+   "scope": "document",
+   "type": "表格定位",
+   "question": "茅台国内外经销商数量各有多少，增减情况如何？",
+   "query_keywords": "经销商数量",
+   "gold": [
+    {
+     "doc": "moutai",
+     "pages": [
+      16
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "moutai",
+     "page": 16,
+     "text": "报告期末经销商数量"
+    }
+   ]
+  },
+  {
+   "id": "moutai-17",
+   "docs": [
+    "moutai"
+   ],
+   "scope": "document",
+   "type": "表格定位",
+   "question": "茅台直销和批发代理两个渠道各卖了多少？",
+   "query_keywords": "直销 批发代理 销售收入",
+   "gold": [
+    {
+     "doc": "moutai",
+     "pages": [
+      16,
+      9
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "moutai",
+     "page": 16,
+     "text": "渠道类型本期销售收入"
+    }
+   ]
+  },
+  {
+   "id": "moutai-18",
+   "docs": [
+    "moutai"
+   ],
+   "scope": "document",
+   "type": "同义口语",
+   "question": "茅台的酒利润有多厚，赚钱能力怎么样？",
+   "query_keywords": "毛利率 分行业",
+   "gold": [
+    {
+     "doc": "moutai",
+     "pages": [
+      9,
+      17
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "moutai",
+     "page": 9,
+     "text": "主营业务分行业情况"
+    }
+   ]
+  },
+  {
+   "id": "moutai-19",
+   "docs": [
+    "moutai"
+   ],
+   "scope": "document",
+   "type": "同义口语",
+   "question": "i茅台这个App去年卖了多少钱？",
+   "query_keywords": "i茅台 线上销售",
+   "gold": [
+    {
+     "doc": "moutai",
+     "pages": [
+      16
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "moutai",
+     "page": 16,
+     "text": "“i茅台”数字营销平台"
+    }
+   ]
+  },
+  {
+   "id": "moutai-20",
+   "docs": [
+    "moutai"
+   ],
+   "scope": "document",
+   "type": "同义口语",
+   "question": "茅台一年能酿多少酒？",
+   "query_keywords": "设计产能 实际产能 基酒",
+   "gold": [
+    {
+     "doc": "moutai",
+     "pages": [
+      14
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "moutai",
+     "page": 14,
+     "text": "茅台酒基酒设计产能"
+    }
+   ]
+  },
+  {
+   "id": "catl-01",
+   "docs": [
+    "catl"
+   ],
+   "scope": "document",
+   "type": "指标定位",
+   "question": "宁德时代研发投入占营收的比例在哪里披露？",
+   "query_keywords": "研发投入 占营业收入比例",
+   "gold": [
+    {
+     "doc": "catl",
+     "pages": [
+      25
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "catl",
+     "page": 25,
+     "text": "研发投入占营业收入比例"
+    }
+   ]
+  },
+  {
+   "id": "catl-02",
+   "docs": [
+    "catl"
+   ],
+   "scope": "document",
+   "type": "指标定位",
+   "question": "宁德时代手上有多少项专利？",
+   "query_keywords": "专利 专利申请",
+   "gold": [
+    {
+     "doc": "catl",
+     "pages": [
+      16
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "catl",
+     "page": 16,
+     "text": "拥有专利及专利申请合计"
+    }
+   ]
+  },
+  {
+   "id": "catl-03",
+   "docs": [
+    "catl"
+   ],
+   "scope": "document",
+   "type": "指标定位",
+   "question": "宁德时代一共有多少员工？",
+   "query_keywords": "在职员工 数量合计",
+   "gold": [
+    {
+     "doc": "catl",
+     "pages": [
+      57
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "catl",
+     "page": 57,
+     "text": "在职员工的数量合计"
+    }
+   ]
+  },
+  {
+   "id": "catl-04",
+   "docs": [
+    "catl"
+   ],
+   "scope": "document",
+   "type": "原因解释",
+   "question": "宁德时代营收下滑主要是哪些业务拖累的？",
+   "query_keywords": "营业收入构成 分产品 同比增减",
+   "gold": [
+    {
+     "doc": "catl",
+     "pages": [
+      19
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "catl",
+     "page": 19,
+     "text": "营业收入合计"
+    }
+   ]
+  },
+  {
+   "id": "catl-05",
+   "docs": [
+    "catl"
+   ],
+   "scope": "document",
+   "type": "原因解释",
+   "question": "宁德时代为什么要做套期保值和远期结售汇？",
+   "query_keywords": "套期保值 外汇 汇率波动",
+   "gold": [
+    {
+     "doc": "catl",
+     "pages": [
+      31
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "catl",
+     "page": 31,
+     "text": "为规避和防范主要产品价格及外汇汇率波动"
+    }
+   ]
+  },
+  {
+   "id": "catl-06",
+   "docs": [
+    "catl"
+   ],
+   "scope": "document",
+   "type": "原因解释",
+   "question": "宁德时代认为全球新能源车需求为什么能持续增长？",
+   "query_keywords": "新能源车 市场需求 增长",
+   "gold": [
+    {
+     "doc": "catl",
+     "pages": [
+      11
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "catl",
+     "page": 11,
+     "text": "受益于新能源在售车型数量快速增加"
+    }
+   ]
+  },
+  {
+   "id": "catl-07",
+   "docs": [
+    "catl"
+   ],
+   "scope": "document",
+   "type": "原因解释",
+   "question": "宁德时代单位产品的碳排放是怎么降下来的？",
+   "query_keywords": "零碳 节能改造 可再生能源",
+   "gold": [
+    {
+     "doc": "catl",
+     "pages": [
+      17
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "catl",
+     "page": 17,
+     "text": "对生产基地进行节能改造与可再生能源利用"
+    }
+   ]
+  },
+  {
+   "id": "catl-08",
+   "docs": [
+    "catl"
+   ],
+   "scope": "document",
+   "type": "展望与计划",
+   "question": "宁德时代未来的发展战略是什么？",
+   "query_keywords": "发展战略",
+   "gold": [
+    {
+     "doc": "catl",
+     "pages": [
+      37
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "catl",
+     "page": 37,
+     "text": "三大战略方向"
+    }
+   ]
+  },
+  {
+   "id": "catl-09",
+   "docs": [
+    "catl"
+   ],
+   "scope": "document",
+   "type": "展望与计划",
+   "question": "宁德时代接下来一年的经营计划有哪些重点？",
+   "query_keywords": "经营计划 数智化 全球化",
+   "gold": [
+    {
+     "doc": "catl",
+     "pages": [
+      38
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "catl",
+     "page": 38,
+     "text": "坚定推进数智化、全球化、低碳化经营"
+    }
+   ]
+  },
+  {
+   "id": "catl-10",
+   "docs": [
+    "catl"
+   ],
+   "scope": "document",
+   "type": "展望与计划",
+   "question": "宁德时代海外工厂建到什么程度了，后面还要建哪些？",
+   "query_keywords": "海外 工厂 匈牙利 西班牙",
+   "gold": [
+    {
+     "doc": "catl",
+     "pages": [
+      18
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "catl",
+     "page": 18,
+     "text": "积极推进匈牙利工厂"
+    }
+   ]
+  },
+  {
+   "id": "catl-11",
+   "docs": [
+    "catl"
+   ],
+   "scope": "document",
+   "type": "风险因素",
+   "question": "宁德时代面临的主要风险有哪些？",
+   "query_keywords": "可能面对的风险",
+   "gold": [
+    {
+     "doc": "catl",
+     "pages": [
+      39
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "catl",
+     "page": 39,
+     "text": "宏观经济与市场波动风险"
+    }
+   ]
+  },
+  {
+   "id": "catl-12",
+   "docs": [
+    "catl"
+   ],
+   "scope": "document",
+   "type": "风险因素",
+   "question": "锂、镍这些原材料涨价对宁德时代有什么影响，公司怎么应对？",
+   "query_keywords": "原材料价格波动 供应风险",
+   "gold": [
+    {
+     "doc": "catl",
+     "pages": [
+      40
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "catl",
+     "page": 40,
+     "text": "原材料价格波动及供应风险"
+    }
+   ]
+  },
+  {
+   "id": "catl-13",
+   "docs": [
+    "catl"
+   ],
+   "scope": "document",
+   "type": "风险因素",
+   "question": "电池行业产能扩张太快，宁德时代担心竞争加剧吗？",
+   "query_keywords": "市场竞争加剧风险",
+   "gold": [
+    {
+     "doc": "catl",
+     "pages": [
+      39
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "catl",
+     "page": 39,
+     "text": "市场竞争加剧风险"
+    }
+   ]
+  },
+  {
+   "id": "catl-14",
+   "docs": [
+    "catl"
+   ],
+   "scope": "document",
+   "type": "表格定位",
+   "question": "宁德时代前五大客户的销售占比是多少？",
+   "query_keywords": "前五名客户 销售金额",
+   "gold": [
+    {
+     "doc": "catl",
+     "pages": [
+      23
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "catl",
+     "page": 23,
+     "text": "前五名客户合计销售金额"
+    }
+   ]
+  },
+  {
+   "id": "catl-15",
+   "docs": [
+    "catl"
+   ],
+   "scope": "document",
+   "type": "表格定位",
+   "question": "宁德时代前五大供应商采购占比多少？",
+   "query_keywords": "前五名供应商 采购金额",
+   "gold": [
+    {
+     "doc": "catl",
+     "pages": [
+      23
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "catl",
+     "page": 23,
+     "text": "前五名供应商合计采购金额"
+    }
+   ]
+  },
+  {
+   "id": "catl-16",
+   "docs": [
+    "catl"
+   ],
+   "scope": "document",
+   "type": "表格定位",
+   "question": "宁德时代研发人员的学历和年龄构成是怎样的？",
+   "query_keywords": "研发人员 学历 年龄构成",
+   "gold": [
+    {
+     "doc": "catl",
+     "pages": [
+      24,
+      25
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "catl",
+     "page": 25,
+     "text": "研发人员学历"
+    }
+   ]
+  },
+  {
+   "id": "catl-17",
+   "docs": [
+    "catl"
+   ],
+   "scope": "document",
+   "type": "表格定位",
+   "question": "宁德时代电池的产能利用率是多少？",
+   "query_keywords": "产能 产能利用率 产量",
+   "gold": [
+    {
+     "doc": "catl",
+     "pages": [
+      21
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "catl",
+     "page": 21,
+     "text": "产能利用率"
+    }
+   ]
+  },
+  {
+   "id": "catl-18",
+   "docs": [
+    "catl"
+   ],
+   "scope": "document",
+   "type": "同义口语",
+   "question": "宁德时代去年一共卖了多少电池？",
+   "query_keywords": "电池 销量 GWh",
+   "gold": [
+    {
+     "doc": "catl",
+     "pages": [
+      17
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "catl",
+     "page": 17,
+     "text": "锂离子电池销量475GWh"
+    }
+   ]
+  },
+  {
+   "id": "catl-19",
+   "docs": [
+    "catl"
+   ],
+   "scope": "document",
+   "type": "同义口语",
+   "question": "宁德时代的储能生意赚钱能力怎么样？",
+   "query_keywords": "储能电池系统 毛利率",
+   "gold": [
+    {
+     "doc": "catl",
+     "pages": [
+      20
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "catl",
+     "page": 20,
+     "text": "储能电池系统"
+    }
+   ]
+  },
+  {
+   "id": "catl-20",
+   "docs": [
+    "catl"
+   ],
+   "scope": "document",
+   "type": "同义口语",
+   "question": "宁德时代这次给股东发多少钱？",
+   "query_keywords": "利润分配预案 现金分红",
+   "gold": [
+    {
+     "doc": "catl",
+     "pages": [
+      3
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "catl",
+     "page": 3,
+     "text": "利润分配预案"
+    }
+   ]
+  },
+  {
+   "id": "byd-01",
+   "docs": [
+    "byd"
+   ],
+   "scope": "document",
+   "type": "指标定位",
+   "question": "比亚迪的研发投入和资本化情况在哪里能看到？",
+   "query_keywords": "研发投入 资本化",
+   "gold": [
+    {
+     "doc": "byd",
+     "pages": [
+      34
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "byd",
+     "page": 34,
+     "text": "研发投入资本化的金额"
+    }
+   ]
+  },
+  {
+   "id": "byd-02",
+   "docs": [
+    "byd"
+   ],
+   "scope": "document",
+   "type": "指标定位",
+   "question": "比亚迪现在有多少员工？",
+   "query_keywords": "在职员工 数量合计",
+   "gold": [
+    {
+     "doc": "byd",
+     "pages": [
+      66
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "byd",
+     "page": 66,
+     "text": "在职员工的数量合计"
+    }
+   ]
+  },
+  {
+   "id": "byd-03",
+   "docs": [
+    "byd"
+   ],
+   "scope": "document",
+   "type": "指标定位",
+   "question": "比亚迪年底账上有多少现金储备？",
+   "query_keywords": "现金储备",
+   "gold": [
+    {
+     "doc": "byd",
+     "pages": [
+      3
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "byd",
+     "page": 3,
+     "text": "我们的现金储备约为"
+    }
+   ]
+  },
+  {
+   "id": "byd-04",
+   "docs": [
+    "byd"
+   ],
+   "scope": "document",
+   "type": "原因解释",
+   "question": "比亚迪经营现金流为什么比上年少了？",
+   "query_keywords": "经营活动 现金流量净额 主要影响因素",
+   "gold": [
+    {
+     "doc": "byd",
+     "pages": [
+      34
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "byd",
+     "page": 34,
+     "text": "主要是购买商品、接受劳务支付的现金增加所致"
+    }
+   ]
+  },
+  {
+   "id": "byd-05",
+   "docs": [
+    "byd"
+   ],
+   "scope": "document",
+   "type": "原因解释",
+   "question": "比亚迪的合同资产为什么变动这么大？",
+   "query_keywords": "合同资产 重大变动 原因",
+   "gold": [
+    {
+     "doc": "byd",
+     "pages": [
+      197
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "byd",
+     "page": 197,
+     "text": "本年合同资产账面价值发生重大变动的主要原因"
+    }
+   ]
+  },
+  {
+   "id": "byd-06",
+   "docs": [
+    "byd"
+   ],
+   "scope": "document",
+   "type": "原因解释",
+   "question": "比亚迪为什么要做金融衍生品投资？",
+   "query_keywords": "套期保值 汇率 利率 衍生品",
+   "gold": [
+    {
+     "doc": "byd",
+     "pages": [
+      39
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "byd",
+     "page": 39,
+     "text": "公司为规避日常经营中所面临的汇率、利率风险"
+    }
+   ]
+  },
+  {
+   "id": "byd-07",
+   "docs": [
+    "byd"
+   ],
+   "scope": "document",
+   "type": "原因解释",
+   "question": "比亚迪认为储能需求为什么这么旺盛？",
+   "query_keywords": "储能 需求",
+   "gold": [
+    {
+     "doc": "byd",
+     "pages": [
+      14
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "byd",
+     "page": 14,
+     "text": "受益于全球多国陆续出台的利好政策"
+    }
+   ]
+  },
+  {
+   "id": "byd-08",
+   "docs": [
+    "byd"
+   ],
+   "scope": "document",
+   "type": "展望与计划",
+   "question": "比亚迪2025年汽车业务有什么打算？",
+   "query_keywords": "未来发展的展望 汽车及电池业务",
+   "gold": [
+    {
+     "doc": "byd",
+     "pages": [
+      42
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "byd",
+     "page": 42,
+     "text": "加速业务出海进程"
+    }
+   ]
+  },
+  {
+   "id": "byd-09",
+   "docs": [
+    "byd"
+   ],
+   "scope": "document",
+   "type": "展望与计划",
+   "question": "比亚迪在手机部件、AI数据中心这些电子业务上未来怎么布局？",
+   "query_keywords": "手机部件 AI数据中心 机器人",
+   "gold": [
+    {
+     "doc": "byd",
+     "pages": [
+      43
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "byd",
+     "page": 43,
+     "text": "AI数据中心领域持续投入大量的研发资源"
+    }
+   ]
+  },
+  {
+   "id": "byd-10",
+   "docs": [
+    "byd"
+   ],
+   "scope": "document",
+   "type": "展望与计划",
+   "question": "比亚迪怎么看今年汽车行业的政策环境，比如以旧换新？",
+   "query_keywords": "以旧换新 汽车行业",
+   "gold": [
+    {
+     "doc": "byd",
+     "pages": [
+      42
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "byd",
+     "page": 42,
+     "text": "做好2025年汽车以旧换新工作的通知"
+    }
+   ]
+  },
+  {
+   "id": "byd-11",
+   "docs": [
+    "byd"
+   ],
+   "scope": "document",
+   "type": "风险因素",
+   "question": "比亚迪年报有没有专门讲经营中可能遇到的风险？",
+   "query_keywords": "风险因素",
+   "gold": [
+    {
+     "doc": "byd",
+     "pages": [
+      5
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "byd",
+     "page": 5,
+     "text": "可能面临的风险因素"
+    }
+   ]
+  },
+  {
+   "id": "byd-12",
+   "docs": [
+    "byd"
+   ],
+   "scope": "document",
+   "type": "风险因素",
+   "question": "比亚迪工厂的环保风险是怎么管的？",
+   "query_keywords": "环保风险 应急预案",
+   "gold": [
+    {
+     "doc": "byd",
+     "pages": [
+      96
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "byd",
+     "page": 96,
+     "text": "对存在的环保风险制定了预防管理措施"
+    }
+   ]
+  },
+  {
+   "id": "byd-13",
+   "docs": [
+    "byd"
+   ],
+   "scope": "document",
+   "type": "风险因素",
+   "question": "比亚迪觉得宏观经济有哪些压力和挑战？",
+   "query_keywords": "经济 挑战 需求不足",
+   "gold": [
+    {
+     "doc": "byd",
+     "pages": [
+      13,
+      42
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "byd",
+     "page": 13,
+     "text": "房地产和地方债务风险化解的压力"
+    }
+   ]
+  },
+  {
+   "id": "byd-14",
+   "docs": [
+    "byd"
+   ],
+   "scope": "document",
+   "type": "表格定位",
+   "question": "比亚迪前五大客户的销售占比是多少？",
+   "query_keywords": "前五名客户 销售金额",
+   "gold": [
+    {
+     "doc": "byd",
+     "pages": [
+      26,
+      27
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "byd",
+     "page": 26,
+     "text": "前五名客户合计销售金额"
+    }
+   ]
+  },
+  {
+   "id": "byd-15",
+   "docs": [
+    "byd"
+   ],
+   "scope": "document",
+   "type": "表格定位",
+   "question": "比亚迪前五大供应商采购占比是多少？",
+   "query_keywords": "前五名供应商 采购金额",
+   "gold": [
+    {
+     "doc": "byd",
+     "pages": [
+      27
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "byd",
+     "page": 27,
+     "text": "前五名供应商合计采购金额"
+    }
+   ]
+  },
+  {
+   "id": "byd-16",
+   "docs": [
+    "byd"
+   ],
+   "scope": "document",
+   "type": "表格定位",
+   "question": "比亚迪乘用车和商用车的产销量分别是多少？",
+   "query_keywords": "整车 产销 乘用车 商用车",
+   "gold": [
+    {
+     "doc": "byd",
+     "pages": [
+      22,
+      23
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "byd",
+     "page": 22,
+     "text": "整车产品产销情况"
+    }
+   ]
+  },
+  {
+   "id": "byd-17",
+   "docs": [
+    "byd"
+   ],
+   "scope": "document",
+   "type": "表格定位",
+   "question": "比亚迪的营业成本是怎么构成的？",
+   "query_keywords": "营业成本构成",
+   "gold": [
+    {
+     "doc": "byd",
+     "pages": [
+      26
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "byd",
+     "page": 26,
+     "text": "营业成本构成"
+    }
+   ]
+  },
+  {
+   "id": "byd-18",
+   "docs": [
+    "byd"
+   ],
+   "scope": "document",
+   "type": "同义口语",
+   "question": "比亚迪去年一共卖了多少辆车？",
+   "query_keywords": "销量 乘用车",
+   "gold": [
+    {
+     "doc": "byd",
+     "pages": [
+      22,
+      15
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "byd",
+     "page": 22,
+     "text": "快报销量"
+    }
+   ]
+  },
+  {
+   "id": "byd-19",
+   "docs": [
+    "byd"
+   ],
+   "scope": "document",
+   "type": "同义口语",
+   "question": "比亚迪帮手机厂商做代工的业务赚钱吗？",
+   "query_keywords": "日用电子器件 毛利率",
+   "gold": [
+    {
+     "doc": "byd",
+     "pages": [
+      25
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "byd",
+     "page": 25,
+     "text": "日用电子器件"
+    }
+   ]
+  },
+  {
+   "id": "byd-20",
+   "docs": [
+    "byd"
+   ],
+   "scope": "document",
+   "type": "同义口语",
+   "question": "比亚迪这次每股派多少股息？",
+   "query_keywords": "利润分配预案 现金红利",
+   "gold": [
+    {
+     "doc": "byd",
+     "pages": [
+      5,
+      3
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "byd",
+     "page": 5,
+     "text": "现金红利39.74元"
+    }
+   ]
+  },
+  {
+   "id": "midea-01",
+   "docs": [
+    "midea"
+   ],
+   "scope": "document",
+   "type": "指标定位",
+   "question": "美的研发人员有多少，研发投入情况在哪一页？",
+   "query_keywords": "研发人员数量 研发投入",
+   "gold": [
+    {
+     "doc": "midea",
+     "pages": [
+      52
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "midea",
+     "page": 52,
+     "text": "研发人员数量（人）"
+    }
+   ]
+  },
+  {
+   "id": "midea-02",
+   "docs": [
+    "midea"
+   ],
+   "scope": "document",
+   "type": "指标定位",
+   "question": "美的一共有多少员工？",
+   "query_keywords": "在职员工 数量合计",
+   "gold": [
+    {
+     "doc": "midea",
+     "pages": [
+      82
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "midea",
+     "page": 82,
+     "text": "在职员工的数量合计"
+    }
+   ]
+  },
+  {
+   "id": "midea-03",
+   "docs": [
+    "midea"
+   ],
+   "scope": "document",
+   "type": "指标定位",
+   "question": "美的在海外有多少研发中心和制造基地？",
+   "query_keywords": "海外 研发中心 制造基地",
+   "gold": [
+    {
+     "doc": "midea",
+     "pages": [
+      13
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "midea",
+     "page": 13,
+     "text": "在海外设有22"
+    }
+   ]
+  },
+  {
+   "id": "midea-04",
+   "docs": [
+    "midea"
+   ],
+   "scope": "document",
+   "type": "原因解释",
+   "question": "美的家电库存为什么一下子涨了这么多？",
+   "query_keywords": "库存量 同比 原因",
+   "gold": [
+    {
+     "doc": "midea",
+     "pages": [
+      50
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "midea",
+     "page": 50,
+     "text": "主要系2024年底临近春节假期提前备货所致"
+    }
+   ]
+  },
+  {
+   "id": "midea-05",
+   "docs": [
+    "midea"
+   ],
+   "scope": "document",
+   "type": "原因解释",
+   "question": "美的投资活动现金流为什么大幅减少？",
+   "query_keywords": "投资活动 现金流量净额 主要系",
+   "gold": [
+    {
+     "doc": "midea",
+     "pages": [
+      53
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "midea",
+     "page": 53,
+     "text": "主要系投资支付的现金增加所致"
+    }
+   ]
+  },
+  {
+   "id": "midea-06",
+   "docs": [
+    "midea"
+   ],
+   "scope": "document",
+   "type": "原因解释",
+   "question": "美的经营现金流和净利润差距大的原因是什么？",
+   "query_keywords": "经营活动 现金净流量 净利润 差异",
+   "gold": [
+    {
+     "doc": "midea",
+     "pages": [
+      54
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "midea",
+     "page": 54,
+     "text": "经营活动产生的现金净流量与本年度净利润存在重大差异的原因说明"
+    }
+   ]
+  },
+  {
+   "id": "midea-07",
+   "docs": [
+    "midea"
+   ],
+   "scope": "document",
+   "type": "原因解释",
+   "question": "美的说国内家电需求是靠什么恢复的？",
+   "query_keywords": "以旧换新 家电消费需求",
+   "gold": [
+    {
+     "doc": "midea",
+     "pages": [
+      20
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "midea",
+     "page": 20,
+     "text": "补贴政策拉动，家电消费需求有所恢复"
+    }
+   ]
+  },
+  {
+   "id": "midea-08",
+   "docs": [
+    "midea"
+   ],
+   "scope": "document",
+   "type": "展望与计划",
+   "question": "美的2025年的经营重点是什么？",
+   "query_keywords": "2025年 经营重点",
+   "gold": [
+    {
+     "doc": "midea",
+     "pages": [
+      60
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "midea",
+     "page": 60,
+     "text": "2025年经营重点"
+    }
+   ]
+  },
+  {
+   "id": "midea-09",
+   "docs": [
+    "midea"
+   ],
+   "scope": "document",
+   "type": "展望与计划",
+   "question": "美的的长期发展战略是什么？",
+   "query_keywords": "发展战略 战略主轴",
+   "gold": [
+    {
+     "doc": "midea",
+     "pages": [
+      59
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "midea",
+     "page": 59,
+     "text": "科技领先、用户直达、数智驱动、全球突破"
+    }
+   ]
+  },
+  {
+   "id": "midea-10",
+   "docs": [
+    "midea"
+   ],
+   "scope": "document",
+   "type": "展望与计划",
+   "question": "美的今年在国内市场打算怎么做？",
+   "query_keywords": "国内市场 零售 渠道",
+   "gold": [
+    {
+     "doc": "midea",
+     "pages": [
+      61
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "midea",
+     "page": 61,
+     "text": "2025年面向国内市场"
+    }
+   ]
+  },
+  {
+   "id": "midea-11",
+   "docs": [
+    "midea"
+   ],
+   "scope": "document",
+   "type": "风险因素",
+   "question": "美的面临哪些风险，有什么应对措施？",
+   "query_keywords": "面临的风险 应对措施",
+   "gold": [
+    {
+     "doc": "midea",
+     "pages": [
+      64,
+      65
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "midea",
+     "page": 64,
+     "text": "公司面临的风险和应对措施"
+    }
+   ]
+  },
+  {
+   "id": "midea-12",
+   "docs": [
+    "midea"
+   ],
+   "scope": "document",
+   "type": "风险因素",
+   "question": "铜、钢、铝这些原材料涨价对美的有什么风险？",
+   "query_keywords": "原材料 价格波动风险",
+   "gold": [
+    {
+     "doc": "midea",
+     "pages": [
+      65
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "midea",
+     "page": 65,
+     "text": "生产要素价格波动风险"
+    }
+   ]
+  },
+  {
+   "id": "midea-13",
+   "docs": [
+    "midea"
+   ],
+   "scope": "document",
+   "type": "风险因素",
+   "question": "美的做期货和外汇业务有哪些风险？",
+   "query_keywords": "外汇风险 期货 衍生品 风险",
+   "gold": [
+    {
+     "doc": "midea",
+     "pages": [
+      57,
+      58
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "midea",
+     "page": 57,
+     "text": "外汇风险敞口及原材料价格风险"
+    }
+   ]
+  },
+  {
+   "id": "midea-14",
+   "docs": [
+    "midea"
+   ],
+   "scope": "document",
+   "type": "表格定位",
+   "question": "美的前五大客户的销售占比是多少？",
+   "query_keywords": "前五名客户 销售金额",
+   "gold": [
+    {
+     "doc": "midea",
+     "pages": [
+      51
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "midea",
+     "page": 51,
+     "text": "前五名客户合计销售金额"
+    }
+   ]
+  },
+  {
+   "id": "midea-15",
+   "docs": [
+    "midea"
+   ],
+   "scope": "document",
+   "type": "表格定位",
+   "question": "美的前五大供应商采购占比是多少？",
+   "query_keywords": "前五名供应商 采购金额",
+   "gold": [
+    {
+     "doc": "midea",
+     "pages": [
+      52
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "midea",
+     "page": 52,
+     "text": "前五名供应商合计采购金额"
+    }
+   ]
+  },
+  {
+   "id": "midea-16",
+   "docs": [
+    "midea"
+   ],
+   "scope": "document",
+   "type": "表格定位",
+   "question": "美的家电的成本里原材料和人工各占多少？",
+   "query_keywords": "营业成本 原材料 人工工资",
+   "gold": [
+    {
+     "doc": "midea",
+     "pages": [
+      51
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "midea",
+     "page": 51,
+     "text": "家用电器行业原材料"
+    }
+   ]
+  },
+  {
+   "id": "midea-17",
+   "docs": [
+    "midea"
+   ],
+   "scope": "document",
+   "type": "表格定位",
+   "question": "美的去年接待了哪些机构调研，聊了什么？",
+   "query_keywords": "接待调研 投资者关系活动",
+   "gold": [
+    {
+     "doc": "midea",
+     "pages": [
+      66
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "midea",
+     "page": 66,
+     "text": "投资者关系活动记录表"
+    }
+   ]
+  },
+  {
+   "id": "midea-18",
+   "docs": [
+    "midea"
+   ],
+   "scope": "document",
+   "type": "同义口语",
+   "question": "美的做家电的利润率高不高？",
+   "query_keywords": "毛利率 分行业 制造业",
+   "gold": [
+    {
+     "doc": "midea",
+     "pages": [
+      50
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "midea",
+     "page": 50,
+     "text": "毛利率"
+    }
+   ]
+  },
+  {
+   "id": "midea-19",
+   "docs": [
+    "midea"
+   ],
+   "scope": "document",
+   "type": "同义口语",
+   "question": "美的在海外卖自己牌子的东西卖得怎么样？",
+   "query_keywords": "自有品牌 海外 OBM",
+   "gold": [
+    {
+     "doc": "midea",
+     "pages": [
+      28
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "midea",
+     "page": 28,
+     "text": "美的系自有品牌在多个国家"
+    }
+   ]
+  },
+  {
+   "id": "midea-20",
+   "docs": [
+    "midea"
+   ],
+   "scope": "document",
+   "type": "同义口语",
+   "question": "美的这次给股东分多少钱？",
+   "query_keywords": "利润分配方案 每10股",
+   "gold": [
+    {
+     "doc": "midea",
+     "pages": [
+      4
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "midea",
+     "page": 4,
+     "text": "向全体股东每10股派"
+    }
+   ]
+  },
+  {
+   "id": "cmb-01",
+   "docs": [
+    "cmb"
+   ],
+   "scope": "document",
+   "type": "指标定位",
+   "question": "招行的不良贷款率和拨备覆盖率在哪里能查到？",
+   "query_keywords": "不良贷款率 拨备覆盖率",
+   "gold": [
+    {
+     "doc": "cmb",
+     "pages": [
+      16,
+      19
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "cmb",
+     "page": 19,
+     "text": "不良贷款率0.95%，与上年末持平"
+    }
+   ],
+   "parse_gap": true
+  },
+  {
+   "id": "cmb-02",
+   "docs": [
+    "cmb"
+   ],
+   "scope": "document",
+   "type": "指标定位",
+   "question": "招行有多少研发人员？",
+   "query_keywords": "研发人员",
+   "gold": [
+    {
+     "doc": "cmb",
+     "pages": [
+      43
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "cmb",
+     "page": 43,
+     "text": "本集团研发人员达10,900人"
+    }
+   ],
+   "parse_gap": true
+  },
+  {
+   "id": "cmb-03",
+   "docs": [
+    "cmb"
+   ],
+   "scope": "document",
+   "type": "指标定位",
+   "question": "招行有多少零售客户，管理的客户资产有多大？",
+   "query_keywords": "零售客户数 AUM",
+   "gold": [
+    {
+     "doc": "cmb",
+     "pages": [
+      5,
+      8
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "cmb",
+     "page": 5,
+     "text": "零售客户数超过2亿户"
+    }
+   ],
+   "parse_gap": true
+  },
+  {
+   "id": "cmb-04",
+   "docs": [
+    "cmb"
+   ],
+   "scope": "document",
+   "type": "原因解释",
+   "question": "招行的利息收入为什么下降？",
+   "query_keywords": "利息收入 同比下降 主要是因为",
+   "gold": [
+    {
+     "doc": "cmb",
+     "pages": [
+      20
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "cmb",
+     "page": 20,
+     "text": "主要是因为生息资产收益率下降"
+    }
+   ],
+   "parse_gap": true
+  },
+  {
+   "id": "cmb-05",
+   "docs": [
+    "cmb"
+   ],
+   "scope": "document",
+   "type": "原因解释",
+   "question": "招行利息支出增长是什么原因？",
+   "query_keywords": "利息支出 同比增长 主要是因为",
+   "gold": [
+    {
+     "doc": "cmb",
+     "pages": [
+      21
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "cmb",
+     "page": 21,
+     "text": "主要是因为计息负债规模增长"
+    }
+   ],
+   "parse_gap": true
+  },
+  {
+   "id": "cmb-06",
+   "docs": [
+    "cmb"
+   ],
+   "scope": "document",
+   "type": "原因解释",
+   "question": "招行投资收益为什么涨了这么多？",
+   "query_keywords": "投资收益 同比增长",
+   "gold": [
+    {
+     "doc": "cmb",
+     "pages": [
+      24
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "cmb",
+     "page": 24,
+     "text": "主要是债券投资收益增加"
+    }
+   ],
+   "parse_gap": true
+  },
+  {
+   "id": "cmb-07",
+   "docs": [
+    "cmb"
+   ],
+   "scope": "document",
+   "type": "原因解释",
+   "question": "招行总资产增长主要来自哪里？",
+   "query_keywords": "资产总额 较上年末增长",
+   "gold": [
+    {
+     "doc": "cmb",
+     "pages": [
+      26
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "cmb",
+     "page": 26,
+     "text": "主要是由于本集团贷款和垫款、债券投资等增长"
+    }
+   ],
+   "parse_gap": true
+  },
+  {
+   "id": "cmb-08",
+   "docs": [
+    "cmb"
+   ],
+   "scope": "document",
+   "type": "展望与计划",
+   "question": "招行怎么看2025年的净息差走势？",
+   "query_keywords": "净利息收益率 展望 承压",
+   "gold": [
+    {
+     "doc": "cmb",
+     "pages": [
+      45
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "cmb",
+     "page": 45,
+     "text": "展望2025年，本集团净利息收益率将继续承压"
+    }
+   ],
+   "parse_gap": true
+  },
+  {
+   "id": "cmb-09",
+   "docs": [
+    "cmb"
+   ],
+   "scope": "document",
+   "type": "展望与计划",
+   "question": "招行对未来经营环境的判断和应对措施是什么？",
+   "query_keywords": "前景展望 应对措施",
+   "gold": [
+    {
+     "doc": "cmb",
+     "pages": [
+      70
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "cmb",
+     "page": 70,
+     "text": "前景展望与应对措施"
+    }
+   ],
+   "parse_gap": true
+  },
+  {
+   "id": "cmb-10",
+   "docs": [
+    "cmb"
+   ],
+   "scope": "document",
+   "type": "展望与计划",
+   "question": "招行行长对2025年有什么期待和打算？",
+   "query_keywords": "2025年 十四五 收官 机遇",
+   "gold": [
+    {
+     "doc": "cmb",
+     "pages": [
+      10
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "cmb",
+     "page": 10,
+     "text": "2025年是“十四五”规划收官之年"
+    }
+   ],
+   "parse_gap": true
+  },
+  {
+   "id": "cmb-11",
+   "docs": [
+    "cmb"
+   ],
+   "scope": "document",
+   "type": "风险因素",
+   "question": "招行的风险管理体系是怎样的？",
+   "query_keywords": "风险管理 风险与合规",
+   "gold": [
+    {
+     "doc": "cmb",
+     "pages": [
+      65
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "cmb",
+     "page": 65,
+     "text": "堡垒式的风险与合规管理体系"
+    }
+   ],
+   "parse_gap": true
+  },
+  {
+   "id": "cmb-12",
+   "docs": [
+    "cmb"
+   ],
+   "scope": "document",
+   "type": "风险因素",
+   "question": "招行对房地产贷款的风险敞口有多大？",
+   "query_keywords": "房地产业 贷款余额",
+   "gold": [
+    {
+     "doc": "cmb",
+     "pages": [
+      46
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "cmb",
+     "page": 46,
+     "text": "本公司房地产业贷款余额"
+    }
+   ],
+   "parse_gap": true
+  },
+  {
+   "id": "cmb-13",
+   "docs": [
+    "cmb"
+   ],
+   "scope": "document",
+   "type": "风险因素",
+   "question": "招行特别提到要防范哪些重点领域的风险？",
+   "query_keywords": "结构性风险 零售信贷风险",
+   "gold": [
+    {
+     "doc": "cmb",
+     "pages": [
+      7
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "cmb",
+     "page": 7,
+     "text": "旧动能减弱带来的结构性风险和零售信贷风险"
+    }
+   ],
+   "parse_gap": true
+  },
+  {
+   "id": "cmb-14",
+   "docs": [
+    "cmb"
+   ],
+   "scope": "document",
+   "type": "表格定位",
+   "question": "招行资本充足率的指标表在哪？",
+   "query_keywords": "资本充足率 核心一级",
+   "gold": [
+    {
+     "doc": "cmb",
+     "pages": [
+      16
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "cmb",
+     "page": 16,
+     "text": "资本充足率指标"
+    }
+   ],
+   "parse_gap": true
+  },
+  {
+   "id": "cmb-15",
+   "docs": [
+    "cmb"
+   ],
+   "scope": "document",
+   "type": "表格定位",
+   "question": "招行贷款按行业的分布表在哪？",
+   "query_keywords": "贷款 行业 批发和零售业",
+   "gold": [
+    {
+     "doc": "cmb",
+     "pages": [
+      33
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "cmb",
+     "page": 33,
+     "text": "批发和零售业"
+    }
+   ],
+   "parse_gap": true
+  },
+  {
+   "id": "cmb-16",
+   "docs": [
+    "cmb"
+   ],
+   "scope": "document",
+   "type": "表格定位",
+   "question": "招行持有的前十大金融债券是哪些？",
+   "query_keywords": "前十大 金融债券",
+   "gold": [
+    {
+     "doc": "cmb",
+     "pages": [
+      29
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "cmb",
+     "page": 29,
+     "text": "前十大面值金融债券"
+    }
+   ],
+   "parse_gap": true
+  },
+  {
+   "id": "cmb-17",
+   "docs": [
+    "cmb"
+   ],
+   "scope": "document",
+   "type": "同义口语",
+   "question": "招行放贷的利差还剩多少？",
+   "query_keywords": "净利差 净利息收益率",
+   "gold": [
+    {
+     "doc": "cmb",
+     "pages": [
+      16,
+      22
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "cmb",
+     "page": 22,
+     "text": "净利差1.86%，同比下降17"
+    }
+   ],
+   "parse_gap": true
+  },
+  {
+   "id": "cmb-18",
+   "docs": [
+    "cmb"
+   ],
+   "scope": "document",
+   "type": "同义口语",
+   "question": "招行的坏账多吗？",
+   "query_keywords": "不良贷款 余额",
+   "gold": [
+    {
+     "doc": "cmb",
+     "pages": [
+      16,
+      19,
+      31
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "cmb",
+     "page": 16,
+     "text": "不良贷款余额"
+    }
+   ],
+   "parse_gap": true
+  },
+  {
+   "id": "cmb-19",
+   "docs": [
+    "cmb"
+   ],
+   "scope": "document",
+   "type": "同义口语",
+   "question": "招行App用的人多不多？",
+   "query_keywords": "App 月活跃用户",
+   "gold": [
+    {
+     "doc": "cmb",
+     "pages": [
+      10
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "cmb",
+     "page": 10,
+     "text": "月活跃用户(MAU)达1.23亿户"
+    }
+   ],
+   "parse_gap": true
+  },
+  {
+   "id": "cmb-20",
+   "docs": [
+    "cmb"
+   ],
+   "scope": "document",
+   "type": "同义口语",
+   "question": "招行这次每股分红多少？",
+   "query_keywords": "现金股息 每股现金分红",
+   "gold": [
+    {
+     "doc": "cmb",
+     "pages": [
+      4
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "cmb",
+     "page": 4,
+     "text": "每股现金分红2.000元"
+    }
+   ],
+   "parse_gap": true
+  },
+  {
+   "id": "pingan-01",
+   "docs": [
+    "pingan"
+   ],
+   "scope": "document",
+   "type": "指标定位",
+   "question": "平安寿险的新业务价值增长情况在哪里讲？",
+   "query_keywords": "新业务价值 同比增长",
+   "gold": [
+    {
+     "doc": "pingan",
+     "pages": [
+      12,
+      15,
+      35
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "pingan",
+     "page": 12,
+     "text": "新业务价值同比增长28.8%"
+    }
+   ]
+  },
+  {
+   "id": "pingan-02",
+   "docs": [
+    "pingan"
+   ],
+   "scope": "document",
+   "type": "指标定位",
+   "question": "平安一共有多少员工？",
+   "query_keywords": "在职员工",
+   "gold": [
+    {
+     "doc": "pingan",
+     "pages": [
+      133
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "pingan",
+     "page": 133,
+     "text": "平安体系内共有在职员工"
+    }
+   ]
+  },
+  {
+   "id": "pingan-03",
+   "docs": [
+    "pingan"
+   ],
+   "scope": "document",
+   "type": "指标定位",
+   "question": "平安寿险、养老险、健康险的偿付能力怎么样？",
+   "query_keywords": "偿付能力充足率",
+   "gold": [
+    {
+     "doc": "pingan",
+     "pages": [
+      41
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "pingan",
+     "page": 41,
+     "text": "偿付能力充足率均显著高于监管要求"
+    }
+   ]
+  },
+  {
+   "id": "pingan-04",
+   "docs": [
+    "pingan"
+   ],
+   "scope": "document",
+   "type": "原因解释",
+   "question": "平安经营活动现金流为什么增加了？",
+   "query_keywords": "经营活动 现金净流入 主要原因",
+   "gold": [
+    {
+     "doc": "pingan",
+     "pages": [
+      78
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "pingan",
+     "page": 78,
+     "text": "主要原因是平安寿险经营产生的现金净流入额增加"
+    }
+   ]
+  },
+  {
+   "id": "pingan-05",
+   "docs": [
+    "pingan"
+   ],
+   "scope": "document",
+   "type": "原因解释",
+   "question": "平安寿险新业务价值大幅提升靠的是什么？",
+   "query_keywords": "新业务价值 寿险改革",
+   "gold": [
+    {
+     "doc": "pingan",
+     "pages": [
+      14
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "pingan",
+     "page": 14,
+     "text": "得益于坚定不移的寿险改革及市场需求回升向好"
+    }
+   ]
+  },
+  {
+   "id": "pingan-06",
+   "docs": [
+    "pingan"
+   ],
+   "scope": "document",
+   "type": "原因解释",
+   "question": "算新业务价值用的首年保费为什么和经营分析里的不一样？",
+   "query_keywords": "首年保费 差异 新业务价值",
+   "gold": [
+    {
+     "doc": "pingan",
+     "pages": [
+      73
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "pingan",
+     "page": 73,
+     "text": "计算新业务价值的首年保费不包含"
+    }
+   ]
+  },
+  {
+   "id": "pingan-07",
+   "docs": [
+    "pingan"
+   ],
+   "scope": "document",
+   "type": "原因解释",
+   "question": "平安投资活动的现金流出为什么增加？",
+   "query_keywords": "投资活动 现金净流出 主要原因",
+   "gold": [
+    {
+     "doc": "pingan",
+     "pages": [
+      78
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "pingan",
+     "page": 78,
+     "text": "主要原因是平安寿险投资支付的现金流出同比增加"
+    }
+   ]
+  },
+  {
+   "id": "pingan-08",
+   "docs": [
+    "pingan"
+   ],
+   "scope": "document",
+   "type": "展望与计划",
+   "question": "平安2025年的经营方针是什么？",
+   "query_keywords": "经营方针 发展战略 经营计划",
+   "gold": [
+    {
+     "doc": "pingan",
+     "pages": [
+      98
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "pingan",
+     "page": 98,
+     "text": "聚焦主业、增收节支、改革创新、防范风险"
+    }
+   ]
+  },
+  {
+   "id": "pingan-09",
+   "docs": [
+    "pingan"
+   ],
+   "scope": "document",
+   "type": "展望与计划",
+   "question": "平安怎么看保险行业未来的发展趋势？",
+   "query_keywords": "发展趋势 保险行业",
+   "gold": [
+    {
+     "doc": "pingan",
+     "pages": [
+      97
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "pingan",
+     "page": 97,
+     "text": "长期利好保险行业"
+    }
+   ]
+  },
+  {
+   "id": "pingan-10",
+   "docs": [
+    "pingan"
+   ],
+   "scope": "document",
+   "type": "展望与计划",
+   "question": "平安的高端养老社区什么时候开业？",
+   "query_keywords": "康养社区 开业",
+   "gold": [
+    {
+     "doc": "pingan",
+     "pages": [
+      15,
+      35,
+      38
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "pingan",
+     "page": 15,
+     "text": "上海及深圳项目拟于2025年下半年正式开业"
+    }
+   ]
+  },
+  {
+   "id": "pingan-11",
+   "docs": [
+    "pingan"
+   ],
+   "scope": "document",
+   "type": "风险因素",
+   "question": "平安经营中主要面临哪几类风险？",
+   "query_keywords": "保险风险 信用风险 市场风险 操作风险",
+   "gold": [
+    {
+     "doc": "pingan",
+     "pages": [
+      4,
+      82
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "pingan",
+     "page": 4,
+     "text": "本公司经营中面临的风险主要有保险风险"
+    }
+   ]
+  },
+  {
+   "id": "pingan-12",
+   "docs": [
+    "pingan"
+   ],
+   "scope": "document",
+   "type": "风险因素",
+   "question": "房价下跌对平安的投资有什么影响？",
+   "query_keywords": "房地产价格风险",
+   "gold": [
+    {
+     "doc": "pingan",
+     "pages": [
+      84
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "pingan",
+     "page": 84,
+     "text": "房地产价格风险"
+    }
+   ]
+  },
+  {
+   "id": "pingan-13",
+   "docs": [
+    "pingan"
+   ],
+   "scope": "document",
+   "type": "风险因素",
+   "question": "平安的保险资金投资风险是怎么管控的？",
+   "query_keywords": "投资风险管理 压力测试",
+   "gold": [
+    {
+     "doc": "pingan",
+     "pages": [
+      52
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "pingan",
+     "page": 52,
+     "text": "投资风险管理"
+    }
+   ]
+  },
+  {
+   "id": "pingan-14",
+   "docs": [
+    "pingan"
+   ],
+   "scope": "document",
+   "type": "表格定位",
+   "question": "平安的营运ROE和每股股息这些关键指标在哪张表？",
+   "query_keywords": "营运ROE 每股股息",
+   "gold": [
+    {
+     "doc": "pingan",
+     "pages": [
+      19
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "pingan",
+     "page": 19,
+     "text": "营运ROE"
+    }
+   ]
+  },
+  {
+   "id": "pingan-15",
+   "docs": [
+    "pingan"
+   ],
+   "scope": "document",
+   "type": "表格定位",
+   "question": "平安产险的偿付能力数据表在哪？",
+   "query_keywords": "平安产险 核心偿付能力充足率",
+   "gold": [
+    {
+     "doc": "pingan",
+     "pages": [
+      46
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "pingan",
+     "page": 46,
+     "text": "平安产险的核心偿付能力充足率"
+    }
+   ]
+  },
+  {
+   "id": "pingan-16",
+   "docs": [
+    "pingan"
+   ],
+   "scope": "document",
+   "type": "表格定位",
+   "question": "平安的现金流量表摘要里三类现金流分别是多少？",
+   "query_keywords": "现金流量净额 经营活动 投资活动 筹资活动",
+   "gold": [
+    {
+     "doc": "pingan",
+     "pages": [
+      78
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "pingan",
+     "page": 78,
+     "text": "筹资活动产生的现金流量净额"
+    }
+   ]
+  },
+  {
+   "id": "pingan-17",
+   "docs": [
+    "pingan"
+   ],
+   "scope": "document",
+   "type": "同义口语",
+   "question": "平安银行的坏账多不多？",
+   "query_keywords": "不良贷款率 拨备覆盖率",
+   "gold": [
+    {
+     "doc": "pingan",
+     "pages": [
+      13,
+      15
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "pingan",
+     "page": 13,
+     "text": "不良贷款率1.06%"
+    }
+   ]
+  },
+  {
+   "id": "pingan-18",
+   "docs": [
+    "pingan"
+   ],
+   "scope": "document",
+   "type": "同义口语",
+   "question": "平安财险的车险到底赚不赚钱？",
+   "query_keywords": "综合成本率 车险",
+   "gold": [
+    {
+     "doc": "pingan",
+     "pages": [
+      12,
+      15,
+      19
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "pingan",
+     "page": 12,
+     "text": "车险综合成本率98.1%"
+    }
+   ]
+  },
+  {
+   "id": "pingan-19",
+   "docs": [
+    "pingan"
+   ],
+   "scope": "document",
+   "type": "同义口语",
+   "question": "平安卖保险的业务员还剩多少人？",
+   "query_keywords": "代理人数量",
+   "gold": [
+    {
+     "doc": "pingan",
+     "pages": [
+      12,
+      15
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "pingan",
+     "page": 12,
+     "text": "代理人数量"
+    }
+   ]
+  },
+  {
+   "id": "pingan-20",
+   "docs": [
+    "pingan"
+   ],
+   "scope": "document",
+   "type": "同义口语",
+   "question": "平安今年每股能分多少钱？",
+   "query_keywords": "股息 每股现金",
+   "gold": [
+    {
+     "doc": "pingan",
+     "pages": [
+      4,
+      12,
+      14
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "pingan",
+     "page": 12,
+     "text": "全年股息每股现金人民币2.55元"
+    }
+   ]
+  },
+  {
+   "id": "cross-01",
+   "docs": [
+    "moutai",
+    "byd"
+   ],
+   "scope": "library",
+   "type": "跨公司",
+   "question": "茅台和比亚迪，谁的客户更集中？",
+   "query_keywords": "前五名客户 销售额",
+   "gold": [
+    {
+     "doc": "moutai",
+     "pages": [
+      10
+     ]
+    },
+    {
+     "doc": "byd",
+     "pages": [
+      26,
+      27
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "moutai",
+     "page": 10,
+     "text": "前五名客户销售额"
+    },
+    {
+     "doc": "byd",
+     "page": 26,
+     "text": "前五名客户合计销售金额"
+    }
+   ]
+  },
+  {
+   "id": "cross-02",
+   "docs": [
+    "catl",
+    "byd"
+   ],
+   "scope": "library",
+   "type": "跨公司",
+   "question": "宁德时代和比亚迪的研发投入谁更多？",
+   "query_keywords": "研发投入金额 占营业收入比例",
+   "gold": [
+    {
+     "doc": "catl",
+     "pages": [
+      25
+     ]
+    },
+    {
+     "doc": "byd",
+     "pages": [
+      34
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "catl",
+     "page": 25,
+     "text": "研发投入金额"
+    },
+    {
+     "doc": "byd",
+     "page": 34,
+     "text": "研发投入金额"
+    }
+   ]
+  },
+  {
+   "id": "cross-03",
+   "docs": [
+    "catl",
+    "byd"
+   ],
+   "scope": "library",
+   "type": "跨公司",
+   "question": "宁德时代和比亚迪的储能业务分别做得怎么样？",
+   "query_keywords": "储能",
+   "gold": [
+    {
+     "doc": "catl",
+     "pages": [
+      19,
+      20,
+      18
+     ]
+    },
+    {
+     "doc": "byd",
+     "pages": [
+      21
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "catl",
+     "page": 19,
+     "text": "储能电池系统"
+    },
+    {
+     "doc": "byd",
+     "page": 21,
+     "text": "在储能业务方面"
+    }
+   ]
+  },
+  {
+   "id": "cross-04",
+   "docs": [
+    "moutai",
+    "midea"
+   ],
+   "scope": "library",
+   "type": "跨公司",
+   "question": "茅台和美的分别有多少员工？",
+   "query_keywords": "在职员工 数量合计",
+   "gold": [
+    {
+     "doc": "moutai",
+     "pages": [
+      33
+     ]
+    },
+    {
+     "doc": "midea",
+     "pages": [
+      82
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "moutai",
+     "page": 33,
+     "text": "在职员工的数量合计"
+    },
+    {
+     "doc": "midea",
+     "page": 82,
+     "text": "在职员工的数量合计"
+    }
+   ]
+  },
+  {
+   "id": "cross-05",
+   "docs": [
+    "cmb",
+    "pingan"
+   ],
+   "scope": "library",
+   "type": "跨公司",
+   "question": "招商银行和平安银行的不良率谁更低？",
+   "query_keywords": "不良贷款率",
+   "gold": [
+    {
+     "doc": "cmb",
+     "pages": [
+      16,
+      19
+     ]
+    },
+    {
+     "doc": "pingan",
+     "pages": [
+      13,
+      15
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "cmb",
+     "page": 19,
+     "text": "不良贷款率0.95%",
+     "parse_gap": true
+    },
+    {
+     "doc": "pingan",
+     "page": 13,
+     "text": "不良贷款率1.06%"
+    }
+   ],
+   "parse_gap": true
+  },
+  {
+   "id": "cross-06",
+   "docs": [
+    "midea",
+    "catl"
+   ],
+   "scope": "library",
+   "type": "跨公司",
+   "question": "美的和宁德时代怎么应对原材料价格波动？",
+   "query_keywords": "原材料 价格波动",
+   "gold": [
+    {
+     "doc": "midea",
+     "pages": [
+      65
+     ]
+    },
+    {
+     "doc": "catl",
+     "pages": [
+      40
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "midea",
+     "page": 65,
+     "text": "生产要素价格波动风险"
+    },
+    {
+     "doc": "catl",
+     "page": 40,
+     "text": "原材料价格波动及供应风险"
+    }
+   ]
+  },
+  {
+   "id": "cross-07",
+   "docs": [
+    "moutai",
+    "catl"
+   ],
+   "scope": "library",
+   "type": "跨公司",
+   "question": "茅台和宁德时代今年的分红方案分别是什么？",
+   "query_keywords": "利润分配预案 现金红利",
+   "gold": [
+    {
+     "doc": "moutai",
+     "pages": [
+      2
+     ]
+    },
+    {
+     "doc": "catl",
+     "pages": [
+      3
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "moutai",
+     "page": 2,
+     "text": "利润分配预案"
+    },
+    {
+     "doc": "catl",
+     "page": 3,
+     "text": "利润分配预案"
+    }
+   ]
+  },
+  {
+   "id": "cross-08",
+   "docs": [
+    "midea",
+    "byd"
+   ],
+   "scope": "library",
+   "type": "跨公司",
+   "question": "美的和比亚迪在海外是怎么布局的？",
+   "query_keywords": "海外 本地化 工厂",
+   "gold": [
+    {
+     "doc": "midea",
+     "pages": [
+      28
+     ]
+    },
+    {
+     "doc": "byd",
+     "pages": [
+      3,
+      42
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "midea",
+     "page": 28,
+     "text": "持续拓展海外制造布局"
+    },
+    {
+     "doc": "byd",
+     "page": 3,
+     "text": "推进本地化生产进程"
+    }
+   ]
+  },
+  {
+   "id": "cross-09",
+   "docs": [
+    "catl",
+    "midea"
+   ],
+   "scope": "library",
+   "type": "跨公司",
+   "question": "宁德时代和美的前五大供应商的采购占比各是多少？",
+   "query_keywords": "前五名供应商 采购金额",
+   "gold": [
+    {
+     "doc": "catl",
+     "pages": [
+      23
+     ]
+    },
+    {
+     "doc": "midea",
+     "pages": [
+      52
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "catl",
+     "page": 23,
+     "text": "前五名供应商合计采购金额"
+    },
+    {
+     "doc": "midea",
+     "page": 52,
+     "text": "前五名供应商合计采购金额"
+    }
+   ]
+  },
+  {
+   "id": "cross-10",
+   "docs": [
+    "pingan",
+    "cmb"
+   ],
+   "scope": "library",
+   "type": "跨公司",
+   "question": "平安和招行对2025年的经营环境怎么看？",
+   "query_keywords": "2025年 展望 外部环境",
+   "gold": [
+    {
+     "doc": "pingan",
+     "pages": [
+      97,
+      98
+     ]
+    },
+    {
+     "doc": "cmb",
+     "pages": [
+      70,
+      45,
+      10
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "pingan",
+     "page": 97,
+     "text": "外部环境依然复杂严峻"
+    },
+    {
+     "doc": "cmb",
+     "page": 70,
+     "text": "前景展望与应对措施",
+     "parse_gap": true
+    }
+   ],
+   "parse_gap": true
+  },
+  {
+   "id": "cross-11",
+   "docs": [
+    "byd",
+    "midea"
+   ],
+   "scope": "library",
+   "type": "跨公司",
+   "question": "比亚迪和美的的现金流变化各是什么原因？",
+   "query_keywords": "现金流量净额 主要影响因素",
+   "gold": [
+    {
+     "doc": "byd",
+     "pages": [
+      34
+     ]
+    },
+    {
+     "doc": "midea",
+     "pages": [
+      53,
+      54
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "byd",
+     "page": 34,
+     "text": "主要是购买商品、接受劳务支付的现金增加所致"
+    },
+    {
+     "doc": "midea",
+     "page": 53,
+     "text": "主要系投资支付的现金增加所致"
+    }
+   ]
+  },
+  {
+   "id": "cross-12",
+   "docs": [
+    "moutai",
+    "pingan"
+   ],
+   "scope": "library",
+   "type": "跨公司",
+   "question": "茅台和平安都怎么看宏观经济带来的风险？",
+   "query_keywords": "宏观经济 风险",
+   "gold": [
+    {
+     "doc": "moutai",
+     "pages": [
+      22
+     ]
+    },
+    {
+     "doc": "pingan",
+     "pages": [
+      97
+     ]
+    }
+   ],
+   "evidence": [
+    {
+     "doc": "moutai",
+     "page": 22,
+     "text": "一是宏观经济风险"
+    },
+    {
+     "doc": "pingan",
+     "page": 97,
+     "text": "国际地缘政治风险显著上升"
+    }
+   ]
+  },
+  {
+   "id": "none-01",
+   "docs": [],
+   "scope": "library",
+   "type": "无答案",
+   "question": "腾讯2024年的游戏收入是多少？",
+   "query_keywords": "腾讯 游戏收入",
+   "gold": [],
+   "absent_terms": [
+    "腾讯"
+   ]
+  },
+  {
+   "id": "none-02",
+   "docs": [],
+   "scope": "library",
+   "type": "无答案",
+   "question": "五粮液去年的经销商有多少家？",
+   "query_keywords": "五粮液 经销商",
+   "gold": [],
+   "absent_terms": [
+    "五粮液"
+   ]
+  },
+  {
+   "id": "none-03",
+   "docs": [],
+   "scope": "library",
+   "type": "无答案",
+   "question": "小米SU7去年交付了多少辆？",
+   "query_keywords": "小米SU7 交付",
+   "gold": [],
+   "absent_terms": [
+    "SU7"
+   ]
+  },
+  {
+   "id": "none-04",
+   "docs": [],
+   "scope": "library",
+   "type": "无答案",
+   "question": "格力电器的空调销量是多少？",
+   "query_keywords": "格力 空调 销量",
+   "gold": [],
+   "absent_terms": [
+    "格力"
+   ]
+  },
+  {
+   "id": "none-05",
+   "docs": [],
+   "scope": "library",
+   "type": "无答案",
+   "question": "海底捞去年的翻台率是多少？",
+   "query_keywords": "海底捞 翻台率",
+   "gold": [],
+   "absent_terms": [
+    "海底捞",
+    "翻台率"
+   ]
+  },
+  {
+   "id": "none-06",
+   "docs": [],
+   "scope": "library",
+   "type": "无答案",
+   "question": "中芯国际的晶圆产能利用率是多少？",
+   "query_keywords": "中芯国际 晶圆 产能利用率",
+   "gold": [],
+   "absent_terms": [
+    "中芯国际"
+   ]
+  },
+  {
+   "id": "none-07",
+   "docs": [],
+   "scope": "library",
+   "type": "无答案",
+   "question": "特斯拉上海超级工厂的产量是多少？",
+   "query_keywords": "特斯拉 上海 产量",
+   "gold": [],
+   "absent_terms": [
+    "特斯拉",
+    "Tesla"
+   ]
+  },
+  {
+   "id": "none-08",
+   "docs": [],
+   "scope": "library",
+   "type": "无答案",
+   "question": "茅台在比特币上投了多少钱？",
+   "query_keywords": "比特币 投资",
+   "gold": [],
+   "absent_terms": [
+    "比特币"
+   ]
+  },
+  {
+   "id": "none-09",
+   "docs": [],
+   "scope": "library",
+   "type": "无答案",
+   "question": "宁德时代2026年一季度的营收是多少？",
+   "query_keywords": "2026年一季度 营收",
+   "gold": [],
+   "absent_terms": [
+    "2026年第一季度",
+    "2026年一季度"
+   ]
+  },
+  {
+   "id": "none-10",
+   "docs": [],
+   "scope": "library",
+   "type": "无答案",
+   "question": "美的集团的生猪养殖业务规模有多大？",
+   "query_keywords": "生猪 养殖",
+   "gold": [],
+   "absent_terms": [
+    "生猪"
+   ]
+  },
+  {
+   "id": "none-11",
+   "docs": [],
+   "scope": "library",
+   "type": "无答案",
+   "question": "比亚迪的飞行汽车什么时候量产？",
+   "query_keywords": "飞行汽车 量产",
+   "gold": [],
+   "absent_terms": [
+    "飞行汽车"
+   ]
+  },
+  {
+   "id": "none-12",
+   "docs": [],
+   "scope": "library",
+   "type": "无答案",
+   "question": "招行和蚂蚁集团合作做了什么？",
+   "query_keywords": "蚂蚁集团 合作",
+   "gold": [],
+   "absent_terms": [
+    "蚂蚁集团"
+   ]
+  }
+ ]
+}

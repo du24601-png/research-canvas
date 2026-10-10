@@ -54,6 +54,7 @@
     "test:ui": "npm run test -w research-canvas-client",
     "test:e2e:smoke": "node scripts/e2e-research-board-smoke.mjs",
     "eval:agent": "node eval/agent/pipeline/run.mjs",
+    "eval:rag": "node eval/rag/run.mjs",
     "eval:agent:component": "node eval/agent/component/run.mjs",
     "eval:agent:planning": "node eval/agent/planning/run.mjs",
     "eval:agent:prompt": "node eval/agent/prompt/run.mjs"
