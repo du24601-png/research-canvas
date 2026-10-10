@@ -83,3 +83,35 @@ test('hook: off → nothing; on → emits research_ui_spec with a compose step',
     endResearchCanvasTurn('composer-hook')
   }
 })
+
+test('composer describes MetricTable / KeyPoints / 个股速览 and accepts the layout', async () => {
+  const metric = (id, m) => ({ ...DS, id, metric: m, title: m, periods: ['2023', '2024', '2025'], data: ['2023', '2024', '2025'].map((period, i) => ({ entityId: A.id, period, value: 10 + i })) })
+  const sets = [
+    metric('research-ds-aaaaaaaa-aaaa-4aaa-8aaa-000000000001', 'revenue'),
+    metric('research-ds-aaaaaaaa-aaaa-4aaa-8aaa-000000000002', 'revenue_growth'),
+    metric('research-ds-aaaaaaaa-aaaa-4aaa-8aaa-000000000003', 'gross_margin'),
+    metric('research-ds-aaaaaaaa-aaaa-4aaa-8aaa-000000000004', 'net_margin'),
+    metric('research-ds-aaaaaaaa-aaaa-4aaa-8aaa-000000000005', 'roe'),
+  ]
+  const ids = sets.map(s => s.id)
+  const overview = {
+    version: 1,
+    blocks: [
+      { component: 'NumberSentence', datasetId: ids[0], template: `{entity:${A.id}} 2025 年营收 {value:${A.id}@2025}，较上年 {delta:${A.id}@2025}` },
+      { component: 'KpiRow', datasetId: ids[0] },
+      { component: 'KpiRow', datasetId: ids[3] },
+      { component: 'TrendView', datasetId: ids[0], actions: ['pin'] },
+      { component: 'KeyPoints', datasetIds: ids.slice(0, 4) },
+      { component: 'MetricTable', datasetIds: ids.slice(0, 4) },
+      { component: 'MetricTable', datasetIds: ids.slice(4) },
+      { component: 'EvidencePanel', datasetIds: ids.slice(0, 4) },
+      { component: 'EvidencePanel', datasetIds: ids.slice(4) },
+    ],
+  }
+  let system = ''
+  const out = await composeResearchUi({ task: '茅台个股速览', datasets: sets, chat: async (messages) => { system = messages[0].content; return JSON.stringify(overview) } })
+  assert.deepEqual(out.spec, overview)
+  for (const word of ['MetricTable', 'KeyPoints', '个股速览', '1–10']) assert.ok(system.includes(word), word)
+  const withPoints = { version: 1, blocks: [{ component: 'KeyPoints', datasetIds: [ids[0]], points: ['营收创新高'] }] }
+  assert.ok((await composeResearchUi({ task: 't', datasets: sets, chat: async () => JSON.stringify(withPoints) })).error)
+})

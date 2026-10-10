@@ -86,6 +86,10 @@
       "types": "./dist/research-ui-spec-text.d.ts",
       "import": "./dist/research-ui-spec-text.js"
     },
+    "./research-key-points": {
+      "types": "./dist/research-key-points.d.ts",
+      "import": "./dist/research-key-points.js"
+    },
     "./research-dataset-delta": {
       "types": "./dist/research-dataset-delta.d.ts",
       "import": "./dist/research-dataset-delta.js"

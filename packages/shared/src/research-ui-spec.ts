@@ -10,7 +10,7 @@ import { checkKpiPeriod, checkNumberSentenceTemplate, type ResearchUiTextDataset
 
 export const RESEARCH_UI_SPEC_VERSION = 1
 
-export const RESEARCH_UI_COMPONENTS = ['ComparisonView', 'TrendView', 'EvidencePanel', 'MissingData', 'KpiRow', 'NumberSentence'] as const
+export const RESEARCH_UI_COMPONENTS = ['ComparisonView', 'TrendView', 'EvidencePanel', 'MissingData', 'KpiRow', 'NumberSentence', 'MetricTable', 'KeyPoints'] as const
 export type ResearchUiComponent = typeof RESEARCH_UI_COMPONENTS[number]
 
 export const RESEARCH_UI_ACTIONS = ['pin', 'open_sources', 'highlight_largest_change', 'rerun', 'adjust'] as const
@@ -25,6 +25,10 @@ export type ResearchUiBlock =
   | { component: 'KpiRow'; datasetId: string; period?: string; title?: string }
   /** 一句结论：模板只含占位符，数字由代码填并做成可追溯的引用 */
   | { component: 'NumberSentence'; datasetId: string; template: string }
+  /** 数值表：行 = 实体，列 = 年份，每个数据集一张小表；数值、首末变化、底色深浅都由前端代码从 Dataset 算 */
+  | { component: 'MetricTable'; datasetIds: string[]; title?: string }
+  /** 2–3 条要点：信号与措辞全部由 shared research-key-points 代码确定，Spec 只给数据集 */
+  | { component: 'KeyPoints'; datasetIds: string[] }
 
 export interface ResearchUiSpec {
   version: typeof RESEARCH_UI_SPEC_VERSION
@@ -39,7 +43,8 @@ export interface ResearchUiDatasetRef extends ResearchUiTextDatasetRef {
 
 export type ResearchUiSpecResult = { ok: true; spec: ResearchUiSpec } | { ok: false; errors: string[] }
 
-const BLOCK_LIMIT = 8
+export const RESEARCH_UI_BLOCK_LIMIT = 10
+const BLOCK_LIMIT = RESEARCH_UI_BLOCK_LIMIT
 const DATASETS_PER_BLOCK = 4
 const TITLE_MAX = 40
 /** 去掉四位年份后还剩数字 → 视为在 Spec 里写了数值 */
@@ -52,6 +57,8 @@ const FIELDS: Record<ResearchUiComponent, readonly string[]> = {
   MissingData: ['component', 'datasetId', 'title'],
   KpiRow: ['component', 'datasetId', 'period', 'title'],
   NumberSentence: ['component', 'datasetId', 'template'],
+  MetricTable: ['component', 'datasetIds', 'title'],
+  KeyPoints: ['component', 'datasetIds'],
 }
 
 const ACTIONS_FOR: Record<ResearchUiComponent, readonly ResearchUiAction[]> = {
@@ -61,6 +68,8 @@ const ACTIONS_FOR: Record<ResearchUiComponent, readonly ResearchUiAction[]> = {
   MissingData: [],
   KpiRow: [],
   NumberSentence: [],
+  MetricTable: [],
+  KeyPoints: [],
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -150,6 +159,8 @@ function parseBlock(raw: unknown, at: string, known: ReadonlyMap<string, Researc
   if (component === 'KpiRow' || component === 'NumberSentence') return parseTextBlock(raw, component, at, known, errors)
   const title = checkTitle(raw.title, at, errors)
   const titled = title ? { title } : {}
+  if (component === 'MetricTable') return { component, datasetIds: checkDatasetIds(raw.datasetIds, `${at}.datasetIds`, known, errors), ...titled }
+  if (component === 'KeyPoints') return { component, datasetIds: checkDatasetIds(raw.datasetIds, `${at}.datasetIds`, known, errors) }
   if (component === 'EvidencePanel') return { component, datasetIds: checkDatasetIds(raw.datasetIds, `${at}.datasetIds`, known, errors), ...titled }
   if (component === 'MissingData') return { component, datasetId: checkDatasetId(raw.datasetId, `${at}.datasetId`, known, errors), ...titled }
   const actions = checkActions(raw.actions, component, at, errors)

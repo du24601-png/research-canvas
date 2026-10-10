@@ -22,12 +22,12 @@ export function formatNumber(value: number | null): string {
   return value < 0 && Number(text) !== 0 ? `−${text}` : text
 }
 
-function signed(value: number): string {
+export function signed(value: number): string {
   const sign = value > 0 ? '+' : value < 0 ? '−' : ''
   return `${sign}${formatNumber(Math.abs(value))}`
 }
 
-function isRatio(dataset: Dataset): boolean {
+export function isRatio(dataset: Dataset): boolean {
   return dataset.unit === '%'
 }
 

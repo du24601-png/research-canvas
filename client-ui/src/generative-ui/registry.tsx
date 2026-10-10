@@ -8,7 +8,9 @@ import {
 import type { Dataset } from '../chat/research-canvas/types'
 import ComparisonView from './ComparisonView'
 import EvidencePanel from './EvidencePanel'
+import KeyPoints from './KeyPoints'
 import KpiRow from './KpiRow'
+import MetricTable from './MetricTable'
 import MissingData from './MissingData'
 import NumberSentence from './NumberSentence'
 import TrendView from './TrendView'
@@ -25,6 +27,8 @@ export function renderBlock(
   if (block.component === 'TrendView') return <TrendView key={key} block={block} getDataset={getDataset} onAction={onAction} />
   if (block.component === 'KpiRow') return <KpiRow key={key} block={block} getDataset={getDataset} />
   if (block.component === 'NumberSentence') return <NumberSentence key={key} block={block} getDataset={getDataset} />
+  if (block.component === 'MetricTable') return <MetricTable key={key} block={block} getDataset={getDataset} />
+  if (block.component === 'KeyPoints') return <KeyPoints key={key} block={block} getDataset={getDataset} />
   if (block.component === 'EvidencePanel') return <EvidencePanel key={key} block={block} getDataset={getDataset} />
   return <MissingData key={key} block={block} getDataset={getDataset} />
 }

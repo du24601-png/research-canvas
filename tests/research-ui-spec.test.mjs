@@ -129,3 +129,44 @@ test('years in context and non-quantity CJK words are allowed', () => {
     assert.equal(result.ok, true, `${template} ${JSON.stringify(result.errors)}`)
   }
 })
+
+test('MetricTable and KeyPoints validate strictly (no actions, known ids, 1–4 datasets)', () => {
+  const raw = { version: 1, blocks: [{ component: 'KeyPoints', datasetIds: [DS] }, { component: 'MetricTable', datasetIds: [DS, DELTA], title: '2023–2025 数值明细' }, { component: 'MetricTable', datasetIds: [DS] }] }
+  const result = parseResearchUiSpec(raw, known)
+  assert.equal(result.ok, true, JSON.stringify(result.errors))
+  assert.deepEqual(result.spec, raw)
+  const bad = [
+    { component: 'MetricTable', datasetIds: [DS], actions: ['pin'] },
+    { component: 'MetricTable', datasetIds: ['research-ds-unknown'] },
+    { component: 'MetricTable', datasetIds: [] },
+    { component: 'MetricTable', datasetIds: [DS, DELTA, 'a', 'b', 'c'] },
+    { component: 'MetricTable', datasetId: DS },
+    { component: 'MetricTable', datasetIds: [DS], title: '净利率 45%' },
+    { component: 'MetricTable', datasetIds: [DS, DS] },
+    { component: 'KeyPoints', datasetIds: [DS], title: '要点' },
+    { component: 'KeyPoints', datasetIds: [DS], actions: ['pin'] },
+    { component: 'KeyPoints', datasetIds: [DS], points: ['净利率最高'] },
+    { component: 'KeyPoints', datasetIds: ['research-ds-unknown'] },
+    { component: 'KeyPoints', datasetIds: DS },
+  ]
+  for (const block of bad) {
+    assert.equal(parseResearchUiSpec({ version: 1, blocks: [block] }, known).ok, false, JSON.stringify(block))
+  }
+})
+
+test('block limit is 10: a full 个股速览 layout fits, 11 blocks reject', () => {
+  const ten = [
+    { component: 'NumberSentence', datasetId: DS, template: `{value:${A}@2025}` },
+    { component: 'KpiRow', datasetId: DS },
+    { component: 'KpiRow', datasetId: DELTA },
+    { component: 'TrendView', datasetId: DS },
+    { component: 'KeyPoints', datasetIds: [DS, DELTA] },
+    { component: 'MetricTable', datasetIds: [DS] },
+    { component: 'MetricTable', datasetIds: [DELTA] },
+    { component: 'MissingData', datasetId: DS },
+    { component: 'EvidencePanel', datasetIds: [DS] },
+    { component: 'EvidencePanel', datasetIds: [DELTA] },
+  ]
+  assert.equal(parseResearchUiSpec({ version: 1, blocks: ten }, known).ok, true)
+  assert.equal(parseResearchUiSpec({ version: 1, blocks: [...ten, { component: 'MissingData', datasetId: DELTA }] }, known).ok, false)
+})

@@ -66,6 +66,15 @@ export const SPEC_DEMO_TEXT = {
   ],
 }
 
+/** Demo E：要点 + 数值明细表（要点的选取、措辞与表里每个数字都由代码算） */
+export const SPEC_DEMO_TABLE = {
+  version: 1,
+  blocks: [
+    { component: 'KeyPoints', datasetIds: [NET_MARGIN.id, ROE.id] },
+    { component: 'MetricTable', datasetIds: [NET_MARGIN.id, ROE.id] },
+  ],
+}
+
 /** 必须整份拒绝的 Spec */
 export const INVALID_SPECS: Record<string, unknown> = {
   unknownComponent: { version: 1, blocks: [{ component: 'PieOfDoom', datasetIds: [NET_MARGIN.id] }] },
@@ -77,5 +86,7 @@ export const INVALID_SPECS: Record<string, unknown> = {
   digitInSentence: { version: 1, blocks: [{ component: 'NumberSentence', datasetId: NET_MARGIN.id, template: `{entity:${A.id}} 净利率 45%` }] },
   unknownEntityInSentence: { version: 1, blocks: [{ component: 'NumberSentence', datasetId: NET_MARGIN.id, template: '{value:CN:SH.000001@2025}' }] },
   kpiUnknownPeriod: { version: 1, blocks: [{ component: 'KpiRow', datasetId: NET_MARGIN.id, period: '2019' }] },
+  tableWithPin: { version: 1, blocks: [{ component: 'MetricTable', datasetIds: [NET_MARGIN.id], actions: ['pin'] }] },
+  keyPointsWithText: { version: 1, blocks: [{ component: 'KeyPoints', datasetIds: [NET_MARGIN.id], points: ['净利率创新高'] }] },
   partlyBad: { version: 1, blocks: [{ component: 'EvidencePanel', datasetIds: [NET_MARGIN.id] }, { component: 'Nope' }] },
 }
