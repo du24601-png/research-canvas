@@ -95,4 +95,4 @@ npm run eval:agent       # 见 docs/AGENT-EVAL.md
 - **改名遗留（易踩）**：数据根默认 `~/.research-canvas`；若 `~/.opptrix` 已存在则继续沿用（升级安全）。`RESEARCH_CANVAS_DATA_DIR` 优先于 `OPPTRIX_DATA_DIR`。`Cache` 默认落盘 `$DATA_ROOT/cache.json`；未设 data-dir env 且新 cache 不存在时，只读回退 `~/.aaashare/cache.json`。
 - `dispose()` 名不副实：不阻断后续 `setWithTtl` 重建定时器，也不阻断 `clearMatching` / `clearType` / `delete` / `clearAll` 的同步 `flushNow()` 落盘，只能当辅助手段。
 
-产品与阶段细节见 `Research Canvas/HANDOFF.md`。公开文档在 `docs/`（随仓提交）。
+产品与阶段细节见 `docs/finframe/HANDOFF.md`（最新）与 `Research Canvas/HANDOFF.md`（早期）。公开文档在 `docs/`（随仓提交）。
