@@ -1,5 +1,7 @@
 # Research Canvas 交接
 
+> **2026-10-11 起的最新进度见 [docs/finframe/HANDOFF.md](../docs/finframe/HANDOFF.md)（FinFrame）。** 本文件保留到 2026-09-14 的双栏画布阶段，作为背景参考。
+
 > 下一会话先读本文件。Research Canvas 独立产品仓库。
 
 **当前阶段（2026-09-13）：C 端金融看板 P0–P4 已落地。** 一个会话一块活看板；点数字看科目/报告期/来源；点名 ≤3 家直接取数，>3 家或行业对比先确认；可演示、导出 16:9 / 竖版；发布生成本机只读快照（不是公网分享）。不要进入 Inspector / Notes / Excel / Phase 5，除非用户明确要求。
