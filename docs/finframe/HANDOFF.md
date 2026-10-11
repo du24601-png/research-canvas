@@ -9,7 +9,7 @@
 | 仓库 | `D:\canvas agent`，远端 `origin` = github.com/du24601-png/research-canvas |
 | 工作分支 | `finframe/m0.5-m1`（**未推送**，没有上游分支） |
 | 基线 | `main` @ `9e630ee`；本分支比 `main` 多 68 个提交 |
-| 交接时 HEAD | `b46b077`（之后只多一个提交：本文件） |
+| 交接时 HEAD | `2c6dc24`（代码最后一次改动 `b46b077`，之后只有交接文档） |
 | 应用版本号 | `0.4.0`（`/api/health` 返回值，未随本轮改动） |
 | 文档库 Schema | v8（`packages/doc-library/src/schema.ts` 的 `DOC_LIBRARY_SCHEMA_VERSION`） |
 | 当前对话模型 | `deepseek:deepseek-flash`（服务端配置，非代码常量） |
