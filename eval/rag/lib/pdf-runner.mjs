@@ -7,6 +7,7 @@ import {
   createTextL0Runner,
   createOfficeL0Runner,
   createOcrL2Runner,
+  createPdfiumL0Runner,
   enhancePagesWithEmbeddedImageOcr,
   pagesToParseResult,
 } from '../../../packages/doc-library/dist/index.js'
@@ -51,6 +52,8 @@ export function buildParseRouter(onPages) {
     text: createTextL0Runner(),
     office: createOfficeL0Runner(),
     pdf: createPdfRunner(onPages),
+    // 与 bridge 一致：首选抽取丢字 / 乱码 → PDFium 文本层兜底（不重复跑嵌图 OCR）
+    pdfFallback: createPdfiumL0Runner({ embeddedImageOcr: false }),
     ocr: createOcrL2Runner(),
   })
 }

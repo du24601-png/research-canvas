@@ -39,12 +39,15 @@ async function runQuestions(ctx, retrieve, questions) {
     for (const mode of MODES) {
       const text = mode === 'question' ? q.question : q.query_keywords
       const t0 = performance.now()
-      const hits = await retrieve(text, opts)
+      const res = await retrieve(text, opts)
+      const hits = res.hits
       const ms = performance.now() - t0
       lat[mode].push(ms)
       const ranked = hitsToPages(hits, ctx.keyByDocId)
       rows.push({
         id: q.id, type: q.type, scope: q.scope, mode, parse_gap: Boolean(q.parse_gap),
+        doc: q.docs.length === 1 ? q.docs[0] : null, found: res.found, reason: res.reason ?? null,
+        natural: hits.some(h => h.match === 'natural'),
         hitCount: hits.length, top1Score: hits[0] ? (hits[0].score ?? hits[0].rank ?? null) : null,
         vecTop1: await vectorTop1(ctx, text, opts),
         top: ranked.slice(0, 10).map(r => `${r.doc}:${r.page}`), ms: Math.round(ms * 10) / 10,
@@ -87,6 +90,7 @@ async function main() {
     pageByChunk: new Map(db.prepare('SELECT id, page FROM chunks').all().map(r => [r.id, r.page])),
     vectorStore: getVectorStore(),
     vectorReady: wantVectors && svc.getEmbeddingService().isReady(),
+    modelId: wantVectors ? process.env.DOC_LIBRARY_EMBEDDING_MODEL : null,
   }
   if (wantVectors && !ctx.vectorReady) throw new Error('embedding model not ready — check DOC_LIBRARY_EMBEDDING_MODEL / DOC_LIBRARY_MODELS_DIR')
   const shared = {

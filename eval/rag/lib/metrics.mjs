@@ -64,6 +64,7 @@ export function aggregate(rows, filter = () => true) {
     mrr10: mean(rs.map(r => r.m.mrr10)),
     ndcg10: mean(rs.map(r => r.m.ndcg10)),
     zeroHit: rs.filter(r => r.hitCount === 0).length,
+    notFound: rs.filter(r => r.found === false || (r.found == null && r.hitCount === 0)).length,
   })
   return {
     overall: summarize(answerable),
@@ -79,6 +80,8 @@ export function noAnswerStats(rows) {
   return {
     n: none.length,
     returnedAny: none.filter(r => r.hitCount > 0).length,
+    notFound: none.filter(r => r.found === false || (r.found == null && r.hitCount === 0)).length,
+    reasons: none.reduce((m, r) => (r.reason ? { ...m, [r.reason]: (m[r.reason] ?? 0) + 1 } : m), {}),
     medianTop1None: med(none),
     medianTop1Answerable: med(ans),
     medianVecTop1None: percentile(none.map(r => r.vecTop1).filter(x => x != null), 50),
