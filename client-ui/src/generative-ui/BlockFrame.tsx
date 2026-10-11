@@ -20,7 +20,10 @@ export const useBlockStyles = makeStyles({
   actions: { display: 'flex', gap: '6px', flexWrap: 'wrap' },
   note: { fontSize: 'var(--opptrix-font-md)', color: opptrixCssVars.textSecondary, lineHeight: 1.5 },
   plot: {
-    height: '220px',
+    // 随列宽等比放大（宽屏不再扁平），220–360px 之间
+    aspectRatio: '3 / 1',
+    minHeight: '220px',
+    maxHeight: '360px',
     minWidth: 0,
     borderRadius: opptrixTokens.radiusMd,
     backgroundColor: opptrixCssVars.canvasAlt,
