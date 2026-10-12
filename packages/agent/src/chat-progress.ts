@@ -280,6 +280,8 @@ export interface ChatProgressOptions {
   researchCanvasEdit?: boolean
   /** 客户端开启「取数前确认」（默认关）：1–3 家的 query_data 先发计划，倒计时内可经 steer 调整 */
   planConfirm?: boolean
+  /** 本轮只检索用户资料，不提供行情、资讯或网页工具 */
+  libraryOnly?: boolean
 }
 
 // ── 工具中文标签映射 ──

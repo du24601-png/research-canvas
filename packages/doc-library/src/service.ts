@@ -23,6 +23,8 @@ import { searchHybridChunks, searchHybridDetailed, type HybridSearchResult } fro
 import { extractTextL0, TEXT_L0_ENGINE_VERSION } from './engines/text-l0.js'
 import { isPlainTextDocument } from './document-kind.js'
 import { shouldEmbedToVector } from './embed-policy.js'
+import { isEmbeddingModelInstalled } from './model-downloader.js'
+import { computeLibraryVectorStatus, type LibraryVectorStatus } from './library-vector-status.js'
 import {
   pruneOrphanBlobsAndMarkdown as pruneOrphanBlobsAndMarkdownImpl,
   type PruneOrphanBlobsOptions,
@@ -56,6 +58,7 @@ export interface ParseLifecycleHooks {
 }
 
 const MIN_USEFUL_CHARS = 24
+const VECTOR_BACKFILL_COOLDOWN_MS = 60_000
 
 export type EmbedPendingOptions = {
   /** 本轮最多处理的文档数 */
@@ -97,6 +100,8 @@ export class DocLibraryService {
   private readonly parseInflight = new Map<string, Promise<void>>()
   /** documentId → 进行中的 embed Promise */
   private readonly embedInflight = new Map<string, Promise<void>>()
+  private backfillJob: Promise<number> | null = null
+  private backfillEndedAt = 0
 
   constructor(private readonly db: Database.Database) {
     this.repo = new DocLibraryRepository(db)
@@ -604,6 +609,27 @@ export class DocLibraryService {
       if ((opts.delayMs ?? 0) > 0) await new Promise<void>(r => setTimeout(r, opts.delayMs))
     }
     return done
+  }
+
+  /** 资料列表用：每份文档当前模型的向量是否已建好 */
+  libraryVectorStatus(
+    docs: Array<{ id: string; status: ParseStatus | null }>,
+  ): Map<string, LibraryVectorStatus> {
+    return computeLibraryVectorStatus(this.db, docs, {
+      modelId: activeEmbeddingModelId(),
+      modelInstalled: isEmbeddingModelInstalled(),
+    })
+  }
+
+  /** 有文档在等向量时补跑回填（模型按需加载）；进行中或刚结束一分钟内不重复 */
+  requestVectorBackfill(): void {
+    if (this.backfillJob || Date.now() - this.backfillEndedAt < VECTOR_BACKFILL_COOLDOWN_MS) return
+    this.backfillJob = this.backfillActiveModel()
+      .catch(() => 0)
+      .finally(() => {
+        this.backfillJob = null
+        this.backfillEndedAt = Date.now()
+      })
   }
 
   /** 模型安装 / Lance 重建后回填未嵌入文档（排除 news）；可限速 */

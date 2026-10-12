@@ -10,7 +10,7 @@ import { hostActions, periodRange, type BlockProps, type BlockView } from './typ
 
 type ComparisonBlock = Extract<ResearchUiBlock, { component: 'ComparisonView' }>
 
-/** 多个 Dataset 并排（F3-A）：每个数据集原样画一张图，不合并、不改值；图种 / 年份切换对几张图同时生效 */
+/** 多个 Dataset 纵向排列（F3-A）：每个数据集原样画一张图，不合并、不改值；图种 / 年份切换对几张图同时生效 */
 export default function ComparisonView({ block, getDataset, onAction }: BlockProps<ComparisonBlock>) {
   const s = useBlockStyles()
   const [view, setView] = useState<BlockView>({ type: 'line_chart' })
@@ -24,7 +24,7 @@ export default function ComparisonView({ block, getDataset, onAction }: BlockPro
       ) : null}
       <div className={s.grid}>
         {datasets.map(dataset => (
-          <div key={dataset.id} data-dataset-id={dataset.id}>
+          <div key={dataset.id} className={s.gridItem} data-dataset-id={dataset.id}>
             <Text className={s.note} block>
               {researchMetricLabel(dataset.metric)}（{dataset.unit || '单位未记录'}）· {periodRange(dataset)}
             </Text>

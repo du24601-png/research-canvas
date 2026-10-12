@@ -50,7 +50,7 @@
 
 - API：http://127.0.0.1:8711（`/api/health`）；前端：http://127.0.0.1:5173 。首次打开要等十几秒（Vite 首次编译）。
 - 改了 `packages/**` 要 `npm run build:packages`，改 shared / agent 还要重启 API。
-- 模型文件在 `D:\finframe-data\models\`（bge-small-zh-v1.5 约 25 MB、Qwen3-Embedding-0.6B 约 630 MB）。要让应用用上，设 `DOC_LIBRARY_MODELS_DIR=D:\finframe-data\models`（必须是绝对路径）；可选 `DOC_LIBRARY_EMBEDDING_MODEL=bge-small-zh-v1.5 | Qwen3-Embedding-0.6B | multilingual-e5-small` 强制指定。都不设时按 bge → e5 → 只用关键词 自动选。**`dev-on-d.ps1` 目前没有设这两个变量**，所以默认启动时如果用户目录没有模型，就是只用关键词检索。
+- 模型文件在 `D:\finframe-data\models\`（bge-small-zh-v1.5 约 25 MB、Qwen3-Embedding-0.6B 约 630 MB）。要让应用用上，设 `DOC_LIBRARY_MODELS_DIR=D:\finframe-data\models`（必须是绝对路径）；可选 `DOC_LIBRARY_EMBEDDING_MODEL=bge-small-zh-v1.5 | Qwen3-Embedding-0.6B | multilingual-e5-small` 强制指定。都不设时按 bge → e5 → 只用关键词 自动选。`dev-on-d.ps1` 已设 `DOC_LIBRARY_MODELS_DIR`（2026-10-11），启动日志 `RAG runtime: embedding=bge-small-zh-v1.5` 即为生效；显示 `keyword-only` 说明没找到模型。模型在第一次检索或入库时才加载，随后后台给缺向量的文档补算。
 - 下载模型：`node scripts/download-embedding-models.mjs bge-small-zh-v1.5 --dest <目录>`（或设 `DOC_LIBRARY_MODELS_DIR`）。
 
 ### 前端开关（localStorage / 环境变量）
@@ -101,7 +101,7 @@ node --test <AGENTS.md 列出的 6 个文件 + 文档库相关测试>   # 250 �
 | 「没检到」不可靠 | 无答案题在检索层几乎总能检到东西（原话问法 0/12 判为没检到）；目前靠模型读片段后判断，实测「火星分行」能如实说没有 | 加重排模型或「答案是否被片段支持」校验；不要只调下限（调高会误伤有答案的题，见 `rag-eval-report-v2.md`） |
 | 演示脚本里写了「平安」要避开 | `dd87d10` 已加简称多义澄清，但 M5 报告的结论早于它，本轮没复测 | 复测「看一下平安近五年的 ROE」，通过就从演示避坑里删掉 |
 | 已有文档不会用新切块 / 新解析 | 只有新上传的文档受益 | 在 `service.ts` 加「按文档重建」方法（读存档 markdown → `rechunkMarkdown` → 写回块 → 重建关键词和向量索引），并决定是否后台批量执行（属于数据回填，按 AGENTS.md 先确认） |
-| `dev-on-d.ps1` 未设模型目录 | 默认启动可能只有关键词检索 | 在脚本里加 `DOC_LIBRARY_MODELS_DIR`，或用应用内下载把 bge 下到用户目录 |
+| 向量表每次重开被误判损坏（已修，2026-10-11） | LanceDB 0.38 的 manifest 用 V2 命名（`u64::MAX - 版本号`），旧检测把它当成版本溢出，每个新进程打开都删表重建、清空嵌入标记、全库重嵌 | `vector-store.ts` 的 `manifestVersionFromName` 按 V1/V2 解码；`lance-vector-store` 测试含真表重开回归 |
 | 应用内模型安装界面 | 已有 e5 时界面显示「已安装」，不会提示下载 bge | 设置页给 bge 一个明确的安装入口 |
 | 手机宽度图表 | 宽屏改动后在 375px 宽度量到图表 660px 宽，未截图确认是否真的溢出 | 手机上看一次 |
 | Qwen3 评测 | 新切块后没重跑；入库很慢（旧切块 6 份年报约 28 分钟） | 有需要再跑 `node eval/rag/run.mjs qwen3` |

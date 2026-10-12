@@ -11,6 +11,7 @@ import {
   isValidEmbeddingVector,
   filterValidUpsertRows,
   detectLanceDatasetPathology,
+  manifestVersionFromName,
   countLanceVersions,
   lanceTableDatasetDir,
   LANCE_VERSIONS_PATHOLOGY_THRESHOLD,
@@ -27,6 +28,8 @@ import {
   setLanceRebuildBackfillHook,
   shouldEmbedToVector,
 } from '../packages/doc-library/dist/index.js'
+
+const SUSPECT_MANIFEST = '5000000000.manifest'
 
 function validVector(seed = 0.01) {
   return Array.from({ length: EMBEDDING_DIM }, (_, i) => seed + i * 1e-6)
@@ -159,12 +162,32 @@ describe('lance pathology detection', () => {
     fs.rmSync(root, { recursive: true, force: true })
   })
 
-  it('flags suspect u64-wrap manifest names', () => {
+  it('decodes V1 and V2 manifest names', () => {
+    assert.equal(manifestVersionFromName('7.manifest'), 7n)
+    assert.equal(manifestVersionFromName('18446744073709551611.manifest'), 4n)
+    assert.equal(manifestVersionFromName('latest_version_hint.json'), null)
+  })
+
+  it('V2-named healthy dataset is not pathological', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'opptrix-lance-path-'))
     const ds = lanceTableDatasetDir(root)
     const versions = path.join(ds, '_versions')
     fs.mkdirSync(versions, { recursive: true })
-    fs.writeFileSync(path.join(versions, '18446744073709551611.manifest'), 'x')
+    for (const name of ['18446744073709551611.manifest', '18446744073709551614.manifest']) {
+      fs.writeFileSync(path.join(versions, name), 'x')
+    }
+    fs.writeFileSync(path.join(versions, 'latest_version_hint.json'), '{"version":4}')
+    const result = detectLanceDatasetPathology(ds)
+    assert.equal(result.pathological, false)
+    fs.rmSync(root, { recursive: true, force: true })
+  })
+
+  it('flags absurd manifest versions', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'opptrix-lance-path-'))
+    const ds = lanceTableDatasetDir(root)
+    const versions = path.join(ds, '_versions')
+    fs.mkdirSync(versions, { recursive: true })
+    fs.writeFileSync(path.join(versions, SUSPECT_MANIFEST), 'x')
     const result = detectLanceDatasetPathology(ds)
     assert.equal(result.pathological, true)
     assert.equal(result.reason, 'suspect_manifest_version')
@@ -184,12 +207,31 @@ describe('lance pathology detection', () => {
     fs.rmSync(root, { recursive: true, force: true })
   })
 
+  it('reopening a real dataset in a new store keeps its vectors', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'opptrix-lance-reopen-'))
+    const first = new LanceVectorStore(root)
+    const available = await first.isAvailable().catch(() => false)
+    if (available) {
+      await first.upsert([{ chunk_id: 'keep', document_id: 'd1', text: 't', vector: validVector(0.4) }])
+      await first.close?.()
+      assert.equal(detectLanceDatasetPathology(lanceTableDatasetDir(root)).pathological, false)
+      const second = new LanceVectorStore(root)
+      assert.equal(await second.isAvailable(), true)
+      const hits = await second.search(validVector(0.4), { limit: 3 })
+      assert.ok(hits.some(h => h.chunk_id === 'keep'), 'vectors must survive reopen')
+      await second.close?.()
+    } else {
+      await first.close?.()
+    }
+    fs.rmSync(root, { recursive: true, force: true })
+  })
+
   it('LanceVectorStore clears pathological dataset dir on ensure (rebuild attempt)', async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'opptrix-lance-store-'))
     const ds = lanceTableDatasetDir(root)
     const versions = path.join(ds, '_versions')
     fs.mkdirSync(versions, { recursive: true })
-    fs.writeFileSync(path.join(versions, '18446744073709551611.manifest'), 'x')
+    fs.writeFileSync(path.join(versions, SUSPECT_MANIFEST), 'x')
     // Also plant a marker file so we can assert rm happened
     fs.writeFileSync(path.join(ds, 'CORRUPT_MARKER'), '1')
 
@@ -208,7 +250,7 @@ describe('lance pathology detection', () => {
     const ds = lanceTableDatasetDir(root)
     const versions = path.join(ds, '_versions')
     fs.mkdirSync(versions, { recursive: true })
-    fs.writeFileSync(path.join(versions, '18446744073709551611.manifest'), 'x')
+    fs.writeFileSync(path.join(versions, SUSPECT_MANIFEST), 'x')
 
     let hookCalls = 0
     /** @type {Promise<void>} */
@@ -231,7 +273,7 @@ describe('lance pathology detection', () => {
       assert.equal(hookCalls, 1)
     } else {
       // 无原生时仍应清掉病理目录；hook 可能未触发（rebuild createTable 失败）
-      assert.equal(fs.existsSync(path.join(versions, '18446744073709551611.manifest')), false)
+      assert.equal(fs.existsSync(path.join(versions, SUSPECT_MANIFEST)), false)
     }
 
     await store.close?.()

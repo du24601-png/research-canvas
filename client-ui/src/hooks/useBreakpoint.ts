@@ -112,14 +112,14 @@ export function useSidebarOverlayMode(enabled: boolean, sidebarWidth: number) {
   return overlayMode
 }
 
-/** Desktop: overlay, closed by default. Mobile: overlay drawer. */
+/** 桌面左侧对话列表默认展开；用户收起后记住。手机仍用抽屉。 */
 export function useSidebarPreference(isMobile: boolean, _sidebarWidth: number) {
   const [userVisible, setUserVisibleState] = useState(() => {
-    if (typeof window === 'undefined') return false
+    if (typeof window === 'undefined') return true
     const stored = localStorage.getItem(SIDEBAR_KEY) ?? localStorage.getItem('inno-sidebar-visible')
     if (stored === 'true') return true
     if (stored === 'false') return false
-    return false
+    return true
   })
   const [drawerOpen, setDrawerOpen] = useState(false)
 

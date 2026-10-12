@@ -3,7 +3,7 @@ import { cleanup, fireEvent, screen } from '@testing-library/react'
 import { renderWithProviders } from '../test/testUtils'
 import SpecRenderer from './SpecRenderer'
 import { renderedKeyPoints } from './KeyPoints'
-import { cellText, firstLastChange, metricTableModel, shadeAlpha, sparkPath } from './metricTableModel'
+import { cellText, firstLastChange, heatWash, metricTableModel, sparkPath } from './metricTableModel'
 import { FIXTURE_DATASETS, NET_MARGIN, ROE, SPEC_DEMO_TABLE } from './specFixtures'
 import type { Dataset } from '../chat/research-canvas/types'
 
@@ -33,7 +33,10 @@ describe('metricTable helpers', () => {
     expect(model.changeHeader).toBe('2021→2025')
     const rowB = model.rows[1]
     expect(rowB?.cells[0]).toEqual({ period: '2021', value: null, text: '—', shade: null })
-    expect(shadeAlpha(null)).toBe(0)
+    expect(heatWash(null)).toBeNull()
+    expect(heatWash(0.5)).toBeNull()
+    expect(heatWash(0)?.side).toBe('low')
+    expect(heatWash(1)?.side).toBe('high')
     const shades = model.rows.flatMap(row => row.cells.map(cell => cell.shade)).filter((v): v is number => v != null)
     expect(Math.min(...shades)).toBe(0)
     expect(Math.max(...shades)).toBe(1)
@@ -71,5 +74,8 @@ describe('metricTable helpers', () => {
     expect(screen.getAllByText('示例公司甲 · 2025 年').length).toBeGreaterThan(0)
     expect(screen.getAllByText(/来源：/).length).toBeGreaterThan(0)
     expect(roeTable?.querySelector(`tr[data-entity="${A}"] [data-change]`)?.textContent).toBe('+3.6 个百分点')
+    expect(cell.style.backgroundColor).toContain('--opptrix-error')
+    const lowCell = roeTable?.querySelector(`tr[data-entity="${B}"] td[data-period="2025"]`) as HTMLElement
+    expect(lowCell.style.backgroundColor).toContain('--opptrix-success')
   })
 })

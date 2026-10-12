@@ -1,7 +1,7 @@
 import { SIDEBAR_DEFAULT_WIDTH, SIDEBAR_MIN_WIDTH } from '../desktop/constants'
 import type { SessionMeta } from '../types/chat'
 
-export type SessionSidebarPresentation = 'drawer' | 'none'
+export type SessionSidebarPresentation = 'drawer' | 'panel'
 
 export const SESSION_PICKER_RECENT_LIMIT = 8
 
@@ -11,9 +11,9 @@ export const DEFAULT_SESSION_DISPLAY_TITLE = '未命名对话'
 /** Overlay width fraction — kept for settings overlay geometry helpers. */
 export const SESSION_OVERLAY_SIDEBAR_RATIO = 0.25
 
-/** Desktop uses command palette + picker; mobile keeps the drawer. */
+/** 桌面把对话列表放在左侧栏；手机仍用抽屉。 */
 export function sessionSidebarPresentation(isMobile: boolean): SessionSidebarPresentation {
-  return isMobile ? 'drawer' : 'none'
+  return isMobile ? 'drawer' : 'panel'
 }
 
 export function resolveSessionOverlaySidebarWidth(viewportWidth: number): number {

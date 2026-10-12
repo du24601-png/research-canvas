@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, memo, useEffect } from 'react'
 import {
   makeStyles, mergeClasses,
 } from '@fluentui/react-components'
-import { SettingsRegular, DeleteRegular, ArchiveRegular, SignOutRegular, SearchRegular } from '@fluentui/react-icons'
+import { SettingsRegular, DeleteRegular, ArchiveRegular, SignOutRegular, SearchRegular, DocumentRegular } from '@fluentui/react-icons'
 import { ChatAddRegular } from './chatIcons'
 import type { SessionMeta } from '../types/chat'
 import { opptrixTokens, opptrixCssVars } from '../theme/tokens'
@@ -13,7 +13,7 @@ import OpptrixSegmentedControl from '../components/opptrix/OpptrixSegmentedContr
 import ThinkingDots from '../components/ThinkingDots'
 import { isElectron, electronPlatform, supportsNativeWindowVibrancy } from '../platform/detect'
 import { useTheme } from '../theme/ThemeContext'
-import { DESKTOP_SIDEBAR_LAYOUT_MS, DESKTOP_SIDEBAR_LAYOUT_EASE, DESKTOP_TITLEBAR_HEIGHT } from '../desktop/constants'
+import { DESKTOP_TITLEBAR_HEIGHT } from '../desktop/constants'
 import { DESKTOP_PAGE_HEADER_HEIGHT } from '../theme/desktopPageChrome'
 import OverlaySidebarShell from '../desktop/OverlaySidebarShell'
 import AppUpdateNotice from '../desktop/AppUpdateNotice'
@@ -28,6 +28,8 @@ import { emitAuthRequired } from '../auth/authEvents'
 import { formatAuthError } from '../auth/authErrors'
 import { PRODUCT_BRAND } from '../branding/productBrand'
 import { useOpptrixDialogAlert } from '../components/opptrix/OpptrixDialogAlert'
+import LibraryShelf from './library/LibraryShelf'
+import { requestLibraryAsk } from './library/libraryAsk'
 
 export type SidebarMode = 'panel' | 'drawer' | 'overlay'
 export type SidebarListTab = 'chat' | 'archive'
@@ -49,24 +51,18 @@ const useStyles = makeStyles({
     overflow: 'hidden',
     pointerEvents: 'none',
     transitionProperty: 'width',
-    transitionDuration: `${DESKTOP_SIDEBAR_LAYOUT_MS}ms`,
-    transitionTimingFunction: DESKTOP_SIDEBAR_LAYOUT_EASE,
+    transitionDuration: '360ms',
+    transitionTimingFunction: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
     backgroundColor: 'transparent',
+    '@media (prefers-reduced-motion: reduce)': {
+      transitionDuration: '1ms',
+    },
   },
   panelShellVisible: {
     pointerEvents: 'auto',
   },
   sidebarPanel: {
     height: '100%',
-    opacity: 0,
-    transform: 'translateX(-8px)',
-    transitionProperty: 'opacity, transform',
-    transitionDuration: `${DESKTOP_SIDEBAR_LAYOUT_MS}ms`,
-    transitionTimingFunction: DESKTOP_SIDEBAR_LAYOUT_EASE,
-  },
-  sidebarPanelVisible: {
-    opacity: 1,
-    transform: 'translateX(0)',
   },
   sidebarElectron: {
     backgroundColor: 'transparent',
@@ -117,7 +113,7 @@ const useStyles = makeStyles({
     height: `${DESKTOP_PAGE_HEADER_HEIGHT}px`,
     minHeight: `${DESKTOP_PAGE_HEADER_HEIGHT}px`,
     boxSizing: 'border-box',
-    padding: '0 20px',
+    padding: '0 20px 0 44px',
     borderBottom: `1px solid ${opptrixCssVars.separatorHairline}`,
   },
   /** 移动抽屉：与右栏 sheet header 同高，品牌文字垂直居中 */
@@ -381,6 +377,7 @@ function SessionSidebar({
   const sidebarGlass = electronChrome && (nativeVibrancy || resolvedScheme !== 'dark')
   const sidebarSolidDark = electronChrome && !nativeVibrancy && resolvedScheme === 'dark'
   const [listTabState, setListTabState] = useState<SidebarListTab>('chat')
+  const [libraryOpen, setLibraryOpen] = useState(false)
   const listTab = listTabProp ?? listTabState
   const setListTab = useCallback((tab: SidebarListTab) => {
     if (listTabProp == null) setListTabState(tab)
@@ -497,8 +494,27 @@ function SessionSidebar({
           <span>搜索</span>
         </button>
       ) : null}
+      <button
+        type="button"
+        className={mergeClasses(s.menuRow, libraryOpen && s.menuRowActive, 'opptrix-focusable')}
+        aria-expanded={libraryOpen}
+        onClick={() => setLibraryOpen(open => !open)}
+      >
+        <DocumentRegular className={s.menuIcon} fontSize={SIDEBAR_TOP_MENU_ICON_SIZE} />
+        <span>我的资料</span>
+      </button>
       </div>
 
+      {libraryOpen ? (
+        <LibraryShelf
+          onBack={() => setLibraryOpen(false)}
+          onAsk={() => {
+            requestLibraryAsk()
+            if (mode !== 'panel') onClose?.()
+          }}
+        />
+      ) : (
+      <>
       <div className={s.listTabWrap}>
         <OpptrixSegmentedControl
           aria-label="对话列表"
@@ -593,6 +609,8 @@ function SessionSidebar({
           <div className={s.empty}>归档功能加载中…</div>
         )
       )}
+      </>
+      )}
 
       <div className={s.footer}>
         <AppUpdateNotice />
@@ -677,7 +695,6 @@ function SessionSidebar({
         s.sidebar,
         isDrawer && s.sidebarDrawer,
         !isDrawer && s.sidebarPanel,
-        !isDrawer && visible && s.sidebarPanelVisible,
         !electronChrome && !isDrawer && s.sidebarWeb,
         electronChrome && s.sidebarElectron,
         sidebarSolidDark && s.sidebarElectronSolid,
@@ -709,6 +726,8 @@ function SessionSidebar({
   return (
     <div
       className={mergeClasses(s.panelShell, visible && s.panelShellVisible)}
+      aria-hidden={!visible}
+      inert={!visible}
       style={{
         width: visible ? width : 0,
         transitionProperty: isDragging ? 'none' : 'width',

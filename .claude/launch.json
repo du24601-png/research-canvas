@@ -1,0 +1,34 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "api",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "start",
+        "-w",
+        "@opptrix/server"
+      ],
+      "port": 8711
+    },
+    {
+      "name": "web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "-w",
+        "research-canvas-client",
+        "--",
+        "--port",
+        "5173",
+        "--strictPort"
+      ],
+      "env": {
+        "WEB_HTTPS": "0"
+      },
+      "port": 5173
+    }
+  ]
+}

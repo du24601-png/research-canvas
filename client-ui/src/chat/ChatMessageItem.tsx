@@ -16,7 +16,6 @@ import MediaPreviewBox from './MediaPreviewBox'
 import OpptrixButton from '../components/opptrix/OpptrixButton'
 import { isWakeResumeDisplayMessage, type ChatAttachmentMeta, type ChatDisplayMessage } from '../types/chat'
 import { opptrixTokens, opptrixCssVars } from '../theme/tokens'
-import { fadeInUp } from '../theme/mixins'
 import { copyTextToClipboard } from '../platform/clipboard'
 import { formatFriendlyTime } from '../utils/formatFriendlyTime'
 import { TurnIndexProvider } from '../generative-ui/report-followup/ReportFollowupContext'
@@ -40,12 +39,12 @@ function wakeResumeStatusLabel(content: string | undefined): string {
 const useStyles = makeStyles({
   entry: {
     outline: 'none',
-    ...fadeInUp,
   },
   entryUser: {
     alignSelf: 'stretch',
     display: 'flex',
     flexDirection: 'column',
+    alignItems: 'flex-end',
   },
   entryAssistant: {
     alignSelf: 'stretch',
@@ -60,16 +59,19 @@ const useStyles = makeStyles({
     fontSize: 'var(--opptrix-font-xl)',
   },
   userBubble: {
-    maxWidth: '100%',
-    padding: '8px 12px',
-    borderRadius: opptrixTokens.radiusXl,
+    width: 'fit-content',
+    maxWidth: '75%',
+    padding: '8px 14px',
+    borderRadius: opptrixTokens.chatComposerRadius,
     border: 'none',
-    backgroundColor: opptrixCssVars.canvasAlt,
-    color: opptrixCssVars.textPrimary,
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
+    backgroundColor: opptrixCssVars.textPrimary,
+    color: opptrixCssVars.canvas,
+    whiteSpace: 'normal',
     boxSizing: 'border-box',
+    [`& .opptrix-composer-inline-chip`]: {
+      backgroundColor: 'color-mix(in srgb, currentColor 18%, transparent)',
+      color: 'inherit',
+    },
   },
   userBubbleEditable: {
     cursor: 'text',
@@ -77,11 +79,17 @@ const useStyles = makeStyles({
   userBubbleEditing: {
     display: 'flex',
     flexDirection: 'column',
+    alignSelf: 'stretch',
+    width: '100%',
+    maxWidth: '100%',
     gap: '8px',
     maxHeight: 'none',
     overflow: 'visible',
     whiteSpace: 'normal',
     textOverflow: 'clip',
+    padding: '8px 12px',
+    backgroundColor: opptrixCssVars.canvasAlt,
+    color: opptrixCssVars.textPrimary,
   },
   userBubbleMobile: {
     maxWidth: '100%',
@@ -132,8 +140,12 @@ const useStyles = makeStyles({
     flexShrink: 0,
   },
   assistantBubble: {
+    width: '100%',
     maxWidth: '100%',
-    padding: '2px 0',
+    boxSizing: 'border-box',
+    padding: '16px 20px 12px',
+    borderRadius: opptrixTokens.chatComposerRadius,
+    backgroundColor: opptrixCssVars.canvasMuted,
     color: opptrixCssVars.textPrimary,
   },
   toolTags: {
@@ -227,6 +239,10 @@ interface Props {
   index: number
   sessionId?: string | null
   isMobile?: boolean
+  /** 刚发出的用户消息 */
+  arrive?: boolean
+  /** 刚落地的助手回答，避免从全透明闪一下 */
+  settle?: boolean
   /** 流式生成中不可进入编辑 */
   editDisabled?: boolean
   onFork?: () => void
@@ -250,6 +266,8 @@ function ChatMessageItem({
   index,
   sessionId,
   isMobile = false,
+  arrive = false,
+  settle = false,
   editDisabled = false,
   onFork,
   onEditResend,
@@ -416,11 +434,10 @@ function ChatMessageItem({
   if (isWakeResume) {
     return (
       <div
-        className={mergeClasses(s.entry, s.entryUser)}
+        className={mergeClasses(s.entry, s.entryUser, arrive && 'finframe-arrive')}
         data-message-index={index}
         data-message-role={message.role}
         data-message-origin="wake_resume"
-        style={{ animationDelay: `${Math.min(index * 40, 200)}ms` }}
       >
         <div className={s.wakeResumeBar} role="status">
           <span className={s.wakeResumeLabel}>{wakeResumeStatusLabel(message.content)}</span>
@@ -456,10 +473,11 @@ function ChatMessageItem({
         s.entry,
         s.entryInteractive,
         isUser ? s.entryUser : s.entryAssistant,
+        arrive && 'finframe-arrive',
+        settle && 'finframe-settle',
       )}
       data-message-index={index}
       data-message-role={message.role}
-      style={{ animationDelay: `${Math.min(index * 40, 200)}ms` }}
       tabIndex={0}
     >
       <div

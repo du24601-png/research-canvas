@@ -20,8 +20,8 @@ describe('sessionSidebarPresentation', () => {
   it('mobile 用抽屉', () => {
     expect(sessionSidebarPresentation(true)).toBe('drawer')
   })
-  it('desktop 不用侧栏', () => {
-    expect(sessionSidebarPresentation(false)).toBe('none')
+  it('desktop 用左侧栏', () => {
+    expect(sessionSidebarPresentation(false)).toBe('panel')
   })
 })
 

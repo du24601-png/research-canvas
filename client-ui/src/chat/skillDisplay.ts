@@ -37,6 +37,30 @@ export function skillSlashRank(skill: SkillLike): number {
   return Number.isFinite(n) ? n : DEFAULT_SLASH_RANK
 }
 
+/**
+ * 「+ / 引用技能」和 `/` 只露出这些内置技能。
+ * 其余要么和它们重复（四大师 / 并行团队 / 财报精读），要么数据源已不可用。
+ * 用户自建技能只要有标题就继续显示。
+ */
+const COMPOSER_BUILTIN_SKILLS = new Set([
+  'morning-market-brief',
+  'closing-market-brief',
+  'news-digest',
+  'multi-role-research-council',
+  'earnings-quick-read',
+  'financial-data',
+  'comps-analysis',
+  'industry-chain',
+  'watchlist-digest',
+])
+
+export function skillShownInComposer(skill: SkillLike & { source?: string }): boolean {
+  if (skill.source && skill.source !== 'builtin') {
+    return Boolean(skill.metadata?.title?.trim())
+  }
+  return COMPOSER_BUILTIN_SKILLS.has(skill.name)
+}
+
 /** 先 slash-rank 升序，再按展示标题 localeCompare */
 export function compareSkillsForSlash(a: SkillLike, b: SkillLike): number {
   const rankDiff = skillSlashRank(a) - skillSlashRank(b)

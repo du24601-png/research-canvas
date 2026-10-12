@@ -2,7 +2,6 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
-  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -24,8 +23,6 @@ import {
   EditRegular,
   FolderOpenRegular,
   FolderRegular,
-  SearchRegular,
-  SettingsRegular,
   TextDescriptionRegular,
 } from '@fluentui/react-icons'
 import type { SettingsSection } from '../pages/settings/SettingsSidebar'
@@ -33,26 +30,18 @@ import { OPPTRIX_GLASS_PANEL_CLASS } from '../theme/mixins'
 import type { SessionArchiveFolder, SessionMeta } from '../types/chat'
 import { createSessionArchiveFolder, listSessionArchiveFolders } from '../api/client'
 import { ComposerTooltipMenuItem } from './ComposerTooltipMenu'
-import { ChatAddRegular } from './chatIcons'
 import { formatTokenCount } from './formatTokenCount'
-import {
-  DEFAULT_SESSION_DISPLAY_TITLE,
-  recentSessionsForPicker,
-} from './sessionSidebarPresentation'
+import { DEFAULT_SESSION_DISPLAY_TITLE } from './sessionSidebarPresentation'
 import { formatFriendlyTime } from '../utils/formatFriendlyTime'
 
-const MENU_WIDTH = 280
-const MENU_MAX_HEIGHT = 420
+const MENU_WIDTH = 220
+const MENU_MAX_HEIGHT = 360
 const ARCHIVE_PANEL_WIDTH = 220
 const VIEWPORT_PAD = 12
 const PANEL_GAP = 6
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
-}
-
-function formatPickerDate(iso: string) {
-  return new Date(iso).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })
 }
 
 export interface ChatSessionTitleToolsProps {
@@ -94,11 +83,6 @@ export default function ChatSessionTitleTools({
   className,
   textClassName,
   style,
-  sessions,
-  onSelectSession,
-  onOpenSearch,
-  onOpenSettings,
-  onNewChat,
   onRename,
   onArchive,
   onDelete,
@@ -127,9 +111,8 @@ export default function ChatSessionTitleTools({
   const newFolderInputRef = useRef<HTMLInputElement>(null)
 
   const hasSession = Boolean(sessionId)
-  const canOpenMenu = !disabled
   const canManageSession = hasSession && !disabled
-  const recentSessions = useMemo(() => recentSessionsForPicker(sessions), [sessions])
+  const canOpenMenu = canManageSession
   const displayTitle = title || DEFAULT_SESSION_DISPLAY_TITLE
 
   useEffect(() => {
@@ -171,12 +154,11 @@ export default function ChatSessionTitleTools({
     if (!menuOpen || !anchor || !primary) return
 
     const rect = anchor.getBoundingClientRect()
-    const caretRect = (chevronRef.current ?? anchor).getBoundingClientRect()
     const panelWidth = MENU_WIDTH
     const panelHeight = primary.offsetHeight
     const gap = 6
 
-    let left = caretRect.left
+    let left = rect.left
     const maxLeft = window.innerWidth - panelWidth - VIEWPORT_PAD
     if (left > maxLeft) left = Math.max(VIEWPORT_PAD, maxLeft)
     if (left < VIEWPORT_PAD) left = VIEWPORT_PAD
@@ -234,7 +216,6 @@ export default function ChatSessionTitleTools({
     creatingFolder,
     folders.length,
     foldersLoading,
-    recentSessions.length,
     canManageSession,
     updatePanelPositions,
   ])
@@ -351,26 +332,6 @@ export default function ChatSessionTitleTools({
     onEditRolePersona?.()
   }
 
-  const handleOpenSearchClick = () => {
-    closeMenus()
-    onOpenSearch()
-  }
-
-  const handleNewChatClick = () => {
-    closeMenus()
-    onNewChat()
-  }
-
-  const handleSettingsClick = () => {
-    closeMenus()
-    onOpenSettings()
-  }
-
-  const handleSessionPick = (id: string) => {
-    closeMenus()
-    onSelectSession(id)
-  }
-
   const titleStyle: CSSProperties | undefined = maxWidth != null
     ? { maxWidth: `${maxWidth}px` }
     : style
@@ -412,7 +373,7 @@ export default function ChatSessionTitleTools({
       onClick={handleTitleClick}
       aria-haspopup={canOpenMenu ? 'menu' : undefined}
       aria-expanded={canOpenMenu ? menuOpen : undefined}
-      aria-label={canOpenMenu ? `对话：${displayTitle}，打开看板菜单` : displayTitle}
+      aria-label={canOpenMenu ? `对话：${displayTitle}，打开对话操作` : displayTitle}
     >
       <span className={mergeClasses('opptrix-session-title-btn__text', textClassName)}>
         {displayTitle}
@@ -445,28 +406,6 @@ export default function ChatSessionTitleTools({
       aria-label="对话菜单"
     >
       <div className="opptrix-session-tools-menu__scroll opptrix-scroll">
-        <ComposerTooltipMenuItem onClick={handleOpenSearchClick}>
-          <SearchRegular fontSize={16} />
-          <span>搜索全部对话</span>
-        </ComposerTooltipMenuItem>
-        <div className="opptrix-session-tools-menu__section" role="presentation">最近</div>
-        {recentSessions.length === 0 ? (
-          <div className="opptrix-session-tools-menu__empty">暂无历史对话，可先新建或搜索。</div>
-        ) : recentSessions.map(session => (
-          <ComposerTooltipMenuItem
-            key={session.id}
-            active={session.id === sessionId}
-            title={session.title}
-            onClick={() => handleSessionPick(session.id)}
-          >
-            <span className="opptrix-session-tools-menu__session-title opptrix-composer-tooltip-menu__item-title">
-              {session.title || DEFAULT_SESSION_DISPLAY_TITLE}
-            </span>
-            <span className="opptrix-session-tools-menu__session-date">
-              {formatPickerDate(session.updatedAt)}
-            </span>
-          </ComposerTooltipMenuItem>
-        ))}
         {canManageSession ? (
           <>
             <div className="opptrix-session-tools-menu__section" role="presentation">当前对话</div>
@@ -513,16 +452,6 @@ export default function ChatSessionTitleTools({
             ) : null}
           </>
         ) : null}
-      </div>
-      <div className="opptrix-session-tools-menu__footer">
-        <ComposerTooltipMenuItem onClick={handleNewChatClick}>
-          <ChatAddRegular fontSize={16} />
-          <span>新建对话</span>
-        </ComposerTooltipMenuItem>
-        <ComposerTooltipMenuItem onClick={handleSettingsClick}>
-          <SettingsRegular fontSize={16} />
-          <span>系统设置</span>
-        </ComposerTooltipMenuItem>
       </div>
     </div>,
     document.body,

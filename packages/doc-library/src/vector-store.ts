@@ -81,8 +81,10 @@ export const DEFAULT_LANCE_OPTIMIZE_EVERY_N_WRITES = 4
 export const DEFAULT_LANCE_CLEANUP_OLDER_THAN_MS = 0
 
 const OPTIMIZE_DEBOUNCE_MS = 3_000
-/** manifest 版本号超过此值（或接近 u64 溢出包装）视为损坏 */
-const MANIFEST_VERSION_SUSPECT = 1_000_000_000
+/** manifest 版本号超过此值视为损坏 */
+const MANIFEST_VERSION_SUSPECT = 1_000_000_000n
+const U64_MAX = 18_446_744_073_709_551_615n
+const V2_MANIFEST_NAME_DIGITS = 20
 
 const ENV_LANCE_MAX_VERSIONS = 'OPPTRIX_LANCE_MAX_VERSIONS'
 const ENV_LANCE_PATHOLOGY_MAX_VERSIONS = 'OPPTRIX_LANCE_PATHOLOGY_MAX_VERSIONS'
@@ -208,6 +210,18 @@ export type LanceVersionMaintenanceResult = {
 }
 
 /**
+ * manifest 文件名 → 版本号。Lance V1 命名 `{version}.manifest`；
+ * V2 命名 `{u64::MAX - version:020}.manifest`（固定 20 位，新版本字典序在前）。
+ */
+export function manifestVersionFromName(name: string): bigint | null {
+  const m = /^(\d+)\.manifest$/i.exec(name)
+  if (!m) return null
+  const raw = BigInt(m[1])
+  if (m[1].length === V2_MANIFEST_NAME_DIGITS && raw <= U64_MAX) return U64_MAX - raw
+  return raw
+}
+
+/**
  * 检测 Lance dataset 目录是否版本爆炸 / manifest 异常。
  * 不打开原生连接；供 ensureTable 与单测使用。
  * `pathologyMaxVersions` / env 可覆盖硬顶；失败不抛。
@@ -230,11 +244,9 @@ export function detectLanceDatasetPathology(
       const entries = fs.readdirSync(versionsDir)
       versionsCount = entries.length
       for (const name of entries) {
-        const m = /^(\d+)\.manifest$/i.exec(name)
-        if (!m) continue
-        const ver = Number(m[1])
-        // u64 wrap / 异常巨大版本号（本机曾出现 18446744073709551611）
-        if (!Number.isSafeInteger(ver) || ver > MANIFEST_VERSION_SUSPECT) {
+        const ver = manifestVersionFromName(name)
+        if (ver === null) continue
+        if (ver > MANIFEST_VERSION_SUSPECT) {
           return {
             pathological: true,
             reason: 'suspect_manifest_version',

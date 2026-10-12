@@ -12,6 +12,7 @@ import {
 } from './chat-attachments.js'
 import { ensureDocLibraryBridge } from './doc-library-bridge.js'
 import { currentToolSessionId } from './mcp/tool-session-context.js'
+import { isLibraryOnlyTurn } from './library-only-turn.js'
 import { docCiteMarkdown, docCiteTemplate, type DocCiteRef } from './document-citation.js'
 import type { DocumentSourceType } from '@opptrix/doc-library'
 import { getUserDataStore } from '@opptrix/user-store'
@@ -305,7 +306,9 @@ export function buildDocumentTools(): DocumentToolDef[] {
         const query = String(args.query ?? '').trim()
         if (!query) return { error: '请提供 query' }
         const limit = parseLimit(args.limit)
-        const sourceType = parseSourceType(args.source_type)
+        const sourceType = isLibraryOnlyTurn(requireSessionId())
+          ? 'report'
+          : parseSourceType(args.source_type)
 
         const svc = ensureDocLibraryBridge()
         const { hits, reason } = await searchLibraryUnified(svc, query, { sourceType, limit })

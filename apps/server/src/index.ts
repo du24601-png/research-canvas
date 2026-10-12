@@ -2393,7 +2393,7 @@ app.post<{
   },
 )
 
-app.post<{ Params: { id: string }; Body: { message: string; model?: string; attachments?: string[]; research_canvas?: unknown; ui_composer?: unknown; plan_confirm?: unknown; canvas_edit?: unknown } }>(
+app.post<{ Params: { id: string }; Body: { message: string; model?: string; attachments?: string[]; research_canvas?: unknown; ui_composer?: unknown; plan_confirm?: unknown; canvas_edit?: unknown; library_only?: unknown } }>(
   '/api/sessions/:id/chat/stream',
   async (req, reply) => {
     if (isReadonlyCollaborationSession(req.params.id)) {
@@ -2443,6 +2443,7 @@ app.post<{ Params: { id: string }; Body: { message: string; model?: string; atta
           researchUiComposer: req.body.ui_composer === true,
           planConfirm: req.body.plan_confirm === true,
           researchCanvasEdit: req.body.canvas_edit === true,
+          libraryOnly: req.body.library_only === true,
         },
         req.body.attachments,
       )
@@ -2465,7 +2466,7 @@ app.post<{ Params: { id: string }; Body: { message: string; model?: string; atta
   },
 )
 
-app.post<{ Params: { id: string }; Body: { message: string; model?: string; attachments?: string[]; research_canvas?: unknown } }>(
+app.post<{ Params: { id: string }; Body: { message: string; model?: string; attachments?: string[]; research_canvas?: unknown; library_only?: unknown } }>(
   '/api/sessions/:id/chat',
   async (req, reply) => {
     if (isReadonlyCollaborationSession(req.params.id)) {
@@ -2485,7 +2486,7 @@ app.post<{ Params: { id: string }; Body: { message: string; model?: string; atta
       req.params.id,
       req.body.message ?? '',
       req.body.model,
-      { researchCanvasSnapshot: req.body.research_canvas },
+      { researchCanvasSnapshot: req.body.research_canvas, libraryOnly: req.body.library_only === true },
       req.body.attachments,
     )
     return {

@@ -164,7 +164,7 @@ const useStyles = makeStyles({
     paddingTop: '8px',
     display: 'flex',
     flexDirection: 'column',
-    gap: '10px',
+    gap: '20px',
     boxSizing: 'border-box',
   },
   contentColumnElectron: {
@@ -320,13 +320,12 @@ const useStyles = makeStyles({
     alignItems: 'center',
   },
   headerInner: {
-    maxWidth: opptrixTokens.chatThreadMaxWidth,
     width: '100%',
     height: '100%',
-    margin: '0 auto',
+    margin: 0,
     minWidth: 0,
-    paddingLeft: opptrixTokens.chatThreadPaddingX,
-    paddingRight: opptrixTokens.chatThreadPaddingX,
+    paddingLeft: '8px',
+    paddingRight: '8px',
     boxSizing: 'border-box',
     display: 'flex',
     alignItems: 'center',
@@ -348,9 +347,9 @@ const useStyles = makeStyles({
     alignItems: 'center',
     gap: '4px',
   },
-  headerSidebarToggle: {
-    flexShrink: 0,
-    marginLeft: '-4px',
+  /** 列表收起后，开关停在窗口左缘，标题让出这块位置。 */
+  headerInnerListCollapsed: {
+    paddingLeft: '44px',
   },
   title: {
     fontSize: 'var(--opptrix-font-lg)',
@@ -401,7 +400,6 @@ const useStyles = makeStyles({
   loadingRow: {
     alignSelf: 'stretch',
     padding: '4px 0 8px',
-    ...fadeInUp,
   },
   contextHint: {
     flexShrink: 0,
@@ -523,6 +521,7 @@ function ChatView({
   contextUsage,
   onRefreshContextUsage,
   isMobile = false,
+  sidebarVisible = false,
   sidebarDrawerOpen = false,
   llmLabel = '',
   backendOk = false,
@@ -556,6 +555,30 @@ function ChatView({
   onOpenMobileFilesPanel,
 }: ChatViewProps) {
   const s = useStyles()
+  const motionPrevRef = useRef<Set<string>>(new Set())
+  const motionFreshRef = useRef<Set<string>>(new Set())
+  const motionSessionRef = useRef<string | null | undefined>(undefined)
+  const motionPrimedRef = useRef(false)
+  if (motionSessionRef.current !== sessionId) {
+    motionSessionRef.current = sessionId
+    motionPrevRef.current = new Set()
+    motionFreshRef.current = new Set()
+    motionPrimedRef.current = false
+  }
+  {
+    const currentKeys = messages.map((item, index) => `${item.role}:${item.at ?? index}`)
+    if (!motionPrimedRef.current) {
+      if (currentKeys.length > 0) {
+        motionPrimedRef.current = true
+        motionPrevRef.current = new Set(currentKeys)
+      }
+    } else {
+      for (const key of currentKeys) {
+        if (!motionPrevRef.current.has(key)) motionFreshRef.current.add(key)
+      }
+      motionPrevRef.current = new Set(currentKeys)
+    }
+  }
   const [liveTrace, setLiveTrace] = useState<ChatLiveTrace | null>(null)
   const [pendingUserPrompt, setPendingUserPrompt] = useState<ChatUserPromptPayload | null>(null)
   const [userPromptSubmitting, setUserPromptSubmitting] = useState(false)
@@ -846,25 +869,14 @@ function ChatView({
       || (collaborationReadonly && collaborationChildStreaming)
     if (streaming) {
       if (stickToBottomRef.current) {
-        scrollToBottom(messages.length <= 1 ? 'auto' : 'smooth')
+        scrollToBottom('auto')
       }
       prevLoadingRef.current = loading || wakeWaiting
       return
     }
 
-    if (prevLoadingRef.current) {
-      let idx = -1
-      for (let i = messages.length - 1; i >= 0; i -= 1) {
-        if (messages[i].role === 'assistant') {
-          idx = i
-          break
-        }
-      }
-      if (idx >= 0) {
-        window.requestAnimationFrame(() => {
-          window.requestAnimationFrame(() => scrollMessageStartToCenter(idx))
-        })
-      }
+    if (prevLoadingRef.current && stickToBottomRef.current) {
+      scrollToBottom('auto')
     }
 
     prevLoadingRef.current = loading || wakeWaiting
@@ -876,7 +888,6 @@ function ChatView({
     collaborationReadonly,
     collaborationChildStreaming,
     scrollToBottom,
-    scrollMessageStartToCenter,
   ])
 
   useEffect(() => {
@@ -965,7 +976,7 @@ function ChatView({
       {!isMobile && !electronChrome && (
         <div className={s.header}>
           <div className={s.headerMain}>
-            <div className={s.headerInner}>
+            <div className={mergeClasses(s.headerInner, !sidebarVisible && onOpenSidebar && s.headerInnerListCollapsed)}>
               <div className={s.headerTitleSlot}>
                 {titleSlot ?? (
                   <Text className={s.title}>{title || DEFAULT_SESSION_DISPLAY_TITLE}</Text>
@@ -1106,7 +1117,7 @@ function ChatView({
               ) : null}
 
               {collaborationReadonly && collaborationChildStreaming && (
-                <div className={s.loadingRow} data-message-role="assistant">
+                <div className={mergeClasses(s.loadingRow, 'finframe-turn-live', 'finframe-arrive')} data-message-role="assistant">
                   {(() => {
                     const childTrace = collaborationChildLiveTrace
                     const replyActive = Boolean(childTrace?.replyDraft?.trim())
@@ -1144,24 +1155,30 @@ function ChatView({
               ) : null}
 
               <ReportFollowupProvider sessionId={sessionId} messages={messages} quote={collaborationReadonly ? undefined : onQuoteSelection} scrollTo={scrollMessageStartToCenter}>
-              {messages.map((m, i) => (
+              {messages.map((m, i) => {
+                const rowKey = `${m.role}:${m.at ?? i}`
+                const justArrived = motionFreshRef.current.has(rowKey)
+                return (
                 <ChatMessageItem
                   key={listRowKey(i, m.at, m.role)}
                   message={m}
                   index={i}
                   sessionId={sessionId}
                   isMobile={isMobile}
+                  arrive={justArrived && m.role === 'user'}
+                  settle={justArrived && m.role === 'assistant'}
                   editDisabled={loading || collaborationReadonly}
                   onFork={!collaborationReadonly && onForkMessage ? () => onForkMessage(i) : undefined}
                   onEditResend={collaborationReadonly ? undefined : onEditResend}
                   onOpenPreview={onOpenFilePreview}
                   hiddenPreviewStepIds={livePreviewStepIds}
                 />
-              ))}
+                )
+              })}
               </ReportFollowupProvider>
 
               {!collaborationReadonly && ((loading || wakeWaiting) && liveTrace) && (
-                <div className={s.loadingRow} data-message-role="assistant">
+                <div className={mergeClasses(s.loadingRow, 'finframe-turn-live', 'finframe-arrive')} data-message-role="assistant">
                   {(() => {
                     const replyActive = Boolean(liveTrace.replyDraft?.trim())
                     const receiptText = replyActive
@@ -1191,7 +1208,7 @@ function ChatView({
                 </div>
               )}
               {!collaborationReadonly && loading && !liveTrace && (
-                <div className={s.loadingRow}>
+                <div className={mergeClasses(s.loadingRow, 'finframe-turn-live', 'finframe-arrive')}>
                   <ChatProcessTrace
                     steps={[]}
                     sessionId={sessionId}

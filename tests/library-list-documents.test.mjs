@@ -40,3 +40,37 @@ test('GET /api/library/documents validates pagination', async () => {
   }
   await app.close()
 })
+
+test('POST /api/library/documents rejects pictures and empty files', async () => {
+  const { registerLibraryRoutes } = await import('../apps/server/dist/library-routes.js')
+  const app = Fastify()
+  app.addContentTypeParser('application/octet-stream', { parseAs: 'buffer' }, (_req, body, done) => {
+    done(null, body)
+  })
+  registerLibraryRoutes(app)
+  const picture = await app.inject({
+    method: 'POST',
+    url: '/api/library/documents',
+    headers: {
+      'content-type': 'application/octet-stream',
+      'x-attachment-name': encodeURIComponent('照片.png'),
+      'x-attachment-mime': 'image/png',
+    },
+    payload: Buffer.from('not-a-png'),
+  })
+  assert.equal(picture.statusCode, 400)
+  const empty = await app.inject({
+    method: 'POST',
+    url: '/api/library/documents',
+    headers: {
+      'content-type': 'application/octet-stream',
+      'x-attachment-name': encodeURIComponent('空.txt'),
+      'x-attachment-mime': 'text/plain',
+    },
+    payload: Buffer.alloc(0),
+  })
+  assert.equal(empty.statusCode, 400)
+  const badId = await app.inject({ method: 'DELETE', url: '/api/library/documents/not%20safe' })
+  assert.equal(badId.statusCode, 400)
+  await app.close()
+})

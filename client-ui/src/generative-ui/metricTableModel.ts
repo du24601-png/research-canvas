@@ -1,7 +1,7 @@
 /**
  * MetricTable 的纯计算：单元格文字、底色深浅、迷你走势线、首年→末年变化，全部由代码从 Dataset 读或算。
  * 布局：每个数据集一张小表（行 = 公司，列 = 年份，再加走势与首末变化两列），多个数据集纵向排列。
- * 缺值一律「—」，不补值；底色只在同一数据集内按数值高低做灰度深浅，缺值无底色。
+ * 缺值一律「—」，不补值。底色只在同一数据集内比较：高于中位用淡红，低于中位用淡绿，恰在中位或无值不着色。
  */
 import { yoyDeltaUnit } from '@opptrix/shared/research-dataset-delta'
 import { researchMetricLabel } from '../chat/research-canvas/sourcePresentation'
@@ -9,8 +9,6 @@ import { pointValue } from '../chat/research-canvas/views'
 import type { Dataset } from '../chat/research-canvas/types'
 import { formatNumber, isRatio, MISSING, signed } from './numberText'
 
-const SHADE_MIN = 0.03
-const SHADE_SPAN = 0.15
 export const SPARK_WIDTH = 56
 export const SPARK_HEIGHT = 16
 
@@ -18,7 +16,7 @@ export interface MetricCell {
   period: string
   value: number | null
   text: string
-  /** 0–1 的灰度强度；缺值为 null */
+  /** 表内相对高低，0 最低、1 最高；缺值为 null */
   shade: number | null
 }
 
@@ -85,9 +83,14 @@ function shadeScale(dataset: Dataset): (value: number | null) => number | null {
   }
 }
 
-/** 灰度底色（墨色按强度取透明度），不用彩色 */
-export function shadeAlpha(shade: number | null): number {
-  return shade == null ? 0 : SHADE_MIN + SHADE_SPAN * shade
+const HEAT_MAX = 0.32
+
+/** 高于中位为淡红，低于中位为淡绿；alpha 随离中位的距离增大，中位与缺值不着色 */
+export function heatWash(shade: number | null): { side: 'high' | 'low'; alpha: number } | null {
+  if (shade == null) return null
+  const distance = Math.abs(shade - 0.5) * 2
+  if (distance === 0) return null
+  return { side: shade > 0.5 ? 'high' : 'low', alpha: distance * HEAT_MAX }
 }
 
 export function metricTableModel(dataset: Dataset): MetricTableModel {

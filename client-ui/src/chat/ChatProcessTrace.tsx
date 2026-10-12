@@ -534,10 +534,19 @@ scrollWrapper: {
     whiteSpace: 'pre-wrap',
     wordBreak: 'break-word',
   },
-  previewEmphasis: {
+  previewSlot: {
     borderRadius: opptrixTokens.radiusLg,
-    outline: `1px solid ${opptrixCssVars.inputBorderFocus}`,
+    outline: '1px solid transparent',
     outlineOffset: '0',
+    transitionProperty: 'outline-color',
+    transitionDuration: '420ms',
+    transitionTimingFunction: 'cubic-bezier(0.23, 1, 0.32, 1)',
+    '@media (prefers-reduced-motion: reduce)': {
+      transitionDuration: '0ms',
+    },
+  },
+  previewEmphasis: {
+    outlineColor: opptrixCssVars.inputBorderFocus,
   },
   replyShell: {
     display: 'flex',
@@ -1111,6 +1120,7 @@ export default function ChatProcessTrace({
             <div
               key={step.id}
               className={mergeClasses(
+                s.previewSlot,
                 live && step.id === lastPreviewId && step.status === 'done' && s.previewEmphasis,
               )}
             >
@@ -1172,7 +1182,7 @@ export function ChatStreamReplyShell({
   // 对话优先：取数摘要已在上方一行展示，不再重复灰条
   const { chatFirst } = usePinBoard()
   return (
-    <div className={s.replyShell}>
+    <div className={s.replyShell} data-stream-reply="">
       {receiptText && !chatFirst ? <ChatStreamReceipt text={receiptText} /> : null}
       {children}
     </div>

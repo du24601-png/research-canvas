@@ -96,7 +96,7 @@ describe('pin to board', () => {
     })
     expect(readPersistedCanvasState(SESSION).widgets).toHaveLength(1)
     expect(screen.getByText('已钉住')).toBeTruthy()
-    expect(screen.getByRole('button', { name: '看板，已钉住 1 项' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '打开看板' })).toBeTruthy()
   })
 
   it('chat-first board ignores agent widget_created; legacy canvas still applies it', async () => {
@@ -127,7 +127,17 @@ describe('pin to board', () => {
     fireEvent.click(screen.getByRole('button', { name: '在看板中查看' }))
     expect(drawer.getAttribute('data-pin-board')).toBe('open')
     expect(screen.getByTestId('board-widgets').textContent).toContain(TITLE)
-    fireEvent.click(screen.getByRole('button', { name: '收起' }))
+    fireEvent.click(screen.getByRole('button', { name: '收起看板' }))
     expect(drawer.getAttribute('data-pin-board')).toBe('closed')
+  })
+
+  it('the header icon toggles the board', () => {
+    const { container } = renderWithProviders(<ChatFirstTurn />)
+    const drawer = container.ownerDocument.querySelector('[data-pin-board]')
+    if (!drawer) throw new Error('看板未挂载')
+    expect(drawer.getAttribute('data-pin-board')).toBe('closed')
+    fireEvent.click(screen.getByRole('button', { name: '打开看板' }))
+    expect(drawer.getAttribute('data-pin-board')).toBe('open')
+    expect(screen.getByRole('button', { name: '收起看板' })).toBeTruthy()
   })
 })

@@ -30,14 +30,13 @@ export interface ChatWorkspaceProps {
 
 /**
  * 聊天工作区。对话优先布局（默认）：对话占满宽度，右栏只用于文件预览，
- * 研究画布收进「看板」抽屉；关闭开关则恢复原双栏。
+ * 研究画布收进可展开的右侧看板；关闭开关则恢复原双栏。
  */
 export function ChatWorkspace(props: ChatWorkspaceProps) {
   const chatFirst = useMemo(() => isChatFirstLayout(), [])
   return (
     <PinBoardProvider chatFirst={chatFirst} sessionId={props.chat.sessionId ?? null}>
       <ChatWorkspaceBody {...props} />
-      {chatFirst ? <PinBoardDrawer sessionId={props.chat.sessionId ?? null} sessionTitle={props.chat.title} /> : null}
     </PinBoardProvider>
   )
 }
@@ -84,6 +83,7 @@ function ChatWorkspaceBody({
       aria-hidden={viewHidden}
     >
       {ui.isMobile ? (
+        <>
         <div className={s.mobileSlideTrack} style={trackStyle}>
           {!viewHidden ? drawerSidebar : null}
 
@@ -137,6 +137,14 @@ function ChatWorkspaceBody({
             </div>
           </div>
         </div>
+        {chatFirst ? (
+          <PinBoardDrawer
+            placement="overlay"
+            sessionId={chat.sessionId ?? null}
+            sessionTitle={chat.title}
+          />
+        ) : null}
+        </>
       ) : (
         <>
           {chatVisible && !ui.presentMode && (
@@ -210,6 +218,13 @@ function ChatWorkspaceBody({
             onClosePreview={ui.closePreview}
             onSlideTransitionEnd={ui.onPeerSlideSettled}
           />
+          {chatFirst ? (
+            <PinBoardDrawer
+              placement="dock"
+              sessionId={chat.sessionId ?? null}
+              sessionTitle={chat.title}
+            />
+          ) : null}
         </>
       )}
     </div>

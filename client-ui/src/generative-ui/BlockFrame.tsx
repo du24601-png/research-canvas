@@ -20,7 +20,11 @@ export const useBlockStyles = makeStyles({
   actions: { display: 'flex', gap: '6px', flexWrap: 'wrap' },
   note: { fontSize: 'var(--opptrix-font-md)', color: opptrixCssVars.textSecondary, lineHeight: 1.5 },
   plot: {
-    // 随列宽等比放大（宽屏不再扁平），220–360px 之间
+    // 高度随列宽走（约 3:1），夹在 220–360px。宽度锁在格子里：
+    // min-height 配 aspect-ratio 会算出 660px 的最小宽度，多图并排时第二张会盖住第一张。
+    width: '100%',
+    maxWidth: '100%',
+    boxSizing: 'border-box',
     aspectRatio: '3 / 1',
     minHeight: '220px',
     maxHeight: '360px',
@@ -30,7 +34,8 @@ export const useBlockStyles = makeStyles({
     border: `1px solid ${opptrixCssVars.separator}`,
     overflow: 'hidden',
   },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' },
+  grid: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '12px' },
+  gridItem: { minWidth: 0, maxWidth: '100%' },
   rows: { display: 'grid', gridTemplateColumns: '6.5em minmax(0, 1fr)', gap: '4px 8px', fontSize: 'var(--opptrix-font-md)' },
   label: { color: opptrixCssVars.textSecondary },
 })

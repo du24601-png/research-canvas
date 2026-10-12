@@ -28,6 +28,15 @@ import FilenameEllipsis from './FilenameEllipsis'
 
 GlobalWorkerOptions.workerSrc = pdfWorker
 
+/** 由 vite-pdfjs-assets 提供；中文 CID 字体依赖 CMap */
+const PDFJS_ASSETS = {
+  cMapUrl: '/pdfjs/cmaps/',
+  cMapPacked: true,
+  standardFontDataUrl: '/pdfjs/standard_fonts/',
+  wasmUrl: '/pdfjs/wasm/',
+  iccUrl: '/pdfjs/iccs/',
+} as const
+
 const FAIL_MESSAGE = '暂时无法打开这份文档，请稍后重试'
 const LOADING_LABEL = '正在打开文档…'
 const ZOOM_STEP = 1.2
@@ -247,18 +256,18 @@ const useStyles = makeStyles({
     flexDirection: 'column',
     alignItems: 'center',
     gap: '8px',
-    width: '100%',
+    width: 'max-content',
+    minWidth: '100%',
   },
   pageSlot: {
     display: 'flex',
     justifyContent: 'center',
-    width: '100%',
+    alignItems: 'flex-start',
     flexShrink: 0,
   },
   canvas: {
     display: 'block',
-    maxWidth: '100%',
-    height: 'auto',
+    flexShrink: 0,
     backgroundColor: opptrixCssVars.canvas,
     boxShadow: `0 0 0 1px ${opptrixCssVars.border}`,
   },
@@ -588,7 +597,7 @@ export default function PdfPreviewViewer({
     setActivePages(new Set([1]))
     visiblePagesRef.current = new Set()
 
-    const task = getDocument({ url, withCredentials: false })
+    const task = getDocument({ url, withCredentials: false, ...PDFJS_ASSETS })
     loadingTaskRef.current = task
 
     void task.promise

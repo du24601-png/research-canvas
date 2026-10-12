@@ -13,6 +13,8 @@ export type QueuedPrompt = {
   text: string
   attachmentIds?: string[]
   attachmentMetas?: ChatAttachmentMeta[]
+  /** 这一轮只根据「我的资料」回答 */
+  libraryOnly?: boolean
   createdAt: number
 }
 
@@ -56,6 +58,7 @@ export function normalizeQueuedPrompt(raw: unknown): QueuedPrompt | null {
     createdAt,
     ...(attachmentIds?.length ? { attachmentIds } : {}),
     ...(attachmentMetas?.length ? { attachmentMetas } : {}),
+    ...(o.libraryOnly === true ? { libraryOnly: true } : {}),
   }
 }
 
@@ -130,6 +133,7 @@ export function enqueueQueuedPrompt(
     text?: string
     attachmentIds?: string[]
     attachmentMetas?: ChatAttachmentMeta[]
+    libraryOnly?: boolean
   },
 ): EnqueueResult {
   const text = (input.text ?? '').trim()
@@ -148,6 +152,7 @@ export function enqueueQueuedPrompt(
     createdAt: Date.now(),
     ...(attachmentIds.length ? { attachmentIds } : {}),
     ...(attachmentMetas?.length ? { attachmentMetas } : {}),
+    ...(input.libraryOnly ? { libraryOnly: true } : {}),
   }
   const items = mutateSession(sessionId, prev => [...prev, item])
   return { ok: true, item, items }

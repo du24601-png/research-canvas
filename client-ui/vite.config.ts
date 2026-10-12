@@ -4,6 +4,7 @@ import basicSsl from '@vitejs/plugin-basic-ssl'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { pdfjsAssets } from './vite-pdfjs-assets'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(__dirname, '..')
@@ -29,6 +30,7 @@ export default defineConfig({
       },
     }),
     ...(WEB_HTTPS ? [basicSsl()] : []),
+    pdfjsAssets(),
   ],
   base: '/',
   resolve: {

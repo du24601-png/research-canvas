@@ -14,6 +14,7 @@ export type SubmitImpl = (
   text?: string,
   attachmentIds?: string[],
   attachmentMetas?: ChatAttachmentMeta[],
+  libraryOnly?: boolean,
 ) => Promise<void>
 
 /** 进行中的流句柄（原 streamHandlesRef 的值类型） */

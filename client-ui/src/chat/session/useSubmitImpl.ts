@@ -11,6 +11,7 @@ import { readPersistedCanvasState } from '../research-canvas/layoutStorage'
 import { consumePendingAdjustProposal } from '../research-canvas/researchPreviewAdjust'
 import { buildResearchCanvasAgentSnapshot } from '../research-canvas/sessionDatasetSnapshot'
 import type { ChatEngineRefs, ChatSubmitPorts, StreamFlags } from './engineTypes'
+import { armLibraryAsk } from '../library/libraryAsk'
 import { isChatFirstLayout, isPlanConfirmEnabled, isUiComposerEnabled } from '../pin-board/chatFirstLayout'
 
 /** 提交后端
@@ -64,10 +65,13 @@ export function useSubmitImpl(refs: ChatEngineRefs, flags: StreamFlags, ports: C
     drainPromptQueueAfterStream,
   } = ports
 
-  submitImplRef.current = async (text?: string, attachmentIds?: string[], attachmentMetas?: ChatAttachmentMeta[]) => {
+  submitImplRef.current = async (text?: string, attachmentIds?: string[], attachmentMetas?: ChatAttachmentMeta[], libraryOnly = false) => {
     const msg = (text ?? '').trim()
     const ids = attachmentIds?.filter(Boolean) ?? []
-    if (!msg && !ids.length) return
+    if (!msg && !ids.length) {
+      if (libraryOnly) armLibraryAsk()
+      return
+    }
 
     let sessionId = activeIdRef.current
     if (!sessionId) {
@@ -83,14 +87,15 @@ export function useSubmitImpl(refs: ChatEngineRefs, flags: StreamFlags, ports: C
         await refreshSessions()
         resetContextUsageForSession(sessionId)
       } catch (e) {
+        if (libraryOnly) armLibraryAsk()
         onError(e instanceof Error ? e.message : '创建对话失败')
         return
       }
     }
 
     if (streamingSessionIdsRef.current.has(sessionId)) {
-      // 生成中：纯文本走 soft steer；带附件仍排队等本轮结束后发送
-      if (!ids.length && msg) {
+      // 生成中：普通补充走 soft steer。只根据资料的提问要等本轮结束，避免沿用上一轮的工具。
+      if (!libraryOnly && !ids.length && msg) {
         try {
           const result = await steerSessionChat(sessionId, msg)
           if (!result.ok) {
@@ -109,9 +114,11 @@ export function useSubmitImpl(refs: ChatEngineRefs, flags: StreamFlags, ports: C
         text: msg,
         attachmentIds: ids,
         attachmentMetas,
+        libraryOnly,
       })
       syncPromptQueueUi(sessionId)
       if (!result.ok && result.reason === 'full') {
+        if (libraryOnly) armLibraryAsk()
         onError('排队已满，请先处理或删除后再添加')
       }
       return
@@ -204,7 +211,7 @@ export function useSubmitImpl(refs: ChatEngineRefs, flags: StreamFlags, ports: C
           activeProposal,
           activeWidgetId: getActiveWidgetId(),
         })
-      })(), { uiComposer: isUiComposerEnabled(), planConfirm: isPlanConfirmEnabled(), canvasEdit: !isChatFirstLayout() })
+      })(), { uiComposer: isUiComposerEnabled(), planConfirm: isPlanConfirmEnabled(), canvasEdit: !isChatFirstLayout(), libraryOnly })
 
       if (!isStreamStale()) {
         const sid = resolvedSessionId

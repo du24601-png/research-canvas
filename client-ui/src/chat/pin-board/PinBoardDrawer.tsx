@@ -1,12 +1,17 @@
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import { makeStyles, mergeClasses, Text } from '@fluentui/react-components'
-import { DismissRegular } from '@fluentui/react-icons'
-import OpptrixButton from '../../components/opptrix/OpptrixButton'
-import { DESKTOP_Z_OVERLAY_SIDEBAR } from '../../desktop/constants'
+import {
+  DESKTOP_SIDEBAR_LAYOUT_EASE,
+  DESKTOP_SIDEBAR_LAYOUT_MS,
+  DESKTOP_TITLEBAR_HEIGHT,
+  DESKTOP_Z_OVERLAY_SIDEBAR,
+} from '../../desktop/constants'
 import { opptrixCssVars } from '../../theme/tokens'
 import ResearchCanvas from '../research-canvas/ResearchCanvas'
 import { useWorkspaceUi } from '../workspace/WorkspaceUiContext'
 import { usePinBoard } from './PinBoardContext'
+
+const DOCK_WIDTH = 'clamp(360px, 36vw, 520px)'
 
 const useStyles = makeStyles({
   shade: {
@@ -15,7 +20,7 @@ const useStyles = makeStyles({
     zIndex: DESKTOP_Z_OVERLAY_SIDEBAR,
     backgroundColor: 'rgba(0, 0, 0, 0.28)',
   },
-  drawer: {
+  overlay: {
     position: 'fixed',
     top: 0,
     right: 0,
@@ -33,11 +38,54 @@ const useStyles = makeStyles({
     transitionTimingFunction: 'ease-out',
     '@media (prefers-reduced-motion: reduce)': { transitionDuration: '0ms' },
   },
-  /** 演示模式（画布工具栏进入）：看板铺满窗口 */
-  drawerPresent: { width: '100vw', borderLeft: 'none' },
-  /** 关闭时移出视口但保持挂载：画布要持续接收数据集事件并落盘，钉住才能成功 */
-  drawerClosed: {
+  overlayPresent: { width: '100vw', borderLeft: 'none' },
+  overlayClosed: {
     transform: 'translate3d(100%, 0, 0)',
+    visibility: 'hidden',
+  },
+  dock: {
+    flex: '0 0 auto',
+    display: 'flex',
+    flexDirection: 'row',
+    alignSelf: 'stretch',
+    minWidth: 0,
+    minHeight: 0,
+    height: '100%',
+    boxSizing: 'border-box',
+    backgroundColor: opptrixCssVars.canvas,
+    borderLeft: `1px solid ${opptrixCssVars.separator}`,
+    overflow: 'hidden',
+    transitionProperty: 'width, flex-basis',
+    transitionDuration: `${DESKTOP_SIDEBAR_LAYOUT_MS}ms`,
+    transitionTimingFunction: DESKTOP_SIDEBAR_LAYOUT_EASE,
+    '@media (prefers-reduced-motion: reduce)': { transitionDuration: '0ms' },
+  },
+  dockClosed: { width: 0, flexBasis: 0, borderLeftWidth: 0 },
+  dockOpen: { width: DOCK_WIDTH, flexBasis: DOCK_WIDTH },
+  dockPresent: {
+    position: 'fixed',
+    inset: 0,
+    width: '100vw',
+    flexBasis: 'auto',
+    zIndex: DESKTOP_Z_OVERLAY_SIDEBAR + 1,
+    borderLeft: 'none',
+  },
+  dockElectron: {
+    marginTop: `-${DESKTOP_TITLEBAR_HEIGHT}px`,
+    height: `calc(100% + ${DESKTOP_TITLEBAR_HEIGHT}px)`,
+    boxSizing: 'border-box',
+  },
+  panel: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 0,
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  /** 收起时画布仍挂载，才能接着收数据集并落盘 */
+  panelClosed: {
+    width: 0,
+    overflow: 'hidden',
     visibility: 'hidden',
   },
   header: {
@@ -49,30 +97,30 @@ const useStyles = makeStyles({
     padding: '10px 12px 6px 16px',
   },
   title: { fontSize: 'var(--opptrix-font-xxl)', fontWeight: 600, color: opptrixCssVars.textPrimary },
-  note: {
-    display: 'block',
-    padding: '0 16px 8px',
-    fontSize: 'var(--opptrix-font-md)',
-    color: opptrixCssVars.textSecondary,
-  },
   body: { flex: 1, minHeight: 0, overflow: 'hidden' },
 })
 
 export interface PinBoardDrawerProps {
   sessionId: string | null
   sessionTitle?: string
+  /** dock：桌面右侧边栏，由顶栏图标开关。overlay：手机浮层。 */
+  placement?: 'dock' | 'overlay'
 }
 
-/** 看板抽屉：复用研究画布组件与其持久化；聊天预览经用户点「钉住」写入。 */
-export default function PinBoardDrawer({ sessionId, sessionTitle }: PinBoardDrawerProps) {
+/** 看板：复用研究画布与其持久化；聊天预览经用户点「钉住」写入。 */
+export default function PinBoardDrawer({
+  sessionId,
+  sessionTitle,
+  placement = 'dock',
+}: PinBoardDrawerProps) {
   const s = useStyles()
   const { open, closeBoard } = usePinBoard()
-  const { presentMode } = useWorkspaceUi()
-  const closeRef = useRef<HTMLButtonElement>(null)
+  const { presentMode, electronChrome } = useWorkspaceUi()
+  const dock = placement === 'dock'
+  const expanded = open || presentMode
 
   useEffect(() => {
     if (!open) return () => {}
-    closeRef.current?.focus()
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') closeBoard()
     }
@@ -80,29 +128,48 @@ export default function PinBoardDrawer({ sessionId, sessionTitle }: PinBoardDraw
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [open, closeBoard])
 
+  const panel = (
+    <div className={mergeClasses(s.panel, dock && !expanded && s.panelClosed)} aria-hidden={dock && !expanded} inert={dock && !expanded}>
+      <div className={s.header}>
+        <Text className={s.title}>看板</Text>
+      </div>
+      <div className={s.body}>
+        <ResearchCanvas sessionId={sessionId} sessionTitle={sessionTitle} />
+      </div>
+    </div>
+  )
+
+  if (!dock) {
+    return (
+      <>
+        {open && !presentMode ? <div className={s.shade} onClick={closeBoard} aria-hidden data-pin-board-shade /> : null}
+        <aside
+          className={mergeClasses(s.overlay, open && presentMode && s.overlayPresent, !open && s.overlayClosed)}
+          role="dialog"
+          aria-modal={open}
+          aria-label="看板"
+          aria-hidden={!open}
+          inert={!open}
+          data-pin-board={open ? 'open' : 'closed'}
+        >
+          {panel}
+        </aside>
+      </>
+    )
+  }
+
   return (
-    <>
-      {open && !presentMode ? <div className={s.shade} onClick={closeBoard} aria-hidden data-pin-board-shade /> : null}
-      <aside
-        className={mergeClasses(s.drawer, open && presentMode && s.drawerPresent, !open && s.drawerClosed)}
-        role="dialog"
-        aria-modal={open}
-        aria-label="看板"
-        aria-hidden={!open}
-        inert={!open}
-        data-pin-board={open ? 'open' : 'closed'}
-      >
-        <div className={s.header}>
-          <Text className={s.title}>看板</Text>
-          <OpptrixButton ref={closeRef} variant="ghost" size="small" icon={<DismissRegular />} onClick={closeBoard}>
-            收起
-          </OpptrixButton>
-        </div>
-        <Text className={s.note}>你在回答里点「钉住」的图表会收在这里，可以拖动排版、导出或删除。</Text>
-        <div className={s.body}>
-          <ResearchCanvas sessionId={sessionId} sessionTitle={sessionTitle} />
-        </div>
-      </aside>
-    </>
+    <aside
+      className={mergeClasses(
+        s.dock,
+        expanded ? s.dockOpen : s.dockClosed,
+        presentMode && s.dockPresent,
+        electronChrome && !presentMode && s.dockElectron,
+      )}
+      aria-label="看板"
+      data-pin-board={expanded ? 'open' : 'closed'}
+    >
+      {panel}
+    </aside>
   )
 }

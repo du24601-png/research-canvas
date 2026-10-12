@@ -1,0 +1,1249 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FinFrame 讲解图</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;900&family=Noto+Sans+SC:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #f3efe6;
+    --paper-2: #ebe5d8;
+    --card: #fbf9f4;
+    --ink: #1a2230;
+    --ink-2: #4a5160;
+    --ink-3: #8a8f99;
+    --rule: #d6cfbf;
+    --model: #2b5aa6;
+    --model-bg: #e3eaf6;
+    --code: #2c6a4c;
+    --code-bg: #e1eee6;
+    --user: #c0402a;
+    --user-bg: #f6e2dc;
+    --warn: #b7791f;
+    --warn-bg: #f7ecd6;
+    --serif: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "SimSun", serif;
+    --sans: "Noto Sans SC", "Source Han Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+    --mono: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { background: #d9d3c6; }
+  body { font-family: var(--sans); color: var(--ink); padding: 40px 0 80px; }
+  body.export { padding: 0; background: var(--paper); }
+
+  .deck { display: flex; flex-direction: column; align-items: center; gap: 28px; }
+  .pair { display: flex; flex-direction: column; gap: 14px; }
+  .group-label { width: 1280px; font-family: var(--serif); font-size: 22px; font-weight: 900; color: #5a5446; margin-top: 24px; border-bottom: 1px solid #b9ad94; padding-bottom: 6px; }
+
+  .slide {
+    width: 1280px; min-height: 720px; height: auto; position: relative; overflow: visible;
+    background: var(--paper);
+    padding: 46px 60px 36px;
+    box-shadow: 0 1px 0 rgba(0,0,0,.04), 0 18px 40px -18px rgba(40,30,10,.35);
+    display: flex; flex-direction: column;
+  }
+  body.export .slide { box-shadow: none; }
+  .slide::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background-image: radial-gradient(rgba(60,40,10,.035) 1px, transparent 1px);
+    background-size: 3px 3px;
+  }
+
+  .head { display: flex; align-items: flex-end; justify-content: space-between; border-bottom: 1.5px solid var(--ink); padding-bottom: 12px; margin-bottom: 20px; gap: 24px; }
+  .kicker { font-family: var(--mono); font-size: 12.5px; letter-spacing: .14em; color: var(--ink-3); margin-bottom: 7px; }
+  h2 { font-family: var(--serif); font-weight: 900; font-size: 34px; line-height: 1.18; letter-spacing: .01em; }
+  .lede { font-size: 16.5px; color: var(--ink); margin-top: 10px; line-height: 1.7; max-width: 1080px; }
+  .legend { display: flex; gap: 8px; flex-shrink: 0; }
+
+  .tag { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; padding: 2px 10px 2px 8px; border-radius: 999px; line-height: 1.45; white-space: nowrap; }
+  .tag::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .t-m { color: var(--model); background: var(--model-bg); }
+  .t-c { color: var(--code); background: var(--code-bg); }
+  .t-u { color: var(--user); background: var(--user-bg); }
+  .t-w { color: var(--warn); background: var(--warn-bg); }
+
+  .foot { margin-top: auto; padding-top: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: var(--ink-3); font-family: var(--mono); letter-spacing: .06em; }
+
+  code, .k { font-family: var(--mono); font-size: .86em; background: rgba(26,34,48,.06); padding: 1px 5px; border-radius: 4px; color: var(--ink); }
+
+  /* cover */
+  .cover { justify-content: center; padding: 64px 90px; }
+  .cover .brand { font-family: var(--mono); font-size: 14px; letter-spacing: .3em; color: var(--user); margin-bottom: 24px; }
+  .cover h1 { font-family: var(--serif); font-weight: 900; font-size: 52px; line-height: 1.16; max-width: 1040px; }
+  .prob { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .prob article { background: var(--card); border: 1px solid var(--rule); border-radius: 12px; padding: 16px 18px 14px; border-top: 4px solid var(--user); }
+  .prob h3 { font-family: var(--serif); font-size: 22px; font-weight: 900; margin-bottom: 8px; }
+  .prob p { font-size: 14px; line-height: 1.6; color: var(--ink-2); }
+  .prob p b { color: var(--ink); }
+  .prob .fig { margin-top: 12px; font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--user); line-height: 1.45; }
+  .slide:has(.prob) > .prob { flex: 1; }
+  .slide:has(.prob) > .foot { margin-top: 14px; }
+  .prob article { display: flex; flex-direction: column; }
+  .prob .do { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--rule); font-size: 13.5px; line-height: 1.55; color: var(--ink-2); }
+  .prob .do b { display: block; color: var(--code); font-size: 12px; letter-spacing: .12em; margin-bottom: 4px; }
+  .scenes { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .scene { background: var(--card); border: 1px solid var(--rule); border-radius: 12px; padding: 16px 18px 14px; }
+  .scene h3 { font-family: var(--serif); font-size: 22px; font-weight: 900; }
+  .scene .meta { font-size: 12.5px; color: var(--ink-3); margin: 3px 0 10px; }
+  .scene .q { background: var(--ink); color: var(--paper); border-radius: 10px; padding: 8px 12px; font-size: 14.5px; line-height: 1.45; margin-bottom: 8px; }
+  .scene .q.alt { margin-top: 8px; background: #2a3344; }
+  .scene ul { margin: 0 0 0 1.15em; }
+  .scene li { font-size: 13.5px; line-height: 1.55; color: var(--ink-2); margin-bottom: 3px; }
+  .scene li b { color: var(--ink); }
+  .bridge { margin-top: 14px; background: var(--ink); color: #d5d8e0; border-radius: 12px; padding: 12px 18px; font-size: 14.5px; line-height: 1.6; }
+  .bridge b { color: #f2b8a8; }
+  .cover .sub { font-size: 19px; color: var(--ink-2); margin-top: 22px; max-width: 900px; line-height: 1.7; }
+  .toc { margin-top: 44px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0 26px; border-top: 1.5px solid var(--ink); }
+  .toc .g { padding-top: 14px; }
+  .toc .g h4 { font-family: var(--serif); font-size: 18px; font-weight: 900; margin-bottom: 8px; }
+  .toc .g a { display: block; font-size: 14px; line-height: 1.7; color: var(--ink-2); text-decoration: none; }
+  .toc .g a:hover { color: var(--ink); }
+  .toc .g b { font-family: var(--mono); font-size: 12px; color: var(--ink-3); font-weight: 500; margin-right: 8px; }
+  .pair { scroll-margin-top: 20px; }
+  .qa-board { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 28px; }
+  .qa-board article { border-top: 1.5px solid var(--ink); padding-top: 8px; }
+  .qa-board h3 { font-size: 15.5px; font-weight: 700; line-height: 1.35; margin-bottom: 4px; }
+  .qa-board p { font-size: 13.5px; line-height: 1.5; color: var(--ink-2); }
+  .qa-board .mark { font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: .06em; margin-right: 6px; }
+  .qa-board .mark.doc { color: var(--code); }
+  .qa-board .mark.gen { color: var(--warn); }
+
+  /* step card */
+  .step { background: var(--card); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 14px 15px; position: relative; }
+  .step .n { font-family: var(--mono); font-size: 12px; color: var(--ink-3); position: absolute; top: 12px; right: 12px; }
+  .step h3 { font-size: 17px; font-weight: 700; margin: 10px 0 6px; line-height: 1.3; }
+  .step p { font-size: 13.5px; line-height: 1.58; color: var(--ink-2); }
+  .step.s-m { border-top: 4px solid var(--model); }
+  .step.s-c { border-top: 4px solid var(--code); }
+  .step.s-u { border-top: 4px solid var(--user); }
+  .flow { display: grid; align-items: stretch; }
+  .arrow { display: flex; align-items: center; justify-content: center; color: var(--ink-3); font-size: 18px; }
+
+  /* 01 path */
+  .ask { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+  .bubble { background: var(--ink); color: var(--paper); font-size: 18px; padding: 11px 20px; border-radius: 16px 16px 16px 4px; font-weight: 500; }
+  .ask .hint { font-size: 14px; color: var(--ink-3); }
+  .s1 .flow { grid-template-columns: 1fr 20px 1fr 20px 1fr 20px 1fr 20px 1fr 20px 1fr; }
+  .principle { margin-top: 22px; display: grid; grid-template-columns: 1.4fr 1fr; gap: 18px; }
+  .big-rule { background: var(--ink); color: var(--paper); border-radius: 12px; padding: 22px 26px; }
+  .big-rule .q { font-family: var(--serif); font-size: 26px; font-weight: 900; line-height: 1.38; }
+  .big-rule .q em { font-style: normal; color: #f2b8a8; }
+  .big-rule p { font-size: 14px; color: #c6cad3; margin-top: 10px; line-height: 1.6; }
+  .side-note { border: 1px dashed var(--ink-3); border-radius: 12px; padding: 18px 22px; font-size: 14px; line-height: 1.75; color: var(--ink-2); }
+  .side-note b { color: var(--ink); }
+
+  /* 02 division */
+  .cols3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .who { border-radius: 12px; padding: 18px 22px 16px; }
+  .who.m { background: var(--model-bg); } .who.c { background: var(--code-bg); } .who.u { background: var(--user-bg); }
+  .who h3 { font-family: var(--serif); font-size: 25px; font-weight: 900; margin-bottom: 2px; }
+  .who.m h3 { color: var(--model); } .who.c h3 { color: var(--code); } .who.u h3 { color: var(--user); }
+  .who .role { font-size: 13.5px; color: var(--ink-2); margin-bottom: 12px; }
+  .who ul { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+  .who li { font-size: 14.5px; line-height: 1.5; padding-left: 18px; position: relative; }
+  .who li::before { content: ""; position: absolute; left: 2px; top: 9px; width: 7px; height: 2px; background: currentColor; opacity: .5; }
+  .who li.no { color: var(--ink-2); }
+  .who li.no::before { content: "×"; width: auto; height: auto; background: none; top: 0; left: 0; opacity: 1; font-weight: 700; color: var(--user); }
+  .evidence { margin-top: 18px; display: grid; grid-template-columns: auto 1fr; gap: 28px; align-items: center; border-top: 1.5px solid var(--ink); padding-top: 16px; }
+  .evidence .num { font-family: var(--mono); font-size: 52px; font-weight: 700; line-height: 1; letter-spacing: -.02em; }
+  .evidence .num span { color: var(--ink-3); font-size: 32px; margin: 0 8px; }
+  .evidence .num .after { color: var(--code); font-size: 52px; margin: 0; }
+  .evidence p { font-size: 14.5px; line-height: 1.65; color: var(--ink-2); }
+  .evidence p b { color: var(--ink); }
+
+  /* decision table */
+  .dt { display: flex; flex-direction: column; border-top: 1.5px solid var(--ink); }
+  .dt-h, .dt-r { display: grid; gap: 16px; align-items: start; }
+  .dt-h { font-family: var(--mono); font-size: 11.5px; letter-spacing: .1em; color: var(--ink-3); padding: 8px 0; border-bottom: 1px solid var(--rule); }
+  .dt-r { padding: 9px 0; border-bottom: 1px solid var(--rule); }
+  .dt-r .q { font-family: var(--serif); font-size: 16.5px; font-weight: 900; line-height: 1.35; }
+  .dt-r .q small { display: block; font-family: var(--sans); font-size: 11.5px; font-weight: 500; color: var(--ink-3); margin-top: 2px; }
+  .dt-r .yes { font-size: 14px; font-weight: 700; line-height: 1.45; color: var(--code); padding-left: 18px; position: relative; }
+  .dt-r .yes::before { content: "✓"; position: absolute; left: 0; }
+  .dt-r .yes small { display: block; color: var(--ink-2); font-weight: 400; font-size: 12.5px; margin-top: 1px; }
+  .dt-r .no { font-size: 13.5px; line-height: 1.45; color: var(--ink-3); padding-left: 18px; position: relative; }
+  .dt-r .no::before { content: "×"; position: absolute; left: 1px; color: var(--user); font-weight: 700; }
+  .dt-r .why { font-size: 13.5px; line-height: 1.55; color: var(--ink-2); }
+  .dt-r .why b { color: var(--ink); }
+  .dt-r .why .ev { font-family: var(--mono); font-size: 12px; color: var(--code); background: var(--code-bg); padding: 0 5px; border-radius: 4px; white-space: nowrap; }
+  .s3 .dt-h, .s3 .dt-r { grid-template-columns: 116px 1.05fr .95fr 1.6fr; }
+  .s8 .dt-h, .s8 .dt-r { grid-template-columns: 128px 1fr 1fr 1.7fr; }
+
+  /* 04 hybrid */
+  .s4 .body { display: grid; grid-template-columns: 1fr 470px; gap: 26px; flex: 1; min-height: 0; }
+  .box { background: var(--card); border: 1px solid var(--rule); border-radius: 12px; padding: 14px 18px; margin-bottom: 12px; }
+  .box h4 { font-size: 16px; font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+  .box p { font-size: 13.5px; line-height: 1.6; color: var(--ink-2); }
+  .grams { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 8px 0 6px; font-size: 13.5px; }
+  .grams .src { font-family: var(--serif); font-weight: 900; font-size: 18px; margin-right: 4px; }
+  .grams .g { font-family: var(--serif); font-weight: 600; font-size: 15px; background: var(--paper-2); border-radius: 5px; padding: 2px 8px; }
+  .grams .g.hit { background: var(--code); color: #fff; }
+  .grams .x { color: var(--ink-3); }
+  .rrf { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+  .rrf div { background: var(--paper-2); border-radius: 8px; padding: 9px 12px; font-size: 13px; line-height: 1.55; }
+  .rrf div b { font-family: var(--mono); font-size: 15px; display: block; margin-top: 2px; }
+  .rrf div.win { background: var(--code-bg); }
+  .rrf div.win b { color: var(--code); }
+  .formula { font-family: var(--mono); font-size: 14px; background: var(--ink); color: var(--paper); border-radius: 6px; padding: 4px 10px; display: inline-block; }
+  .chart h4 { font-family: var(--serif); font-size: 18px; font-weight: 900; margin-bottom: 2px; }
+  .chart .sub { font-size: 12.5px; color: var(--ink-3); margin-bottom: 14px; line-height: 1.5; }
+  .bar-g { margin-bottom: 14px; }
+  .bar-g .lbl { font-size: 14px; font-weight: 700; margin-bottom: 5px; display: flex; justify-content: space-between; }
+  .bar-g .lbl small { font-weight: 400; color: var(--ink-3); font-size: 12px; }
+  .bar { display: grid; grid-template-columns: 54px 1fr 50px; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 12px; color: var(--ink-3); }
+  .bar .track { height: 14px; background: var(--paper-2); border-radius: 3px; overflow: hidden; }
+  .bar .fill { height: 100%; border-radius: 3px; }
+  .bar .fill.a { background: #9aa3b4; }
+  .bar .fill.b { background: var(--ink); }
+  .bar .fill.hl { background: var(--code); }
+  .bar .v { font-family: var(--mono); font-size: 13px; color: var(--ink); text-align: right; font-weight: 700; }
+  .chart .legend2 { display: flex; gap: 14px; font-size: 12px; color: var(--ink-3); margin-bottom: 12px; }
+  .chart .legend2 i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+
+  /* 05 models */
+  .mt { border-top: 1.5px solid var(--ink); }
+  .mt-h, .mt-r { display: grid; grid-template-columns: 186px 108px 108px 1fr 100px 86px 168px; gap: 14px; align-items: center; }
+  .mt-h { font-family: var(--mono); font-size: 11px; letter-spacing: .06em; color: var(--ink-3); padding: 8px 0; border-bottom: 1px solid var(--rule); line-height: 1.4; }
+  .mt-r { padding: 10px 0; border-bottom: 1px solid var(--rule); font-size: 14px; }
+  .mt-r .nm { font-weight: 700; font-size: 15px; line-height: 1.3; }
+  .mt-r .nm small { display: block; font-weight: 400; font-size: 12px; color: var(--ink-3); }
+  .mt-r .num { font-family: var(--mono); font-size: 15px; font-weight: 700; }
+  .mt-r .na { color: var(--ink-3); font-size: 12.5px; }
+  .mt-r.pick { background: var(--code-bg); margin: 0 -12px; padding: 10px 12px; border-radius: 8px; border-bottom-color: transparent; }
+  .ing { display: flex; align-items: center; gap: 8px; }
+  .ing .track { flex: 1; height: 12px; background: var(--paper-2); border-radius: 3px; overflow: hidden; }
+  .ing .fill { height: 100%; background: var(--ink); }
+  .ing .fill.g { background: var(--code); }
+  .ing span { font-family: var(--mono); font-size: 13px; font-weight: 700; width: 68px; text-align: right; }
+  .verdict { font-size: 13px; font-weight: 700; line-height: 1.4; }
+  .verdict.ok { color: var(--code); }
+  .verdict.alt { color: var(--warn); }
+  .verdict.off { color: var(--ink-3); font-weight: 500; }
+  .s5 .below { margin-top: 16px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+  .s5 .below div { font-size: 13.5px; line-height: 1.6; color: var(--ink-2); border-top: 1.5px solid var(--ink); padding-top: 8px; }
+  .s5 .below b { color: var(--ink); display: block; font-size: 14.5px; margin-bottom: 2px; }
+
+  /* 06 boundaries */
+  .s6 .body { display: grid; grid-template-columns: 1.2fr 1fr; gap: 26px; flex: 1; }
+  .nl-wrap { background: var(--card); border: 1px solid var(--rule); border-radius: 12px; padding: 16px 22px 18px; }
+  .nl-wrap h4 { font-family: var(--serif); font-size: 18px; font-weight: 900; margin-bottom: 4px; }
+  .nl-wrap .sub { font-size: 13px; color: var(--ink-2); margin-bottom: 8px; line-height: 1.55; }
+  .nl { position: relative; height: 146px; margin: 6px 6px 0; }
+  .nl .axis { position: absolute; left: 0; right: 0; top: 96px; height: 1.5px; background: var(--ink); }
+  .nl .tick { position: absolute; top: 92px; width: 1.5px; height: 10px; background: var(--ink); }
+  .nl .tl { position: absolute; top: 106px; transform: translateX(-50%); font-family: var(--mono); font-size: 11.5px; color: var(--ink-3); }
+  .nl .band { position: absolute; top: 56px; height: 26px; background: rgba(192,64,42,.18); border: 1.5px solid var(--user); border-radius: 4px; }
+  .nl .band span { position: absolute; top: -20px; left: 0; font-size: 12px; color: var(--user); font-weight: 700; white-space: nowrap; }
+  .nl .mark { position: absolute; top: 18px; bottom: 54px; width: 0; border-left: 2px solid; }
+  .nl .mark span { position: absolute; top: -2px; left: 6px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+  .nl .mark.cur { border-color: var(--code); color: var(--code); top: 0; }
+  .nl .mark.try { border-color: var(--warn); border-left-style: dashed; color: var(--warn); top: 0; }
+  .nl .mark.p10 { border-color: var(--model); color: var(--model); top: 30px; }
+  .nl .mark.p10 span { top: 96px; left: -60px; }
+  .outcome { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+  .outcome div { border-radius: 8px; padding: 9px 12px; font-size: 13px; line-height: 1.55; }
+  .outcome .a { background: var(--warn-bg); color: #5d4a22; }
+  .outcome .b { background: var(--code-bg); color: #24493a; }
+  .outcome b { display: block; font-size: 14px; }
+  .cards { display: flex; flex-direction: column; gap: 12px; }
+  .ccard { border-radius: 12px; padding: 13px 18px; background: var(--card); border: 1px solid var(--rule); }
+  .ccard h4 { font-size: 15.5px; font-weight: 700; margin-bottom: 4px; display: flex; gap: 8px; align-items: center; }
+  .ccard p { font-size: 13px; line-height: 1.6; color: var(--ink-2); }
+  .ccard p b { color: var(--ink); }
+
+  /* 07 loop */
+  .s7 .body { display: grid; grid-template-columns: 210px 1fr 250px; gap: 18px; flex: 1; min-height: 0; }
+  .col-t { font-family: var(--mono); font-size: 11.5px; letter-spacing: .12em; color: var(--ink-3); margin-bottom: 8px; }
+  .loopbox { border: 1.5px solid var(--ink); border-radius: 16px; padding: 14px 16px 14px; position: relative; }
+  .loopbox .lt { position: absolute; top: -11px; left: 18px; background: var(--paper); padding: 0 8px; font-family: var(--serif); font-weight: 900; font-size: 15px; }
+  .loop4 { display: grid; grid-template-columns: 1fr 34px 1fr; grid-template-rows: auto 34px auto; }
+  .loop4 .step h3 { font-size: 16px; margin-top: 8px; }
+  .loop4 .step p { font-size: 13px; }
+  .loop4 .ar { display: flex; align-items: center; justify-content: center; color: var(--ink-2); font-size: 20px; font-weight: 700; }
+  .exit { margin-top: 12px; display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: var(--ink-2); }
+  .exit b { color: var(--model); }
+  .guards { margin-top: 12px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .guards div { background: var(--ink); color: #c6cad3; border-radius: 9px; padding: 9px 12px; font-size: 12.5px; line-height: 1.5; }
+  .guards b { display: block; color: var(--paper); font-size: 13.5px; margin-bottom: 2px; }
+  .sse { margin-top: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-2); }
+  .sse .e { font-family: var(--mono); font-size: 11.5px; background: var(--paper-2); border-radius: 4px; padding: 2px 7px; color: var(--ink); }
+  .sidebox { border-radius: 12px; padding: 13px 15px; font-size: 13px; line-height: 1.6; color: var(--ink-2); margin-bottom: 12px; }
+  .sidebox.code { background: var(--code-bg); }
+  .sidebox.model { background: var(--model-bg); }
+  .sidebox.line { border: 1px dashed var(--ink-3); }
+  .sidebox h4 { font-size: 14.5px; color: var(--ink); margin-bottom: 5px; }
+  .sidebox ol { padding-left: 18px; }
+  .sidebox li { margin-bottom: 3px; }
+
+  /* 09 live report */
+  .s9 .chain { display: grid; grid-template-columns: 1fr 26px 1fr 26px 1fr 26px 1fr; align-items: stretch; }
+  .gate { border-radius: 12px; padding: 14px 15px; position: relative; }
+  .gate .gn { font-family: var(--mono); font-size: 11.5px; letter-spacing: .1em; font-weight: 700; }
+  .gate h3 { font-size: 16.5px; font-weight: 700; margin: 6px 0 6px; line-height: 1.35; }
+  .gate p { font-size: 13px; line-height: 1.58; color: var(--ink-2); }
+  .gate.c { background: var(--code-bg); } .gate.c .gn { color: var(--code); }
+  .gate.m { background: var(--model-bg); } .gate.m .gn { color: var(--model); }
+  .gate.d { background: var(--ink); color: #c6cad3; } .gate.d h3 { color: var(--paper); } .gate.d p { color: #c6cad3; } .gate.d .gn { color: #f2b8a8; }
+  .fallback-line { margin-top: 10px; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--user); font-weight: 700; }
+  .fallback-line .dash { flex: 1; border-top: 1.5px dashed var(--user); }
+  .s9 .lower { margin-top: 14px; display: grid; grid-template-columns: 1.45fr 1fr; gap: 20px; }
+  .alts { border-top: 1.5px solid var(--ink); }
+  .alt { display: grid; grid-template-columns: 200px 1fr; gap: 14px; padding: 8px 0; border-bottom: 1px solid var(--rule); }
+  .alt .no { font-size: 13.5px; color: var(--ink-3); padding-left: 16px; position: relative; line-height: 1.45; }
+  .alt .no::before { content: "×"; position: absolute; left: 0; color: var(--user); font-weight: 700; }
+  .alt .why { font-size: 13px; color: var(--ink-2); line-height: 1.55; }
+  .alts h4, .proof h4 { font-size: 12px; font-family: var(--mono); letter-spacing: .1em; color: var(--ink-3); font-weight: 500; padding: 8px 0 4px; }
+  .proof { border-top: 1.5px solid var(--ink); }
+  .pf { display: grid; grid-template-columns: 112px 1fr; gap: 12px; align-items: baseline; padding: 7px 0; border-bottom: 1px solid var(--rule); }
+  .pf .v { font-family: var(--mono); font-size: 22px; font-weight: 700; }
+  .pf .v.w { color: var(--warn); }
+  .pf .v.g { color: var(--code); }
+  .pf span { font-size: 13px; color: var(--ink-2); line-height: 1.5; }
+
+  /* 10 eval */
+  .s10 .body { display: grid; grid-template-columns: 1.25fr 1fr; gap: 28px; flex: 1; }
+  .sets { display: flex; flex-direction: column; gap: 12px; }
+  .set { display: grid; grid-template-columns: 1fr 166px; gap: 16px; align-items: center; background: var(--card); border: 1px solid var(--rule); border-radius: 12px; padding: 14px 18px; }
+  .set h3 { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
+  .set p { font-size: 13px; line-height: 1.6; color: var(--ink-2); }
+  .metric { text-align: right; }
+  .metric .v { font-family: var(--mono); font-size: 28px; font-weight: 700; line-height: 1.1; }
+  .metric .v small { font-size: 17px; color: var(--ink-3); }
+  .metric .l { font-size: 12px; color: var(--ink-3); margin-top: 4px; line-height: 1.45; }
+  .trap { font-size: 13px; line-height: 1.65; color: var(--ink-2); padding: 11px 15px; border-left: 3px solid var(--code); background: var(--code-bg); border-radius: 0 8px 8px 0; }
+  .trap b { color: var(--code); }
+  .loop-title { font-family: var(--serif); font-size: 20px; font-weight: 900; margin-bottom: 10px; }
+  .vloop { display: flex; flex-direction: column; }
+  .vloop .li { display: grid; grid-template-columns: 32px 1fr; gap: 12px; align-items: start; padding-bottom: 12px; position: relative; }
+  .vloop .li:not(:last-child)::after { content: ""; position: absolute; left: 15px; top: 30px; bottom: 2px; width: 1.5px; background: var(--rule); }
+  .vloop .dot { width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid var(--ink); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 13px; font-weight: 700; background: var(--paper); }
+  .vloop .li b { font-size: 15.5px; display: block; margin-top: 4px; }
+  .vloop .li span { font-size: 13px; color: var(--ink-2); line-height: 1.5; }
+  .results { margin-top: 4px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .res { background: var(--ink); color: #c6cad3; border-radius: 10px; padding: 11px 13px; font-size: 12.5px; line-height: 1.5; }
+  .res .v { font-family: var(--mono); color: var(--paper); font-size: 21px; font-weight: 700; display: block; margin-bottom: 3px; }
+  .res .v span { color: #8b93a3; font-size: 15px; margin: 0 4px; }
+
+  /* 11 layers */
+  .stack { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+  .layer { display: grid; grid-template-columns: 190px 1fr 330px; gap: 22px; align-items: center; border-radius: 10px; padding: 12px 22px; background: var(--card); border: 1px solid var(--rule); }
+  .layer .name { font-family: var(--serif); font-size: 20px; font-weight: 900; }
+  .layer .name small { display: block; font-family: var(--sans); font-size: 12px; font-weight: 500; color: var(--ink-3); margin-top: 2px; }
+  .layer .what { font-size: 14.5px; line-height: 1.55; color: var(--ink-2); }
+  .layer .tech { font-family: var(--mono); font-size: 12.5px; color: var(--ink-3); line-height: 1.6; text-align: right; }
+  .layer.engine { background: var(--ink); border-color: var(--ink); }
+  .layer.engine .name { color: var(--paper); }
+  .layer.engine .what { color: #c6cad3; }
+  .layer.engine .tech { color: #8b93a3; }
+  .layer.split { grid-template-columns: 190px 1fr 1fr; align-items: stretch; }
+  .half { background: var(--paper-2); border-radius: 8px; padding: 9px 14px; }
+  .half b { font-size: 14.5px; display: block; margin-bottom: 2px; }
+  .half p { font-size: 13px; line-height: 1.55; color: var(--ink-2); }
+  .half .tech { text-align: left; margin-top: 3px; font-size: 12px; }
+  .down { text-align: center; color: var(--ink-3); font-size: 12.5px; line-height: 1; margin: -3px 0; }
+
+  /* 12 dev */
+  .s12 .flow { grid-template-columns: 1fr 20px 1fr 20px 1fr 20px 1fr 20px 1fr 20px 1fr; }
+  .s12 .step.me { background: var(--user-bg); border-color: transparent; }
+  .s12 .step.ai { background: var(--model-bg); border-color: transparent; }
+  .s12 .step.auto { background: var(--code-bg); border-color: transparent; }
+  .backloop { margin: 10px 0 0; display: grid; grid-template-columns: 1fr 20px 1fr 20px 1fr 20px 1fr 20px 1fr 20px 1fr; }
+  .backloop .bar2 { grid-column: 5 / 10; border: 1.5px dashed var(--user); border-top: none; height: 22px; border-radius: 0 0 10px 10px; position: relative; }
+  .backloop .bar2 span { position: absolute; left: 50%; bottom: -11px; transform: translateX(-50%); background: var(--paper); padding: 0 10px; font-size: 13px; color: var(--user); font-weight: 700; white-space: nowrap; }
+  .rules-box { margin-top: 28px; display: grid; grid-template-columns: 1fr 1.1fr; gap: 20px; }
+  .rules-box .card { border-radius: 12px; padding: 16px 22px; }
+  .rules-box .card.light { border: 1px dashed var(--ink-3); }
+  .rules-box .card.dark { background: var(--ink); color: #c6cad3; }
+  .rules-box h4 { font-size: 15.5px; font-weight: 700; margin-bottom: 9px; }
+  .rules-box ul { list-style: none; display: flex; flex-direction: column; gap: 5px; }
+  .rules-box li { font-size: 13.5px; line-height: 1.55; padding-left: 16px; position: relative; color: var(--ink-2); }
+  .rules-box li::before { content: "—"; position: absolute; left: 0; color: var(--ink-3); }
+  .rules-box .dark p { font-family: var(--serif); font-size: 22px; font-weight: 900; color: var(--paper); line-height: 1.45; }
+  .rules-box .dark p em { font-style: normal; color: #f2b8a8; }
+  .rules-box .dark small { display: block; font-size: 13.5px; line-height: 1.6; margin-top: 10px; }
+
+  /* 13 IR */
+  .map { display: flex; flex-direction: column; border-top: 1.5px solid var(--ink); }
+  .map-h, .map-r { display: grid; grid-template-columns: 1fr 30px 1.25fr 92px; gap: 14px; align-items: center; }
+  .map-h { font-size: 11.5px; color: var(--ink-3); font-family: var(--mono); letter-spacing: .1em; padding: 8px 0; border-bottom: 1px solid var(--rule); }
+  .map-r { padding: 8px 0; border-bottom: 1px solid var(--rule); }
+  .map-r .need { font-size: 15px; font-weight: 700; line-height: 1.4; }
+  .map-r .need small { display: block; font-size: 12.5px; font-weight: 400; color: var(--ink-3); }
+  .map-r .to { color: var(--ink-3); text-align: center; font-size: 17px; }
+  .map-r .have { font-size: 14px; line-height: 1.5; color: var(--ink-2); }
+  .map-r .st { text-align: right; }
+  .todo { margin-top: 14px; display: grid; grid-template-columns: auto 1fr; gap: 18px; align-items: start; background: var(--ink); color: #c6cad3; border-radius: 12px; padding: 14px 22px; }
+  .todo h4 { font-family: var(--serif); font-size: 18px; font-weight: 900; color: var(--paper); white-space: nowrap; padding-top: 1px; }
+  .todo ul { list-style: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .todo li { font-size: 13px; line-height: 1.55; }
+  .todo li b { color: var(--paper); display: block; font-size: 14px; margin-bottom: 2px; }
+
+  /* speaker notes — private */
+  .notes { width: 1280px; background: #fffdf8; border: 1.5px dashed #b9ad94; border-radius: 10px; padding: 20px 26px; font-size: 14.5px; line-height: 1.75; color: #3b3f48; }
+  .notes .tag-private { font-family: var(--mono); font-size: 12px; letter-spacing: .14em; color: var(--user); margin-bottom: 8px; }
+  .notes h5 { font-size: 15px; margin: 12px 0 4px; color: var(--ink); }
+  .notes h5:first-of-type { margin-top: 0; }
+  .notes p { margin-bottom: 4px; }
+  .notes .qa { display: grid; gap: 7px; }
+  .notes .qa div { padding-left: 14px; border-left: 2px solid var(--rule); }
+  .notes .qa i { font-style: normal; font-weight: 700; color: var(--ink); }
+  .notes .src { display: inline-block; font-size: 11.5px; font-weight: 700; border-radius: 4px; padding: 0 6px; margin-right: 4px; vertical-align: 1px; }
+  .notes .src.doc { color: var(--code); background: var(--code-bg); }
+  .notes .src.gen { color: var(--warn); background: var(--warn-bg); }
+  .notes .fallback { margin-top: 10px; background: var(--warn-bg); border-radius: 6px; padding: 8px 12px; color: #5d4a22; }
+
+  body.report .notes, body.export .notes, body.export .screen-only { display: none !important; }
+  body.export .pair:not(.on) { display: none; }
+  body.export .deck { gap: 0; }
+
+  .screen-only.intro { width: 1280px; font-size: 14px; color: #5a5446; line-height: 1.75; }
+  .screen-only.intro b { color: var(--ink); }
+
+  @media print {
+    html, body { background: #fff; padding: 0; }
+    .notes, .screen-only { display: none !important; }
+    .deck { gap: 0; }
+    .slide { box-shadow: none; min-height: 0; height: auto; overflow: visible; page-break-after: always; break-after: page; }
+    @page { size: 1280px 1100px; margin: 0; }
+  }
+</style>
+</head>
+<body class="report">
+<main class="deck">
+
+<div class="screen-only intro">
+  <b>怎么读：</b>按封面目录往下看即可，每条都能点。每页标题是结论，标题下面是依据。
+</div>
+
+<!-- 00 封面 -->
+<section class="pair" data-i="0">
+<div class="slide cover">
+  <div class="brand">FINFRAME · 项目报告</div>
+  <h1>投研里最容易错的是数字。<br>这个 Agent 把数字从模型手里拿开。</h1>
+  <p class="sub">查一个数，同花顺更快。这份报告说明后面几步是怎么做的：两家公司、五年、同一口径放在一张图上，每个数能点开看来源；上传的年报能翻到原文那一页，没有的内容直说没有。每页先写结论，再写依据。</p>
+  <div class="toc">
+    <div class="g"><h4>开场</h4>
+      <a href="#q-problem"><b>问题</b>要解决的是比较和核对</a>
+      <a href="#q-demo"><b>场景</b>一条看图，一条看原文</a>
+    </div>
+    <div class="g"><h4>方案</h4>
+      <a href="#q-path"><b>01</b>数字由代码取回</a>
+      <a href="#q-split"><b>02</b>模型看不到数值</a>
+      <a href="#q-spec"><b>09</b>图上的数不经过模型</a>
+    </div>
+    <div class="g"><h4>架构</h4>
+      <a href="#q-layers"><b>11</b>五层，只和下一层说话</a>
+      <a href="#q-loop"><b>07</b>一轮是带护栏的循环</a>
+      <a href="#q-frame"><b>08</b>控制留在代码里</a>
+      <a href="#q-rag"><b>03</b>本地检索，带回页码</a>
+      <a href="#q-hybrid"><b>04</b>两路检索，按名次合并</a>
+      <a href="#q-embed"><b>05</b>命中率相同，用更小的</a>
+      <a href="#q-none"><b>06</b>没有，不能靠调门槛</a>
+    </div>
+    <div class="g"><h4>评测和你自己</h4>
+      <a href="#q-eval"><b>10</b>三套题库，分开记分</a>
+      <a href="#q-role"><b>12</b>标准由我定</a>
+      <a href="#q-follow"><b>追问</b>八个点，各一句</a>
+      <a href="#q-ir"><b>13</b>同一条约束，用到投资者关系</a>
+    </div>
+  </div>
+</div>
+</section>
+
+<div class="group-label screen-only">问题与场景</div>
+
+<section class="pair" id="q-problem" data-i="14">
+<div class="slide">
+  <div class="head">
+    <div><div class="kicker">问题</div><h2>要解决的是比较和核对</h2><p class="lede">如果只查一个数，同花顺更快，不需要 Agent。要解决的是比较和核对：年份和口径要对齐，缺的数不能画成 0；模型不能凭记忆写数；年报里的句子要能翻到那一页。</p></div>
+  </div>
+  <div class="prob">
+    <article>
+      <h3>对齐要手工做</h3>
+      <p>「对比宁德时代和比亚迪近五年毛利率」。同花顺、东方财富能查出单个数，但要开两家 F10，自己对年份、自己确认是年报还是季报、合并还是母公司，再抄进表格画图。</p>
+      <div class="fig">缺的年份如果当成 0，<br>图会直接画错。</div>
+      <div class="do"><b>做法</b>代码按公司、指标、报告期取数。缺的年份显示「—」，不补成 0。</div>
+    </article>
+    <article>
+      <h3>模型会写记忆里的数</h3>
+      <p>早期让模型在正文里写关键数字。它看不到刚取回的值，就按训练记忆补。对照组有一次写出了数据里根本没有的数；走势也会说反。</p>
+      <div class="fig">无据数字 7 → 0<br>走势说反 3/7 → 0</div>
+      <div class="do"><b>做法</b>模型只决定查谁、查哪项、哪几年。数值和「上升 / 下降 / 波动」由代码给出，正文不写数。</div>
+    </article>
+    <article>
+      <h3>年报读出来对不上页</h3>
+      <p>招商银行 2024 年报 362 页。原先的解析器只读出 3 页中文，其余是乱码，问答无从核对。即便读出来了，没有页码，对方也无法翻到那一句。</p>
+      <div class="fig">可读中文页 3 → 351<br>回答要能点到具体页</div>
+      <div class="do"><b>做法</b>文字抽不出来就改用识图认字。回答必须带文档名和页码，点开翻到那一页。</div>
+    </article>
+  </div>
+  <div class="evidence">
+    <div class="num" style="font-size:28px;font-family:var(--serif);font-weight:900;letter-spacing:0">不比查数速度</div>
+    <p>同花顺查一个数一两秒就有。这个产品比的是后面几步：<b>年份和口径对齐、缺数显示「—」、每个数能点开看来源、年报里的句子能翻到那一页。</b>买卖建议不做。</p>
+  </div>
+  <div class="foot"><span>FINFRAME</span><span>数字来自单因素实验（DeepSeek，temperature 0）和 PDF 解析记录</span></div>
+</div>
+<div class="notes">
+  <div class="tag-private">讲稿 · 只给自己看</div>
+  <h5>这样讲（40 秒）</h5>
+  <p>「如果只是查茅台某一年的 ROE，不需要 Agent，同花顺更快。我要解决的是比较和核对。比较时年份和口径要对齐，缺的数不能画成 0。核对时有两条路会出错：让模型写数字，它会凭记忆编，我们测到过一次写出 7 个数据里没有的数；让它读年报，招商银行那份 362 页里原先只有 3 页是中文。所以产品的标准是每个数、每句话都能点开看出处。」</p>
+</div>
+</section>
+
+<section class="pair" id="q-demo" data-i="15">
+<div class="slide">
+  <div class="head">
+    <div><div class="kicker">场景</div><h2>一条看图，一条看原文</h2><p class="lede">2026-10-11 用 deepseek-flash 跑过，每段单独一个对话。画布证明图上的数由代码取回，点开能看到来源。资料库证明回答带页码，库里没有的内容会直说没有。两条路不混用。</p></div>
+  </div>
+  <div class="scenes">
+    <div class="scene">
+      <h3>画布：多家、多年、一张图</h3>
+      <div class="meta">结构化财报 · 新开对话实测约 17 秒</div>
+      <div class="q">对比宁德时代和比亚迪近五年毛利率</div>
+      <ul>
+        <li>代码取 <b>2021–2025</b> 年报毛利率，出一张折线，不是模型报数。</li>
+        <li>宁德时代是波动，高点在 2021、低点在 2023；比亚迪往上走。</li>
+        <li>点一个点：公司、指标、年份、来源。缺的年份是「—」。</li>
+        <li>点「钉住」才进看板。研究图表目前只做 <b>A 股</b>。</li>
+      </ul>
+      <div class="q alt">一次只对比一项指标</div>
+      <ul>
+        <li>毛利率一张折线就够。再叠加营收、净利、ROE，会排成多张图，更慢，缺数也更多。</li>
+      </ul>
+    </div>
+    <div class="scene">
+      <h3>资料库：原文能翻到那一页</h3>
+      <div class="meta">《招商银行2024年度报告》· 等状态变成「已整理」再问</div>
+      <div class="q">2024 年不良贷款率是多少？请附上页码</div>
+      <ul>
+        <li>回答带 <b>《招商银行2024年度报告》p.31</b>。点引用，右侧翻到那一页。大约 20 秒。</li>
+      </ul>
+      <div class="q alt">管理层怎么解释净利息收入的变化？</div>
+      <ul>
+        <li>同一问题对应多处页码，用来说明不是只标了一个出处。大约 25 秒。</li>
+      </ul>
+      <div class="q alt">年报里有没有提到火星分行？</div>
+      <ul>
+        <li>库里没有。模型应直说没有，大约 5 秒。年报里的数字不拿去画图。</li>
+      </ul>
+    </div>
+  </div>
+  <div class="bridge">图上的数来自财报数据接口，模型只决定查谁、查哪项、哪几年。年报里的句子来自检索到的那一页，引用必须照抄页码。年报里抄出来的数字不拿去画图。</div>
+  <div class="foot"><span>FINFRAME</span><span>公司用全称。「平安」会同时命中平安银行和中国平安</span></div>
+</div>
+<div class="notes">
+  <div class="tag-private">讲稿 · 只给自己看</div>
+  <h5>这样讲（40 秒）</h5>
+  <p>「我用两段演示。第一段问宁德时代和比亚迪近五年毛利率，大约 17 秒出一张折线。宁德时代波动，比亚迪往上。我点一个点给您看来源，再钉进看板。第二段换对话，问招商银行年报里的不良贷款率，回答上有页码，点开翻到第 31 页。然后再问一个年报里没有的事，火星分行，它应该说没有。图上的数和年报里的句子是两条路，不混在一起。」</p>
+  <h5>现场避开</h5>
+  <div class="qa">
+    <div><i>为什么不比拓维和同行？</i><span class="src doc">有记录</span>这组本地缺过数，现场不要用。</div>
+    <div><i>为什么不说平安？</i><span class="src doc">有记录</span>简称会同时命中平安银行和中国平安。演示说全称。</div>
+  </div>
+</div>
+</section>
+
+<div class="group-label screen-only">方案</div>
+
+<!-- 01 一次提问 -->
+<section class="pair" id="q-path" data-i="1">
+<div class="slide s1">
+  <div class="head">
+    <div><div class="kicker">01 · 一次提问的路径</div><h2>一句话走到图，数字由代码取回</h2><p class="lede">模型决定查哪家公司、哪个指标、哪几年，并提议用什么图。取数、算走势、填进图里的数字都由代码完成。用户点「钉住」，图才进入看板。</p></div>
+    <div class="legend"><span class="tag t-u">用户</span><span class="tag t-m">模型</span><span class="tag t-c">代码</span></div>
+  </div>
+  <div class="ask"><div class="bubble">对比宁德时代和比亚迪近五年毛利率</div><div class="hint">← 用日常话提问，不用选菜单</div></div>
+  <div class="flow">
+    <div class="step s-u"><span class="n">1</span><span class="tag t-u">用户</span><h3>提问</h3><p>在对话框里直接说要看什么</p></div>
+    <div class="arrow">→</div>
+    <div class="step s-m"><span class="n">2</span><span class="tag t-m">模型</span><h3>决定查什么</h3><p>选取数工具，填好公司、指标、年份</p></div>
+    <div class="arrow">→</div>
+    <div class="step s-c"><span class="n">3</span><span class="tag t-c">代码</span><h3>取数、算走势</h3><p>从财报数据源取回每个数，记下科目、报告期、来源；算出「上升 / 下降 / 波动」标签</p></div>
+    <div class="arrow">→</div>
+    <div class="step s-m"><span class="n">4</span><span class="tag t-m">模型</span><h3>选图、写解读</h3><p>只「提议」用哪种图；解读只能按代码给的走势标签写</p></div>
+    <div class="arrow">→</div>
+    <div class="step s-c"><span class="n">5</span><span class="tag t-c">代码</span><h3>校验后出报告</h3><p>拼成指标卡、对比图、要点；格式不合规就退回简单图卡</p></div>
+    <div class="arrow">→</div>
+    <div class="step s-u"><span class="n">6</span><span class="tag t-u">用户</span><h3>决定留不留</h3><p>点「钉住」才放进看板，AI 不能自己往里写</p></div>
+  </div>
+  <div class="principle">
+    <div class="big-rule">
+      <div class="q">模型只决定<em>查什么</em>，<br>数字全部由<em>代码取回</em>。</div>
+      <p>所以图上每个数字点开都能看到来源和口径；缺的数显示「—」，不会被猜成 0。</p>
+    </div>
+    <div class="side-note">
+      <b>边做边显示：</b>服务端把每一步（开始取数、取数完成、图表出现、最终回答）实时推给浏览器，用户能看到 Agent 正在做什么。<br>
+      <b>不支持的直接说：</b>研究图表只做 A 股，问美股、港股会马上说明，不会反复重试。
+    </div>
+  </div>
+  <div class="foot"><span>FINFRAME</span><span>示例：新开对话后实测约 17 秒</span></div>
+</div>
+<div class="notes">
+  <div class="tag-private">讲稿 · 只给自己看</div>
+  <h5>这样讲（30 秒）</h5>
+  <p>「可以把模型想成一个研究助理：它负责听懂问题、决定去查哪家公司哪个指标、选什么图。真正去拿数、算数的是代码。所以回答里每个数都有出处，模型没有机会自己编数字。最后留不留这张图，由用户决定。」</p>
+  <p>工程细节被追问时，转到第 07 到 09 张图；检索细节转到第 03 到 06 张。</p>
+</div>
+</section>
+
+<!-- 02 分工 -->
+<section class="pair" id="q-split" data-i="2">
+<div class="slide s2">
+  <div class="head">
+    <div><div class="kicker">02 · 分工</div><h2>模型看不到数值，所以写不了数字</h2><p class="lede">模型看不到数值，只能按代码给的「上升 / 下降 / 波动」写话。早期要求正文写数字时，对照组一次写出 7 个数据里没有的数；改规则后，两次运行都是 0。</p></div>
+  </div>
+  <div class="cols3">
+    <div class="who m"><h3>模型</h3><div class="role">负责理解和表达</div><ul>
+      <li>听懂问题，决定查哪家公司、哪个指标、哪几年</li>
+      <li>选合适的图：对比、走势、表格</li>
+      <li>按代码给的走势标签写解读</li>
+      <li class="no">不写具体数字（它根本看不到数值）</li>
+      <li class="no">不直接画图，不直接写进看板</li></ul></div>
+    <div class="who c"><h3>代码</h3><div class="role">负责每一个数字</div><ul>
+      <li>从数据源取回每个财务数字，记来源和报告期</li>
+      <li>同比变化等衍生数由代码算</li>
+      <li>算走势标签：上升、下降、最高年份、缺数年份</li>
+      <li>校验报告格式，不合规就退回</li>
+      <li>缺数显示「—」，不当成 0</li></ul></div>
+    <div class="who u"><h3>用户</h3><div class="role">负责判断和确认</div><ul>
+      <li>决定一张图留不留（点「钉住」）</li>
+      <li>有歧义时做选择，比如「平安」指哪家</li>
+      <li>决定下一步问什么、怎么改图</li>
+      <li class="no">系统不替用户下买卖结论</li></ul></div>
+  </div>
+  <div class="evidence">
+    <div class="num">7<span>→</span><span class="after">0</span></div>
+    <p><b>为什么要这样分：</b>早期规则要求「正文写关键数字」，模型看不到数值就凭记忆补。对照组跑两次，其中一次写出了 <b>7 个数据里根本没有的数字</b>。改成「正文不写数字、走势只按代码标签说」之后，两次运行都是 <b>0</b>；走势说反的情况也从 3/7 降到 0。</p>
+  </div>
+  <div class="foot"><span>FINFRAME</span><span>数据来源：单因素实验报告，DeepSeek 模型，temperature 0</span></div>
+</div>
+<div class="notes">
+  <div class="tag-private">讲稿 · 只给自己看</div>
+  <h5>这样讲（30 秒）</h5>
+  <p>「大模型最大的风险是一本正经地编数字。我们让它根本接触不到数值：代码取数、代码算走势，模型只拿到『上升、2024 年最高』这样的标签去写话。这对投资者关系场景特别重要，对外说的每个数都必须和披露一致。」</p>
+  <h5>可能被追问</h5>
+  <div class="qa">
+    <div><i>「7 → 0」样本是不是太小？</i><span class="src doc">有记录</span>是，每组只跑了两次，报告里也写了「信号弱、方向一致」。效果最确定的是走势说反（3/7 → 0）和美港股重复调用（10–14 次 → 1 次）。</div>
+    <div><i>「平安」歧义解决了吗？</i><span class="src doc">有记录</span>后来加了澄清，简称对应多家公司时先问用户，但演示前没有复测，所以现场我说全称。</div>
+  </div>
+</div>
+</section>
+
+<div class="group-label screen-only">技术架构 · 知识库检索</div>
+
+<!-- 03 RAG 每一步的选择 -->
+<section class="pair" id="q-rag" data-i="3">
+<div class="slide s3">
+  <div class="head">
+    <div><div class="kicker">03 · 知识库检索</div><h2>本地检索，回答带回页码</h2><p class="lede">本地检索分五步：解析、切到约 500 字、关键词和向量两路索引、按名次合并、丢掉相似度过低的结果，再由模型带页码作答。做法参照了 10 个开源知识库，参数由 6 份年报、144 题的评测决定。</p></div>
+    <div class="legend"><span class="tag t-c">选了</span><span class="tag t-u">没选</span></div>
+  </div>
+  <div class="dt">
+    <div class="dt-h"><div>环节</div><div>选了</div><div>没选</div><div>为什么</div></div>
+    <div class="dt-r"><div class="q">读出文字<small>PDF 解析</small></div>
+      <div class="yes">三道兜底，保守择优<small>常规解析 → 换 PDF 引擎 → 识图认字</small></div>
+      <div class="no">只用一种解析器</div>
+      <div class="why">招商银行年报 362 页，原解析只有 3 页读得出中文。加兜底后 <span class="ev">3 → 351 页</span>。只在新结果明显更好时才替换。</div></div>
+    <div class="dt-r"><div class="q">切成小段<small>切块</small></div>
+      <div class="yes">约 500 字，重叠约 15%<small>按句断开、不跨页、表格尽量整块</small></div>
+      <div class="no">一页一块</div>
+      <div class="why">一页 1000–2800 字，超过向量模型 512 个词元的上限，<b>后半页根本没进向量</b>。不跨页，才能保证每段都对得上页码。</div></div>
+    <div class="dt-r"><div class="q">建索引<small>存储</small></div>
+      <div class="yes">SQLite 全文索引 + LanceDB 向量库<small>都是嵌入式，跟着应用走</small></div>
+      <div class="no">Elasticsearch、整套 RAGFlow / Dify</div>
+      <div class="why">不用单独起服务，资料留在本机。成熟平台要多一套 Python 服务和搜索引擎依赖，页码引用和数字溯源也要重新对接。</div></div>
+    <div class="dt-r"><div class="q">怎么找<small>召回</small></div>
+      <div class="yes">关键词 + 向量，两路都找</div>
+      <div class="no">只用向量</div>
+      <div class="why">关键词擅长精确术语，向量擅长换个说法。混合检索命中率 <span class="ev">0.955</span>，只用向量 <span class="ev">0.830</span>（关键词问法）。</div></div>
+    <div class="dt-r"><div class="q">两份名单怎么合<small>融合</small></div>
+      <div class="yes">RRF：只看名次</div>
+      <div class="no">两边分数加权相加</div>
+      <div class="why">两路分数刻度不同，直接相加没有意义；只看名次不用调权重。</div></div>
+    <div class="dt-r"><div class="q">不相关的怎么办<small>过滤</small></div>
+      <div class="yes">只靠向量命中的，相似度低于 0.45 就丢</div>
+      <div class="no">把门槛调高</div>
+      <div class="why">关键词精确命中不受限制。门槛调高会误伤有答案的题，见第 06 张。</div></div>
+    <div class="dt-r"><div class="q">谁来检索<small>作答</small></div>
+      <div class="yes">模型自己调 4 个文档工具<small>列文档、全库搜、文档内搜、按页读</small></div>
+      <div class="no">每次提问前固定检索一遍，塞进提示词</div>
+      <div class="why">一个问题可能要取数，也可能要查年报；模型可以先搜、再翻到具体页读原文。工具结果自带页码链接，提示词要求原样引用。</div></div>
+  </div>
+  <div class="foot"><span>FINFRAME</span><span>依据：开源知识库调研（10 个项目）、两轮检索评测（6 份年报 · 144 题）</span></div>
+</div>
+<div class="notes">
+  <div class="tag-private">讲稿 · 只给自己看</div>
+  <h5>这样讲（40 秒）</h5>
+  <p>「知识库就是 RAG：先检索、再生成。我先调研了 RAGFlow、FastGPT、Dify 等 10 个开源项目，发现成熟做法几乎都是这几层：解析、切块、两路索引、融合、过滤、带引用作答。我们照着这个骨架自己实现，每一步都用评测决定参数。」</p>
+  <h5>可能被追问「为什么不……」</h5>
+  <div class="qa">
+    <div><i>为什么不直接用 RAGFlow 或 Dify？</i><span class="src doc">有记录</span>它们要多一套 Python 服务和 Elasticsearch 这类依赖，和我们本机、轻量、Node 的部署方式冲突；而且我们的页码引用、数字溯源要重新对接。有几个项目的许可证限制商用或有传染性，所以只学思路、不拷代码。借鉴的点包括：RRF 融合、最低相关度、重排失败自动回退。</div>
+    <div><i>为什么不用 Elasticsearch、Milvus、pgvector？</i><span class="src gen">通用理由</span>个人级资料量（几份到几百份年报）不需要分布式检索服务；SQLite 和 LanceDB 都是嵌入式的，就是磁盘上的文件，部署零运维。代价是数据量很大时扩展性不如独立服务。</div>
+    <div><i>为什么选 LanceDB，不选 FAISS 或 Chroma？</i><span class="src gen">通用理由</span>LanceDB 能在 Node 里直接用、数据落盘、按表管理（我们每个向量模型一张表）。坦白说没有做过向量库之间的对比评测。</div>
+    <div><i>为什么让模型自己调检索工具？</i><span class="src gen">通用理由</span>投研对话里很多问题根本不需要查年报，每次都检索会浪费上下文、还会塞进无关片段；让模型决定，它也能根据第一次结果再翻具体页。代价是模型可能漏掉该检索的时候，所以提示词里写了文档引用规则。</div>
+    <div><i>文档里的数字能拿去画图吗？</i><span class="src doc">有记录</span>不能。规则规定文档里的数字只作原文摘录，不进取数和画图工具，避免把没核对过的数当成结构化数据。</div>
+    <div><i>已经上传的旧文档会用新切法吗？</i><span class="src doc">有记录</span>不会，只有新上传的受益。重建要改用户已有数据，按项目规则要先确认，还没做。</div>
+  </div>
+  <div class="fallback">答不上时：「检索代码在 <code>packages/doc-library</code>，调研和评测报告在 <code>docs/finframe/rag-oss-survey.md</code>、<code>rag-eval-report-v2.md</code>。我可以打开评测数据给您看每个选择的前后对比。」</div>
+</div>
+</section>
+
+<!-- 04 为什么两路 -->
+<section class="pair" id="q-hybrid" data-i="4">
+<div class="slide s4">
+  <div class="head">
+    <div><div class="kicker">04 · 混合检索</div><h2>两路一起查，只按名次合并</h2><p class="lede">关键词精确但不会换说法，向量能换说法但会带回无关段落。两路名单用 RRF 只按名次合并，不用把两种分数加权。原话问法混合是 0.67，高于只用向量的 0.62；关键词问法是 0.96，高于 0.83。</p></div>
+  </div>
+  <div class="body">
+    <div>
+      <div class="box">
+        <h4><span class="tag t-c">按字找</span>中文三字切片（trigram）</h4>
+        <div class="grams"><span class="src">年毛利率下降</span><span class="x">→</span><span class="g">年毛利</span><span class="g hit">毛利率</span><span class="g">利率下</span><span class="g">率下降</span></div>
+        <p>旧分词把一串连续汉字当成一个词，搜「毛利率」找不到「年毛利率下降」，中文检索基本失效。改成每三个字切一片，<b>不需要词典和模型</b>。整句问题也切成三字片段，至少命中 2 个且不少于 30% 才算。</p>
+      </div>
+      <div class="box">
+        <h4><span class="tag t-m">按意思找</span>向量检索</h4>
+        <p>本机小模型把每段文字变成一串数字，意思接近的段落数字也接近。用户不用年报原词也能找到，比如问「赚钱能力」，找到写「盈利能力」的段落。</p>
+      </div>
+      <div class="box">
+        <h4>合并：RRF，只看名次 <span class="formula">得分 = Σ 1 / (60 + 名次)</span></h4>
+        <div class="rrf">
+          <div class="win">段落甲：关键词第 1、向量第 3<b>1/61 + 1/63 = 0.0323</b></div>
+          <div>段落乙：只在向量里排第 1<b>1/61 = 0.0164</b></div>
+        </div>
+        <p style="margin-top:8px">两边都靠前的排最前。不用比较两种分数的大小，也就不用调权重。</p>
+      </div>
+    </div>
+    <div class="chart">
+      <h4>前 10 条里有没有答案所在页</h4>
+      <div class="sub">6 份 2024 年报 · 144 题 · Recall@10 · 第二轮评测</div>
+      <div class="legend2"><span><i style="background:#9aa3b4"></i>用户原话问</span><span><i style="background:var(--ink)"></i>改写成关键词问</span></div>
+      <div class="bar-g"><div class="lbl">旧分词关键词 <small>改造前</small></div>
+        <div class="bar"><span>原话</span><div class="track"><div class="fill a" style="width:0%"></div></div><span class="v">0.00</span></div>
+        <div class="bar"><span>关键词</span><div class="track"><div class="fill b" style="width:26.9%"></div></div><span class="v">0.27</span></div></div>
+      <div class="bar-g"><div class="lbl">三字切片关键词</div>
+        <div class="bar"><span>原话</span><div class="track"><div class="fill a" style="width:37.9%"></div></div><span class="v">0.38</span></div>
+        <div class="bar"><span>关键词</span><div class="track"><div class="fill b" style="width:90.2%"></div></div><span class="v">0.90</span></div></div>
+      <div class="bar-g"><div class="lbl">只用向量 <small>bge-small-zh</small></div>
+        <div class="bar"><span>原话</span><div class="track"><div class="fill a" style="width:61.7%"></div></div><span class="v">0.62</span></div>
+        <div class="bar"><span>关键词</span><div class="track"><div class="fill b" style="width:83%"></div></div><span class="v">0.83</span></div></div>
+      <div class="bar-g"><div class="lbl">两路混合 <small>默认配置</small></div>
+        <div class="bar"><span>原话</span><div class="track"><div class="fill hl" style="width:67%"></div></div><span class="v">0.67</span></div>
+        <div class="bar"><span>关键词</span><div class="track"><div class="fill hl" style="width:95.5%"></div></div><span class="v">0.96</span></div></div>
+      <div class="sub" style="margin-top:4px">「关键词问」是看过原文后写的，算上限；「原话问」更接近真实用户。</div>
+    </div>
+  </div>
+  <div class="foot"><span>FINFRAME</span><span>RRF 的常数 60 是业界常用默认值</span></div>
+</div>
+<div class="notes">
+  <div class="tag-private">讲稿 · 只给自己看</div>
+  <h5>这样讲（40 秒）</h5>
+  <p>「关键词检索精确但死板，向量检索懂意思但会把不相关的也找回来。两路各出一份名单，用 RRF 按名次合并。数据上，混合比任何单一路都好：用原话问，只用向量 0.62、混合 0.67；用关键词问，只用向量 0.83、混合 0.96。」</p>
+  <h5>可能被追问「为什么不……」</h5>
+  <div class="qa">
+    <div><i>为什么不用 jieba 这类中文分词？</i><span class="src gen">通用理由</span>三字切片不需要词典，金融长词、新词（比如「扣非归母净利润」）不在词典里也能切到；SQLite 内置支持，零依赖。代价是索引更大：新索引 12.4 MB，旧的 6.3 MB<span class="src doc">有记录</span>。项目里没有和 jieba 做过对比。</div>
+    <div><i>为什么用 RRF，不用加权求和？</i><span class="src doc">有记录</span>关键词给的是 BM25 分，向量给的是相似度，刻度完全不同，直接相加要反复调权重。RAGFlow 用的是加权（默认关键词 0.7、向量 0.3），FastGPT 用 RRF。我们选 RRF，因为不用调参、对分数分布不敏感。</div>
+    <div><i>k 为什么是 60？</i><span class="src gen">通用理由</span>这是提出 RRF 的论文和多数实现的默认值，作用是让第 1 名和第 5 名的差距不要太悬殊。我们没有专门调这个参数。</div>
+    <div><i>只用向量不就够了吗？</i><span class="src doc">有记录</span>看图：只用向量在两种问法下都比混合低。年报里大量精确术语和数字，关键词更可靠。</div>
+    <div><i>原话问法为什么只有 0.67？</i><span class="src doc">有记录</span>用户原话和年报措辞差距大，「同义口语」题只用向量时只有 0.25。改进方向是加重排模型，或者先让模型把问题改写成关键词，这也是 Agent 现在自己在做的事。</div>
+    <div><i>整句问题怎么走关键词？</i><span class="src doc">有记录</span>把整句切成三字片段，用「或」匹配，要求至少命中 max(2, 30%) 个片段，按相关度排序。改之前原话问法关键词命中是 0。</div>
+  </div>
+</div>
+</section>
+
+<!-- 05 向量模型选型 -->
+<section class="pair" id="q-embed" data-i="5">
+<div class="slide s5">
+  <div class="head">
+    <div><div class="kicker">05 · 向量模型选型</div><h2>命中率相同，默认用更小的模型</h2><p class="lede">和关键词组成混合检索后，bge 小模型和 Qwen3 的命中率都是 0.977，但 Qwen3 入库慢约 50 倍、内存多约 3 倍，所以默认用 bge。下表是切块改小之前的第一轮，不含解析失败的招商银行。</p></div>
+  </div>
+  <div class="mt">
+    <div class="mt-h"><div>候选</div><div>混合检索命中<br>关键词问</div><div>只用向量命中<br>原话问</div><div>6 份年报入库耗时</div><div>峰值内存</div><div>查询 p50</div><div>结论</div></div>
+    <div class="mt-r pick"><div class="nm">bge-small-zh-v1.5<small>约 25 MB · 只懂中文 · MIT</small></div><div class="num">0.977</div><div class="num">0.591</div>
+      <div class="ing"><div class="track"><div class="fill g" style="width:2%"></div></div><span>33 秒</span></div><div class="num">0.9 GB</div><div class="num">16 ms</div><div class="verdict ok">默认</div></div>
+    <div class="mt-r"><div class="nm">Qwen3-Embedding-0.6B<small>约 630 MB · Apache-2.0</small></div><div class="num">0.977</div><div class="num">0.645</div>
+      <div class="ing"><div class="track"><div class="fill" style="width:100%"></div></div><span>1655 秒</span></div><div class="num">3.1 GB</div><div class="num">60 ms</div><div class="verdict alt">可选的「高质量」档</div></div>
+    <div class="mt-r"><div class="nm">multilingual-e5-small<small>旧默认 · 多语言通用</small></div><div class="na">本机没有，未测</div><div class="na">—</div><div class="na">中文不是强项</div><div class="na">—</div><div class="na">—</div><div class="verdict alt">自动选择的第二顺位</div></div>
+    <div class="mt-r"><div class="nm">bge-m3<small>约 5.7 亿参数 · 支持长文本</small></div><div class="na">未测</div><div class="na">—</div><div class="na">CPU 上偏慢</div><div class="na">—</div><div class="na">—</div><div class="verdict off">备选，没下载</div></div>
+    <div class="mt-r"><div class="nm">云端接口<small>通义、智谱等</small></div><div class="na">通常更强</div><div class="na">—</div><div class="na">按调用付费</div><div class="na">—</div><div class="na">—</div><div class="verdict off">资料要上传，默认关</div></div>
+  </div>
+  <div class="below">
+    <div><b>自动选择，缺什么都能跑</b>先找 bge，没有就用 e5，都没有就只用关键词。向量那一路坏了也只是退回关键词，不会报错。</div>
+    <div><b>换模型不用重建整个库</b>每个模型一张向量表，并记录「哪段文字用哪个模型算过」。换模型后在后台补算，补算期间旧表照常可用。</div>
+    <div><b>全部本机运行</b>用 ONNX 格式在 Node 里直接跑，不需要 Python 和显卡。用户的资料不离开电脑。</div>
+  </div>
+  <div class="foot"><span>FINFRAME</span><span>Qwen3 只在用户原话问时略好（0.645 对 0.591），入库慢 50 倍、内存 3 倍多</span></div>
+</div>
+<div class="notes">
+  <div class="tag-private">讲稿 · 只给自己看</div>
+  <h5>这样讲（30 秒）</h5>
+  <p>「我比较了几个能在本机跑的中文向量模型。和关键词检索组成混合之后，bge 小模型和 Qwen3 的命中率一样，都是 0.977；但 Qwen3 入库慢 50 倍、内存多 3 倍。所以默认用 bge，把 Qwen3 留成可选的高质量档。」</p>
+  <h5>可能被追问「为什么不……」</h5>
+  <div class="qa">
+    <div><i>为什么不直接用效果最好的模型？</i><span class="src doc">有记录</span>在混合检索里效果一样，差别只在只用向量、用原话问时（0.645 对 0.591）。用户在笔记本上传一份年报要等几分钟，这个体验代价比 5 个点的单路提升大。</div>
+    <div><i>为什么不用云端向量接口？</i><span class="src doc">有记录</span>资料要上传到第三方。投研和投资者关系场景里，未公开资料、内部纪要都很敏感，所以默认本机，云端只作为可选项。</div>
+    <div><i>公开榜单上谁最强？</i><span class="src doc">有记录</span>调研时看过 C-MTEB 中文榜单，但各模型的公开分数来源不一、不能直接互比，所以最终以我们自建的 144 题评测为准。</div>
+    <div><i>这是旧切块下的数，现在呢？</i><span class="src doc">有记录</span>对，这是第一轮评测。切块改小后 bge 重跑过，混合检索在关键词问法下是 0.955（含招商银行）；Qwen3 新切块后没有重跑，因为入库时间预计翻倍以上。</div>
+    <div><i>不同模型的相似度能直接比吗？</i><span class="src doc">有记录</span>不能。比如 e5 的相似度整体偏高，无关文本也常在 0.7 以上，所以它的门槛设 0.80，bge 和 Qwen3 设 0.45。门槛按模型分别设。</div>
+  </div>
+</div>
+</section>
+
+<!-- 06 门槛、重排、边界 -->
+<section class="pair" id="q-none" data-i="6">
+<div class="slide s6">
+  <div class="head">
+    <div><div class="kicker">06 · 边界与未解决的问题</div><h2>「没有」不能靠调高门槛</h2><p class="lede">向量检索几乎总会返回一些段落，不能靠调高门槛判断「没有」。门槛从 0.45 提到 0.55，会误伤 29/132 道有答案的题。现在只丢掉明显无关的，由模型读完片段再决定。</p></div>
+  </div>
+  <div class="body">
+    <div>
+      <div class="nl-wrap">
+        <h4>向量最高分：有答案和无答案的题重叠很大</h4>
+        <div class="sub">bge 模型 · 用户原话问 · 每题取向量结果的最高相似度</div>
+        <div class="nl">
+          <div class="band" style="left:17.1%;width:62.9%"><span>无答案的题：0.46 – 0.68</span></div>
+          <div class="mark cur" style="left:14.3%"><span>现在 0.45</span></div>
+          <div class="mark try" style="left:42.9%"><span>试过 0.55</span></div>
+          <div class="mark p10" style="left:57.1%"><span>有答案的题，最低的 10% 在 0.60 以下</span></div>
+          <div class="axis"></div>
+          <div class="tick" style="left:0%"></div><div class="tl" style="left:0%">0.40</div>
+          <div class="tick" style="left:28.6%"></div><div class="tl" style="left:28.6%">0.50</div>
+          <div class="tick" style="left:57.1%"></div><div class="tl" style="left:57.1%">0.60</div>
+          <div class="tick" style="left:85.7%"></div><div class="tl" style="left:85.7%">0.70</div>
+          <div class="tick" style="left:100%"></div><div class="tl" style="left:100%">0.75</div>
+        </div>
+        <div class="outcome">
+          <div class="a"><b>门槛提到 0.55</b>能多拦下一半无答案题，但关键词问法下误伤 29/132 道有答案题的向量结果</div>
+          <div class="b"><b>保持 0.45</b>只挡明显无关的尾部；检索返回「没检到」信号，由模型读完片段再判断</div>
+        </div>
+      </div>
+    </div>
+    <div class="cards">
+      <div class="ccard"><h4><span class="tag t-w">没做</span>重排模型</h4><p>先粗找 30 条，再用专门模型逐条判断「这段能不能回答这个问题」。通常更准，但<b>每次检索多几百毫秒</b>。计划用 bge-reranker 的 ONNX 版本机跑，失败时退回原排序；<b>评测证明有提升再默认打开</b>。</p></div>
+      <div class="ccard"><h4><span class="tag t-w">已知问题</span>跨公司提问</h4><p>「两家谁的研发投入多」一次取前 10 条，常被一家公司占满。现在靠提示词要求分开检索，计划在工具层按文档分组各取前几条。</p></div>
+      <div class="ccard"><h4><span class="tag t-c">已处理</span>无答案的实际表现</h4><p>问「年报里有没有提到火星分行」，模型能如实说没有。但检索层本身判断不了：用原话问的 12 道无答案题，<b>0 道</b>被检索层判为「没检到」。</p></div>
+      <div class="ccard"><h4><span class="tag t-w">下一步</span>真正的解法</h4><p>加重排，或专门校验「答案是否被检索到的片段支持」，而不是继续调门槛。</p></div>
+    </div>
+  </div>
+  <div class="foot"><span>FINFRAME</span><span>依据：检索评测第二轮报告 · 门槛数值写在 relevance-floor.ts，注明是保守起点</span></div>
+</div>
+<div class="notes">
+  <div class="tag-private">讲稿 · 只给自己看</div>
+  <h5>这样讲（40 秒，主动讲弱点反而加分）</h5>
+  <p>「向量检索永远会返回点什么，所以最难的是判断『文档里没有』。我试过把门槛调高，数据显示有答案和无答案的分数重叠太多，调高会误伤一批有答案的题。所以门槛只挡明显无关的，剩下的交给模型读片段后判断。真正的解法是重排模型，或者校验答案有没有被片段支持。这对投资者关系很关键：宁可说『资料里没有』，也不能编。」</p>
+  <h5>可能被追问「为什么不……」</h5>
+  <div class="qa">
+    <div><i>为什么还不加重排？</i><span class="src doc">有记录</span>每次检索多几百毫秒，而且项目规则是改动要先用评测证明有效。重排是下一步优先级最高的检索改进之一。</div>
+    <div><i>为什么关键词精确命中不受门槛限制？</i><span class="src doc">有记录</span>精确命中说明原文里真有这个词，不该因为向量分低被丢掉。整句切片的近似命中不享受这个豁免。</div>
+    <div><i>那怎么保证不编？</i><span class="src doc">有记录</span>三层：检索结果带「找到 / 没找到 / 低于门槛」的信号；提示词规定没检到就如实说；文档数字只作原文摘录，引用必须原样抄写。弱点是前两层依赖模型遵守，所以要靠评测持续盯。</div>
+    <div><i>固定回复「未找到」行不行？</i><span class="src gen">通用理由</span>RAGFlow 就是这么做的，最安全。我们的难点是检索层几乎从不返回空，触发不了固定回复，所以先要把「没检到」判断准。</div>
+  </div>
+</div>
+</section>
+
+<div class="group-label screen-only">技术架构 · Agent 引擎与活报告</div>
+
+<!-- 07 Agent 循环 -->
+<section class="pair" id="q-loop" data-i="7">
+<div class="slide s7">
+  <div class="head">
+    <div><div class="kicker">07 · Agent 引擎</div><h2>一轮回答是一个带护栏的循环</h2><p class="lede">一次回答是一个循环：代码组装上下文，模型决定直接回答或调用工具，代码执行后再交回去。最多 50 轮，最后一轮关掉工具。工具清单在会话开始时冻结。交给模型的取数结果没有数值。</p></div>
+    <div class="legend"><span class="tag t-m">模型</span><span class="tag t-c">代码</span></div>
+  </div>
+  <div class="body">
+    <div>
+      <div class="col-t">会话开始时</div>
+      <div class="sidebox code"><h4>冻结工具清单</h4>按用户勾选的功能包算出可用工具，排好固定顺序，整个会话不再变。</div>
+      <div class="sidebox line"><h4>可选功能包</h4>报告与脑图、改画布等工具默认不在清单里。只有用户在「+」菜单勾选才会加入，<b>模型自己打不开</b>。</div>
+    </div>
+    <div>
+      <div class="loopbox">
+        <span class="lt">工具循环（最多 50 轮）</span>
+        <div class="loop4">
+          <div class="step s-c"><span class="n">1</span><span class="tag t-c">代码</span><h3>组装上下文</h3><p>系统提示词 + 会话记忆 + 最近消息；太长先压缩</p></div>
+          <div class="ar">→</div>
+          <div class="step s-m"><span class="n">2</span><span class="tag t-m">模型</span><h3>调用模型</h3><p>流式输出：要么直接回答，要么给出「调哪个工具、带什么参数」</p></div>
+          <div class="ar">↑</div><div></div><div class="ar">↓</div>
+          <div class="step s-c"><span class="n">4</span><span class="tag t-c">代码</span><h3>结果回填</h3><p>工具结果作为一条消息加回对话，回到第 1 步</p></div>
+          <div class="ar">←</div>
+          <div class="step s-c"><span class="n">3</span><span class="tag t-c">代码</span><h3>执行工具</h3><p>取数、检索、读页；返回给模型的只有元数据和走势标签</p></div>
+        </div>
+        <div class="exit"><span>第 2 步不再调工具</span><span>→</span><b>最终回答</b><span>→ 第 09 张：组装活报告</span></div>
+      </div>
+      <div class="guards">
+        <div><b>轮数上限 50</b>防止停不下来、烧掉 token</div>
+        <div><b>最后一轮关掉工具</b>强制模型必须给出回答</div>
+        <div><b>接口参数降级</b>上游不支持某个参数时自动去掉重试</div>
+        <div><b>调用记录修复</b>工具调用和结果配不上时先补齐，避免接口报错</div>
+      </div>
+      <div class="sse"><span>每一步都实时推给浏览器：</span><span class="e">工具开始</span><span class="e">工具完成</span><span class="e">图表预览</span><span class="e">报告规格</span><span class="e">最终回答</span></div>
+    </div>
+    <div>
+      <div class="col-t">上下文太长时</div>
+      <div class="sidebox model"><h4>三级压缩</h4><ol>
+        <li><b>超过软上限</b>：缩短旧的工具结果，只改「给模型看的版本」，原始记录不动</li>
+        <li><b>超过硬上限</b>：让模型把早期对话总结成「会话记忆」</li>
+        <li><b>模型仍报超长</b>：更激进地压缩，再试一次</li></ol></div>
+      <div class="sidebox line"><h4>模型接入</h4>一个 OpenAI 兼容接口的客户端，自己解析流。现在接 DeepSeek，换模型只改地址、密钥和模型名。</div>
+    </div>
+  </div>
+  <div class="foot"><span>FINFRAME</span><span>代码：packages/agent/src/engine.ts · loop/budget.ts · context/compact.ts · llm/provider.ts</span></div>
+</div>
+<div class="notes">
+  <div class="tag-private">讲稿 · 只给自己看</div>
+  <h5>这样讲（40 秒）</h5>
+  <p>「Agent 的核心就是一个循环：组装上下文、问模型、模型要调工具就由代码执行、把结果交回去，直到模型给出回答。我们在这个循环外面加了几道护栏：最多 50 轮，最后一轮把工具关掉逼它作答；上下文太长分三级压缩；接口报错自动降级。工具清单在会话开始时就冻结，模型不能自己打开额外功能。」</p>
+  <h5>可能被追问</h5>
+  <div class="qa">
+    <div><i>Agent 和普通聊天机器人的区别？</i>普通聊天是一问一答；Agent 能在一次回答里多次调用工具，根据上一次的结果决定下一步，直到任务完成。</div>
+    <div><i>为什么上限是 50？</i><span class="src doc">有记录</span>代码里默认值就是 50，是安全上限，不是正常用量。评测里一道题的决策次数超过 8 次就算不合格，正常提问远低于这个数。</div>
+    <div><i>压缩会不会丢信息？</i><span class="src doc">有记录</span>第一级只改「给模型看的视图」，原始记录完整保存，界面和历史回放不受影响；第二级才让模型做总结，会损失细节，所以放在后面。</div>
+    <div><i>「调用记录修复」是什么？</i><span class="src doc">有记录</span>OpenAI 格式要求每个工具调用后面必须跟着它的结果。中途被打断或压缩后可能配不上，上游会直接报 400，所以发送前先检查并修复。</div>
+    <div><i>流式是怎么做的？</i><span class="src doc">有记录</span>服务端用 SSE，把模型输出和自定义事件（工具开始、完成、图表、报告规格、最终回答）推给浏览器。历史回放和实时看到的是同一套事件。</div>
+    <div><i>有多 Agent 吗？</i><span class="src doc">有记录</span>引擎支持子代理和 MCP 外接工具，但投研主路径只用一个工具循环。原因见下一张。</div>
+  </div>
+  <div class="fallback">答不上时：「循环在 <code>engine.ts</code>，上限和最后一轮的规则在 <code>loop/budget.ts</code>，压缩在 <code>context/compact.ts</code>。我可以打开代码，指给您看对应的位置。」</div>
+</div>
+</section>
+
+<!-- 08 框架取舍 -->
+<section class="pair" id="q-frame" data-i="8">
+<div class="slide s8">
+  <div class="head">
+    <div><div class="kicker">08 · Agent 设计取舍</div><h2>自己写引擎，控制留在代码里</h2><p class="lede">没有用 LangChain。循环本身不复杂，难的是控制：哪些工具能用、不支持的请求直接拒绝、数值不交给模型。后两条有实验：问美股港股从 10–14 次调用降到 1 次，无据数字从 7 降到 0。</p></div>
+    <div class="legend"><span class="tag t-c">选了</span><span class="tag t-u">没选</span></div>
+  </div>
+  <div class="dt">
+    <div class="dt-h"><div>问题</div><div>选了</div><div>没选</div><div>为什么</div></div>
+    <div class="dt-r"><div class="q">用不用框架</div>
+      <div class="yes">自研 TypeScript 引擎</div>
+      <div class="no">LangChain、LangGraph、Vercel AI SDK</div>
+      <div class="why">要精确控制<b>哪些工具什么时候可用、数字从哪来、每一步怎么推到界面</b>，框架的抽象反而碍事。能接任何 OpenAI 兼容的国产模型。前端已有自己的流协议，迁移成本大于收益。</div></div>
+    <div class="dt-r"><div class="q">怎么调工具</div>
+      <div class="yes">模型原生的工具调用<small>function calling</small></div>
+      <div class="no">让模型输出文字，再用规则解析</div>
+      <div class="why">参数是结构化 JSON，能直接校验；不用担心模型输出格式跑偏。上游不支持某些参数时自动降级。</div></div>
+    <div class="dt-r"><div class="q">工具清单</div>
+      <div class="yes">每个会话冻结一份，固定顺序</div>
+      <div class="no">每轮按问题动态挑工具</div>
+      <div class="why">工具定义在请求最前面，<b>前面不变才能命中 DeepSeek 的前缀缓存</b>，更快更省。可选包只能由用户打开，模型无法自己扩权。</div></div>
+    <div class="dt-r"><div class="q">几个 Agent</div>
+      <div class="yes">主路径一个工具循环</div>
+      <div class="no">多个 Agent 分工协作</div>
+      <div class="why">一次投研提问的步骤不多，多 Agent 会增加延迟、成本和出错点，也更难评测。子代理能力保留，不在主路径。</div></div>
+    <div class="dt-r"><div class="q">不支持的请求</div>
+      <div class="yes">工具直接返回「不支持」，模型照实说明</div>
+      <div class="no">让模型自己想办法找替代</div>
+      <div class="why">问美股、港股时，模型原来会反复重试、甚至去搜网页。改成工具层快速失败后，工具调用 <span class="ev">10–14 次 → 1 次</span>。</div></div>
+    <div class="dt-r"><div class="q">工具结果给模型看什么</div>
+      <div class="yes">元数据 + 代码算的走势标签，没有数值</div>
+      <div class="no">把数值给模型，再要求它别写错</div>
+      <div class="why">靠提示词约束不可靠。看不到数值，就没法编。走势说反 <span class="ev">3/7 → 0</span>；正文无据数字 <span class="ev">7 → 0</span>。</div></div>
+  </div>
+  <div class="foot"><span>FINFRAME</span><span>后两行来自单因素实验：一次只改一处，每组跑两次</span></div>
+</div>
+<div class="notes">
+  <div class="tag-private">讲稿 · 只给自己看</div>
+  <h5>这样讲（40 秒）</h5>
+  <p>「我们没有用 LangChain 这类框架，核心原因是这个产品的关键在控制：哪些工具能用、数字从哪来、事件怎么到界面。工具清单每个会话冻结，一是为了命中模型的前缀缓存，二是让模型无法自己扩权。最后两条是用实验验证过的：不支持就在工具层直接拒绝；不给模型看数值，它就编不出来。」</p>
+  <h5>可能被追问「为什么不……」</h5>
+  <div class="qa">
+    <div><i>不用框架，不是重复造轮子吗？</i><span class="src doc">有记录</span>核心循环本身不复杂；复杂的是围绕它的控制：会话级工具冻结、可选包、最后一轮禁工具、压缩、事件流。这些用框架也得自己写，还要绕开框架的默认行为。</div>
+    <div><i>为什么不用 LangGraph 的状态图？</i><span class="src gen">通用理由</span>状态图适合固定的多步流程，比如审批流。我们的主路径就是一个循环加几道护栏，下一步做什么交给模型决定，画成状态图是过度设计。</div>
+    <div><i>为什么不用 Vercel AI SDK？</i><span class="src doc">有记录</span>它的前端 hook 绑定自己的服务端流格式，我们服务端是自研引擎，事件类型也是自定义的，要改的是整个接口层。</div>
+    <div><i>前缀缓存是什么？</i><span class="src doc">有记录</span>模型服务会缓存请求开头相同的部分，下一次请求开头一样就不用重新算，更快也更便宜。工具定义很长、放在最前面，如果每轮工具顺序或集合变了，缓存就失效。代码注释写明了冻结就是为了这个。</div>
+    <div><i>为什么不做多 Agent？</i><span class="src gen">通用理由</span>多 Agent 适合任务能拆成独立子任务的场景。投研提问通常是「取数、出图、解读」一条线，拆开反而要在 Agent 之间传上下文，延迟和出错点都会增加，评测也更难定位。</div>
+    <div><i>原生工具调用有什么缺点？</i><span class="src gen">通用理由</span>依赖模型和服务商的支持程度，不同服务商对参数的支持不一样，所以我们做了自动降级。</div>
+    <div><i>MCP 用了吗？</i><span class="src doc">有记录</span>支持，用官方 SDK，可以外接工具；主路径的工具都在进程内，不走 MCP。</div>
+  </div>
+  <div class="fallback">答不上时：「这几个取舍的依据写在 <code>docs/finframe/interview-architecture.md</code> 和单因素实验报告里。我更擅长讲为什么这样选、怎么验证，具体实现可以一起看代码。」</div>
+</div>
+</section>
+
+<!-- 09 活报告三道关 -->
+<section class="pair" id="q-spec" data-i="9">
+<div class="slide s9">
+  <div class="head">
+    <div><div class="kicker">09 · 活报告</div><h2>图上的数不经过模型</h2><p class="lede">排版交给模型，但它只拿到数据集编号，看不到数值，标题里也不许写数字。校验有一处不合规，整份退回预览卡，界面上不会出现模型编出来的数。</p></div>
+  </div>
+  <div class="chain">
+    <div class="gate c"><div class="gn">第一关 · 输入</div><h3>只给元数据</h3><p>交给模型的只有数据集的编号、指标、公司、期间、覆盖情况，<b>没有任何数值</b></p></div>
+    <div class="arrow">→</div>
+    <div class="gate m"><div class="gn">模型</div><h3>写报告描述（JSON）</h3><p>选哪些组件、引用哪个数据集、标题写什么、放哪些动作</p></div>
+    <div class="arrow">→</div>
+    <div class="gate c"><div class="gn">第二关 · 校验</div><h3>整份严格校验</h3><p>只认登记过的组件、动作和已知的数据集编号；未知字段拒绝；标题除年份不许有数字。<b>一处不合规整份拒绝，不修补</b></p></div>
+    <div class="arrow">→</div>
+    <div class="gate d"><div class="gn">第三关 · 渲染</div><h3>数字由前端按编号取</h3><p>图表、指标卡里的数，前端按数据集编号从代码取回的数据填，每个数都挂着来源</p></div>
+  </div>
+  <div class="fallback-line"><span>任何一关失败</span><span class="dash"></span><span>退回最简单的预览卡，数据仍然正确</span></div>
+  <div class="lower">
+    <div class="alts">
+      <h4>没选的做法</h4>
+      <div class="alt"><div class="no">让模型直接写图表配置或 Markdown 图表</div><div class="why">数字由模型手打，没有来源；配置自由度太大，没法校验。项目里还留着这种画法，但规定不能用于研究图表。</div></div>
+      <div class="alt"><div class="no">校验不过就自动修补</div><div class="why">修补等于替模型猜意图，可能把错误变成「看起来对」的输出。退回预览卡更安全。</div></div>
+      <div class="alt"><div class="no">主回答时顺便输出报告</div><div class="why">主回答要同时管取数、选图、解读，任务越多越容易违规。单独一次调用、任务单一，更容易合规。</div></div>
+      <div class="alt"><div class="no">直接用现成的生成式界面库</div><div class="why">调研过 json-render：能流式渲染，但它支持表达式计算，必须关掉，否则模型能绕过「数字只来自数据集」。暂时自己写校验，接口保持一致，以后可替换。</div></div>
+    </div>
+    <div class="proof">
+      <h4>结果与代价</h4>
+      <div class="pf"><span class="v g">0 个</span><span>合规的报告描述里出现的数字</span></div>
+      <div class="pf"><span class="v">25/30</span><span>首次接入时合规率；不合规的都退回了预览卡</span></div>
+      <div class="pf"><span class="v">20/22</span><span>30 题场景集里，两次运行都是这个合规率</span></div>
+      <div class="pf"><span class="v w">2.5–4 秒</span><span>代价：报告比预览卡晚出现。先显示预览卡，用户不用干等</span></div>
+    </div>
+  </div>
+  <div class="foot"><span>FINFRAME</span><span>用户点「钉住」才进看板 · 数据变了就派生新数据集并记下来源，旧的不改</span></div>
+</div>
+<div class="notes">
+  <div class="tag-private">讲稿 · 只给自己看</div>
+  <h5>这样讲（40 秒）</h5>
+  <p>「回答最后以『活报告』呈现：指标卡、对比图、要点。排版交给模型，但它拿到的只有数据集的编号和描述，没有数值；它写的报告描述要过一道严格校验，标题里连数字都不许有；真正的数字是前端按编号从代码取回的数据里填的。任何一关失败，就退回最简单的预览卡，所以用户永远不会看到错的数。」</p>
+  <h5>可能被追问「为什么不……」</h5>
+  <div class="qa">
+    <div><i>为什么不用 zod 之类的校验库？</i><span class="src doc">有记录</span>本来计划用 zod 4，安装时被本机的权限检查拦下了，没有绕过。现在是手写的严格校验，规则和计划的一样，对外只返回「通过 / 错误列表」，以后换 zod 调用方不用改。</div>
+    <div><i>不合规的是什么问题？</i><span class="src doc">有记录</span>30 题场景集里的几次失败，是输出不是合法 JSON，或者给不该带动作的组件加了动作。都被校验拦住、退回了预览卡。首次接入时那 5 次的具体原因我没有逐条整理。</div>
+    <div><i>为什么报告描述存成一个「合成步骤」？</i><span class="src doc">有记录</span>有两个方案：一是作为一个合成的工具步骤写进历史，不改会话存储格式；二是在消息上加新字段，要改存储格式。选了一，因为项目规则是存储格式只增不破，而且历史回放和实时看到的完全一致。</div>
+    <div><i>「钉住」为什么不让 AI 自动做？</i><span class="src doc">有记录</span>看板是用户自己的研究成果，AI 只能提议。这样用户永远知道看板里每张图是自己确认过的。</div>
+    <div><i>「派生新数据集」是什么意思？</i><span class="src doc">有记录</span>数据集不可改。比如算同比变化，会生成一个新数据集，记下它来自哪个父数据集、做了什么变换。这样任何一个数都能追溯回原始取数。</div>
+  </div>
+  <div class="fallback">答不上时：「校验规则在 <code>packages/shared/src/research-ui-spec.ts</code>，设计记录在 <code>docs/finframe/m3-notes.md</code> 和 <code>m4-notes.md</code>。」</div>
+</div>
+</section>
+
+<div class="group-label screen-only">评测</div>
+
+<!-- 10 评测 -->
+<section class="pair" id="q-eval" data-i="10">
+<div class="slide s10">
+  <div class="head">
+    <div><div class="kicker">10 · 评测</div><h2>三套题库，分开记分</h2><p class="lede">三套题库分开记分，不合成一个总分。每次只改一处，每组至少跑两次。场景题里的财务数字故意用成合成值，模型凭记忆写出真实财报数字，会被判成编造。</p></div>
+  </div>
+  <div class="body">
+    <div class="sets">
+      <div class="set"><div><h3>工具调用题库</h3><p>100 题看第一步有没有选对工具、填对参数；另外 24 题看多步决策能不能走完，用的是用户实际用到的那套提示词。</p></div>
+        <div class="metric"><div class="v">22<small>/24</small></div><div class="l">多步决策（线上提示词）<br>第一步选对 93.9%</div></div></div>
+      <div class="set"><div><h3>投研场景题库</h3><p>30 题，五类场景：基础对比、多步骤、多轮修改、歧义和缺数、数据源出错。五个评分器分别查：编造数字、来源口径、该拒绝时拒绝、决策步骤、报告格式。</p></div>
+        <div class="metric"><div class="v">30<small>/30</small></div><div class="l">编造数字检查<br>连跑两次都通过</div></div></div>
+      <div class="set"><div><h3>年报检索题库</h3><p>6 份 2024 年年报、144 题，含 12 道跨公司题和 12 道无答案题。看前 10 条结果里有没有答案所在页。</p></div>
+        <div class="metric"><div class="v">0.83→0.96</div><div class="l">按关键词问<br>按原话问 0.50→0.67</div></div></div>
+      <div class="trap"><b>怎么抓编造的数字：</b>题库里的财务数据故意用和真实财报不同的合成值。模型凭记忆写出「真实」数字，评分器把正文里的数字和代码取回的数据逐个比对，对不上就判为编造。</div>
+    </div>
+    <div>
+      <div class="loop-title">每次改动走同一个循环</div>
+      <div class="vloop">
+        <div class="li"><div class="dot">1</div><div><b>先找到失败的题</b><span>不凭感觉改</span></div></div>
+        <div class="li"><div class="dot">2</div><div><b>写下假设</b><span>猜原因，但只当假设，不当结论</span></div></div>
+        <div class="li"><div class="dot">3</div><div><b>一次只改一处</b><span>才知道是哪处起了作用</span></div></div>
+        <div class="li"><div class="dot">4</div><div><b>每组至少跑两次</b><span>同样设置也有波动，小差别标「不确定」</span></div></div>
+        <div class="li"><div class="dot">5</div><div><b>有效保留，无效撤销</b><span>结论写进实验报告</span></div></div>
+      </div>
+      <div class="results">
+        <div class="res"><span class="v">10–14<span>→</span>1</span>问美股港股：工具调用次数</div>
+        <div class="res"><span class="v">3/7<span>→</span>0</span>走势说反：改为代码给走势标签</div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>FINFRAME</span><span>评测和产品门禁测试分开；三层分数不合成一个总分</span></div>
+</div>
+<div class="notes">
+  <div class="tag-private">讲稿 · 只给自己看</div>
+  <h5>可能被追问</h5>
+  <div class="qa">
+    <div><i>为什么跑两次？</i><span class="src doc">有记录</span>即使 temperature 0，对照组两次也差了 3 题，所以只有大的效果能确定。</div>
+    <div><i>30 题全过说明什么？</i><span class="src doc">有记录</span>说明题偏容易、区分不出新改动，下一版要加长多轮、口径冲突、多个故障叠加。</div>
+    <div><i>为什么不接真实数据源评测？</i><span class="src doc">有记录</span>用固定测试数据保证可复现、不花接口额度；代价是没测真实数值和真实界面操作。</div>
+    <div><i>为什么三层不合成一个总分？</i><span class="src doc">有记录</span>三层测的不是同一件事，合成会把问题藏起来；看哪层掉了，才知道该改提示词还是改测试数据。</div>
+  </div>
+</div>
+</section>
+
+<!-- 11 分层 -->
+<section class="pair" id="q-layers" data-i="11">
+<div class="slide s11">
+  <div class="head">
+    <div><div class="kicker">11 · 系统分层</div><h2>五层，每层只和下一层说话</h2><p class="lede">从上到下是界面、服务端、自研 Agent 引擎、取数与检索、存储。年报的版面分析和识图认字用 Python，需要时才启动。其余主程序是 TypeScript。</p></div>
+  </div>
+  <div class="stack">
+    <div class="layer"><div class="name">浏览器界面<small>用户看到的部分</small></div><div class="what">对话框、流式出现的图表和报告、看板、页码引用跳转</div><div class="tech">React · ECharts / Vega-Lite</div></div>
+    <div class="down">↓ 发问题　↑ 实时推回每一步</div>
+    <div class="layer"><div class="name">服务端<small>接收和转发</small></div><div class="what">收问题、校验输入、管理会话，把结果一条条推回浏览器</div><div class="tech">Fastify · SSE 推送</div></div>
+    <div class="down">↓</div>
+    <div class="layer engine"><div class="name">Agent 引擎<small style="color:#8b93a3">核心，自己写的</small></div><div class="what">拼提示词、跑「模型 ↔ 工具」循环、控制哪些工具可用、组装活报告</div><div class="tech">TypeScript 自研 · DeepSeek（OpenAI 兼容接口）</div></div>
+    <div class="down">↓ 调工具</div>
+    <div class="layer split">
+      <div class="name">取数与检索<small>真正拿数据的地方</small></div>
+      <div class="half"><b>财报和行情</b><p>规划要查什么；一个数据源出错就切到备用源；常用结果先存起来</p><div class="tech">查询计划 · 多源切换 · 缓存 · 熔断</div></div>
+      <div class="half"><b>年报和资料</b><p>解析 PDF、切小段、按字和按意思两种检索</p><div class="tech">SQLite 全文 · LanceDB 向量 · 本机模型 · Python 识图认字</div></div>
+    </div>
+    <div class="down">↓</div>
+    <div class="layer"><div class="name">存储<small>记住东西</small></div><div class="what">会话、看板、上传的资料；升级时只加不删，老数据不丢</div><div class="tech">SQLite · 自动迁移</div></div>
+  </div>
+  <div class="foot"><span>FINFRAME</span><span>可以用 Docker 一键部署，也可以本机直接运行</span></div>
+</div>
+<div class="notes">
+  <div class="tag-private">讲稿 · 只给自己看</div>
+  <h5>可能被追问</h5>
+  <div class="qa">
+    <div><i>熔断是什么？</i>某个数据源连续出错，就暂时不再请求它，转去备用源，过一会儿再试，避免一个慢接口拖住整个系统。</div>
+    <div><i>为什么还有 Python？</i><span class="src doc">有记录</span>PDF 版面分析和识图认字用 Python 的现成库更成熟（pdfplumber、RapidOCR），作为需要时才启动的小服务；主程序是 TypeScript。</div>
+    <div><i>项目有多大？</i><span class="src doc">有记录</span>TypeScript 约 24 万行、测试约 7.3 万行、二十多个包（粗算，含注释空行）。仓库里还留着早期项目的一些模块，不在现在的主路径上。</div>
+    <div><i>已知的技术债？</i><span class="src doc">有记录</span>取数层有两条路径各自维护缓存；合并多个数据源时逐行来源会被压成「混合」，影响溯源。这些在工程规则文件里列着，改到相关区域时处理。</div>
+  </div>
+</div>
+</section>
+
+<!-- 12 开发方式 -->
+<section class="pair" id="q-role" data-i="12">
+<div class="slide s12">
+  <div class="head">
+    <div><div class="kicker">12 · 开发方式</div><h2>代码由 AI 写，标准和去留由我定</h2><p class="lede">代码主要由 AI 编码工具写。我负责把问题定义清楚、写下验收规则，在方案里做选择，再用自动测试和评测决定这段改动留不留。</p></div>
+    <div class="legend"><span class="tag t-u">我</span><span class="tag t-m">AI</span><span class="tag t-c">自动检查</span></div>
+  </div>
+  <div class="flow">
+    <div class="step s-u me"><span class="n">1</span><span class="tag t-u">我</span><h3>定目标和验收标准</h3><p>要解决什么问题，怎样才算合格</p></div>
+    <div class="arrow">→</div>
+    <div class="step s-m ai"><span class="n">2</span><span class="tag t-m">AI</span><h3>先给两种方案</h3><p>改功能、改结构前，说明影响范围，我选一个</p></div>
+    <div class="arrow">→</div>
+    <div class="step s-m ai"><span class="n">3</span><span class="tag t-m">AI</span><h3>按规则写代码</h3><p>每轮都自动带上项目的工程规则</p></div>
+    <div class="arrow">→</div>
+    <div class="step s-c auto"><span class="n">4</span><span class="tag t-c">自动</span><h3>门禁测试</h3><p>500 多条自动测试必须全部通过</p></div>
+    <div class="arrow">→</div>
+    <div class="step s-m ai"><span class="n">5</span><span class="tag t-m">另一个 AI</span><h3>按标准逐条验收</h3><p>写的和验的分开，不让它自己判自己合格</p></div>
+    <div class="arrow">→</div>
+    <div class="step s-u me"><span class="n">6</span><span class="tag t-u">我</span><h3>看评测，决定去留</h3><p>前后数据对比，保留或撤销</p></div>
+  </div>
+  <div class="backloop"><div class="bar2"><span>不合格 → 返工</span></div></div>
+  <div class="rules-box">
+    <div class="card light">
+      <h4>写给 AI 的几条硬规则（节选）</h4>
+      <ul>
+        <li>模型不许生成或计算财务数字，宁可没有数据也不要猜</li>
+        <li>AI 只能提议图表，不能自己写进看板</li>
+        <li>改数据库只加不删，老用户数据不能丢</li>
+        <li>界面文字给投资者看，不出现技术名词</li>
+        <li>大改动的实现和验收由不同模型完成</li>
+      </ul>
+    </div>
+    <div class="card dark">
+      <p>我的角色更像<em>产品负责人</em>加<em>评测负责人</em>：<br>决定做什么、怎么算做好、证据够不够。</p>
+      <small>Agent 开发里最难的往往不是写出代码，而是让模型的行为可控、可验证。这是我在这个项目里花时间最多的地方。</small>
+    </div>
+  </div>
+  <div class="foot"><span>FINFRAME</span><span>规则文件：AGENTS.md，每轮自动注入给编码 AI</span></div>
+</div>
+<div class="notes">
+  <div class="tag-private">讲稿 · 只给自己看</div>
+  <h5>这样讲（主动说，别等对方问）</h5>
+  <p>「我不是科班工程背景，代码主要是我指挥 AI 编码工具写的。前面那些取舍，是我让 AI 先调研、给至少两个方案，我按评测数据和产品目标选的。我负责的是：定义问题和边界、写工程规则、设计评测、判断结果。」</p>
+  <h5>可能被追问</h5>
+  <div class="qa">
+    <div><i>那你能独立改代码吗？</i>能读懂主流程、定位到相关文件；改动时先让 AI 给方案、我来选，再用测试和评测确认。比较复杂的底层实现我还在学习。</div>
+    <div><i>怎么保证 AI 写的代码靠谱？</i>三道关：自动测试必须全过；大改动由另一个模型按验收标准逐条核对；行为变化用评测题库前后对比。</div>
+  </div>
+  <div class="fallback">底线：不懂的地方直接说「这块我没有深入到代码层，我理解的作用是……」，比硬编更加分。</div>
+</div>
+</section>
+
+<div class="group-label screen-only">接着问</div>
+
+<section class="pair" id="q-follow" data-i="16">
+<div class="slide">
+  <div class="head">
+    <div><div class="kicker">追问</div><h2>八个容易追问的点</h2><p class="lede">绿色来自实验或代码。黄色没有做过专门对比，只代表当时的设计判断。</p></div>
+  </div>
+  <div class="qa-board">
+    <article>
+      <h3>不采用 RAGFlow、Dify 或 LangChain</h3>
+      <p><span class="mark doc">有记录</span>RAGFlow 这类要另起 Python 和 Elasticsearch，和本机 Node 部署冲突，页码引用、数字溯源也要重接。引擎循环本身不复杂，难的是工具冻结、最后一轮关掉工具、不给模型看数值。</p>
+    </article>
+    <article>
+      <h3>「7 降到 0」样本小，方向一致</h3>
+      <p><span class="mark doc">有记录</span>每组只跑两次，报告里写了信号弱。更稳的是走势说反 3/7 降到 0，问美股港股从 10–14 次工具调用降到 1 次。</p>
+    </article>
+    <article>
+      <h3>原话检索 0.67，差在措辞</h3>
+      <p><span class="mark doc">有记录</span>口语和年报措辞差。「同义」题只用向量时是 0.25。下一步是重排，或先让模型把问题改写成关键词。</p>
+    </article>
+    <article>
+      <h3>重排还没有默认打开</h3>
+      <p><span class="mark doc">有记录</span>每次检索多几百毫秒，而且要先用评测证明有效。12 道无答案的原话题，检索层 0 道被判成「没检到」。</p>
+    </article>
+    <article>
+      <h3>30 题全过，题还偏容易</h3>
+      <p><span class="mark doc">有记录</span>是。现有题区分不出新改动。下一版要加长多轮、口径冲突，以及多个故障叠在一起。</p>
+    </article>
+    <article>
+      <h3>每组跑两次，三层不合成总分</h3>
+      <p><span class="mark doc">有记录</span>temperature 0 时，对照组两次仍差 3 题，小差别不能当真。三层测的不是同一件事，合成一个分会把掉的那层藏起来。</p>
+    </article>
+    <article>
+      <h3>向量默认放在本机</h3>
+      <p><span class="mark doc">有记录</span>未公开资料和内部纪要默认不上传，云端只是可选项。<span class="mark gen">理解</span>LanceDB 能在 Node 里落盘；和其他向量库没有做过对比评测。</p>
+    </article>
+    <article>
+      <h3>方案和评测由我定，代码我能改</h3>
+      <p><span class="mark doc">有记录</span>能读主流程、定位到文件。方案我选；500 多条测试必须全过；大改动换一个模型按标准验收；行为变化看评测前后。</p>
+    </article>
+  </div>
+  <div class="foot"><span>FINFRAME</span><span>绿色来自实验或代码；黄色没有做过专门对比</span></div>
+</div>
+<div class="notes">
+  <div class="tag-private">讲稿 · 只给自己看</div>
+  <h5>这样用</h5>
+  <p>对方打断时，先用这一页的一句话接住，再跳回对应的正页展开。不要把黄色那句说成「我们测过」。</p>
+</div>
+</section>
+
+<!-- 13 投资者关系 -->
+<section class="pair" id="q-ir" data-i="13">
+<div class="slide s13">
+  <div class="head">
+    <div><div class="kicker">13 · 迁移</div><h2>同一条约束，用到投资者关系</h2><p class="lede">对外说的每句话都要有出处、不能编、超出范围就停。数字溯源、页码引用、不支持就拒绝、评测留证，这四件已经有了。还要补问答知识库、可靠地判断「资料里没有」、敏感问题转人工，以及每次回答的留痕。</p></div>
+    <div class="legend"><span class="tag t-c">已做到</span><span class="tag t-w">需新做</span></div>
+  </div>
+  <div class="map">
+    <div class="map-h"><div>投资者关系场景要什么</div><div></div><div>这个项目里的对应做法</div><div style="text-align:right">状态</div></div>
+    <div class="map-r"><div class="need">说出的数字要和披露一致<small>业绩问答、说明会准备</small></div><div class="to">→</div><div class="have">数字只由代码从数据源取回，带科目、报告期、来源；模型看不到也不写数字</div><div class="st"><span class="tag t-c">已做到</span></div></div>
+    <div class="map-r"><div class="need">引用年报、公告原文<small>让对方能自己核对</small></div><div class="to">→</div><div class="have">混合检索 + 页码引用，点开翻到原文那一页</div><div class="st"><span class="tag t-c">已做到</span></div></div>
+    <div class="map-r"><div class="need">不说没披露的、不编<small>信息披露合规</small></div><div class="to">→</div><div class="have">检不到就如实说；资料、索引、模型都在本机处理，不外传</div><div class="st"><span class="tag t-c">已做到</span></div></div>
+    <div class="map-r"><div class="need">问题超出范围时不硬答<small>五花八门的投资者提问</small></div><div class="to">→</div><div class="have">工具层直接返回「不支持」；简称有歧义先问清楚</div><div class="st"><span class="tag t-c">已做到</span></div></div>
+    <div class="map-r"><div class="need">上线前能证明靠谱<small>给合规和管理层看证据</small></div><div class="to">→</div><div class="have">题库加评分器，单因素实验，前后数据对比</div><div class="st"><span class="tag t-c">已做到</span></div></div>
+    <div class="map-r"><div class="need">不给投资建议，敏感问题转人工<small>股价预测、未公开事项</small></div><div class="to">→</div><div class="have">产品只做历史数据对比；固定的合规说法和转人工规则还没有</div><div class="st"><span class="tag t-w">需新做</span></div></div>
+  </div>
+  <div class="todo">
+    <h4>要补的四件事</h4>
+    <ul>
+      <li><b>问答知识库</b>接入历史问答、业绩说明会纪要、互动平台回复</li>
+      <li><b>判断「资料里没有」</b>加重排或答案支持度校验，比调门槛可靠</li>
+      <li><b>敏感问题识别</b>预测股价、未公开信息等，拒答或转人工</li>
+      <li><b>回答留痕</b>每次回答记录引用和依据，方便事后审核</li>
+    </ul>
+  </div>
+  <div class="foot"><span>FINFRAME</span><span>核心思路通用：可核对、不编造、超出范围就说</span></div>
+</div>
+<div class="notes">
+  <div class="tag-private">讲稿 · 只给自己看</div>
+  <h5>这样讲（收尾用）</h5>
+  <p>「这个项目是给研究员用的，但核心问题和投资者关系一样：对外说的每句话都要有出处、不能编、不能越界。还要补的是问答知识库、『资料里没有』的可靠判断、敏感问题识别和回答留痕。」</p>
+  <h5>可能被追问</h5>
+  <div class="qa">
+    <div><i>让你做投资者关系 Agent，第一步做什么？</i>先收集真实投资者提问（互动平台、说明会纪要），分成能答、要转人工、不能答三类，做成题库和评分标准，再开始搭 Agent。</div>
+    <div><i>敏感问题怎么识别？</i><span class="src gen">通用理由</span>先用规则加模型分类：问股价走势、未公告事项的直接拒答并给标准话术，拿不准的转人工。关键是把这类题放进评测，盯住拒答率和误拒率。</div>
+  </div>
+</div>
+</section>
+
+</main>
+<script>
+  const params = new URLSearchParams(location.search)
+  if (params.has('notes')) document.body.classList.remove('report')
+  if (params.has('export')) {
+    document.body.classList.add('export')
+    document.querySelector(`.pair[data-i="${params.get('export')}"]`)?.classList.add('on')
+  } else if (params.has('clean')) {
+    document.querySelectorAll('.notes, .screen-only').forEach((el) => el.remove())
+  }
+</script>
+</body>
+</html>

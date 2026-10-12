@@ -4,7 +4,7 @@ import { opptrixCssVars } from '../theme/tokens'
 import type { Dataset } from '../chat/research-canvas/types'
 import { BlockFrame } from './BlockFrame'
 import { WithCitation } from './CitationChip'
-import { metricTableModel, shadeAlpha, SPARK_HEIGHT, SPARK_WIDTH, type MetricRow } from './metricTableModel'
+import { heatWash, metricTableModel, SPARK_HEIGHT, SPARK_WIDTH, type MetricRow } from './metricTableModel'
 import { citationFor, MISSING } from './numberText'
 import type { BlockProps } from './types'
 
@@ -43,8 +43,10 @@ const useStyles = makeStyles({
 })
 
 function shadeStyle(shade: number | null) {
-  const pct = Math.round(shadeAlpha(shade) * 100)
-  return pct ? { backgroundColor: `color-mix(in srgb, ${opptrixCssVars.textPrimary} ${pct}%, transparent)` } : undefined
+  const wash = heatWash(shade)
+  if (!wash) return undefined
+  const color = wash.side === 'high' ? opptrixCssVars.error : opptrixCssVars.success
+  return { backgroundColor: `color-mix(in srgb, ${color} ${Math.round(wash.alpha * 100)}%, transparent)` }
 }
 
 function Row({ dataset, row }: { dataset: Dataset; row: MetricRow }) {

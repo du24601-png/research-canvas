@@ -32,6 +32,7 @@ export * from './types.js'
 export { documentKindFromMime, extOfFilename, isPlainTextDocument } from './document-kind.js'
 export { DocLibraryRepository } from './repository.js'
 export { DocLibraryService } from './service.js'
+export type { LibraryVectorStatus } from './library-vector-status.js'
 export type { LegacyExtractWriter, ParseLifecycleHooks, EmbedPendingOptions } from './service.js'
 export { shouldEmbedToVector, resolveLanceRebuildBackfillOptions } from './service.js'
 export {
@@ -97,6 +98,7 @@ export {
   isValidEmbeddingVector,
   filterValidUpsertRows,
   detectLanceDatasetPathology,
+  manifestVersionFromName,
   countLanceVersions,
   lanceTableDatasetDir,
   LANCE_VERSIONS_PATHOLOGY_THRESHOLD,

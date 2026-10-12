@@ -10,6 +10,8 @@ import ComposerContextRefTag from './ComposerContextRefTag'
 import ComposerActiveWidgetChip from './ComposerActiveWidgetChip'
 import ChatWorkspaceGrants, { type ChatWorkspaceGrantsHandle } from './ChatWorkspaceGrants'
 import ComposerPlusMenu from './ComposerPlusMenu'
+import LibraryAskChip from './library/LibraryAskChip'
+import { LIBRARY_ASK_EVENT, armLibraryAsk } from './library/libraryAsk'
 import ComposerStockMentionList from './ComposerStockMentionList'
 import ComposerSkillSlashList from './ComposerSkillSlashList'
 import ComposerAgentUserPromptPanel from './ComposerAgentUserPromptPanel'
@@ -1055,13 +1057,28 @@ const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(function 
     setSpeechError('')
   }, [refreshContentState])
 
-  /** 「+ → 我的资料」点选文件：把「根据《文件名》，」插到光标处 */
+  /** 「+ → 我的资料」点选文件：插入引用，这一轮只根据资料回答 */
   const insertLibraryRef = useCallback((text: string) => {
     const root = editorRef.current
     if (!root) return
+    armLibraryAsk()
     insertTextAtCaret(root, text, caretRangeRef.current)
     caretRangeRef.current = captureCaretRange(root)
     refreshContentState()
+  }, [refreshContentState])
+
+  useEffect(() => {
+    const onAsk = () => {
+      const root = editorRef.current
+      if (!root) return
+      if (!root.textContent?.trim()) {
+        insertTextAtCaret(root, '根据我的资料，')
+        refreshContentState()
+      }
+      root.focus()
+    }
+    window.addEventListener(LIBRARY_ASK_EVENT, onAsk)
+    return () => window.removeEventListener(LIBRARY_ASK_EVENT, onAsk)
   }, [refreshContentState])
 
   const {
@@ -1471,6 +1488,7 @@ const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(function 
               if (picked.length) void offerFiles(picked)
             }}
           />
+          <LibraryAskChip />
           <div
             className={mergeClasses(
               s.inputRow,

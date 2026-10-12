@@ -4,7 +4,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { listAgentSkills, type PublicAgentSkill } from '../api/client'
-import { compareSkillsForSlash } from './skillDisplay'
+import { compareSkillsForSlash, skillShownInComposer } from './skillDisplay'
 
 const CATALOG_TTL_MS = 30_000
 
@@ -46,7 +46,7 @@ export async function loadAgentSkillsCatalog(
   const epochAtStart = cacheEpoch
   const request = listAgentSkills()
     .then(resp => {
-      const sorted = resp.skills.slice().sort(compareSkillsForSlash)
+      const sorted = resp.skills.filter(skillShownInComposer).sort(compareSkillsForSlash)
       if (epochAtStart === cacheEpoch) {
         cachedSkills = sorted
         cachedAt = Date.now()

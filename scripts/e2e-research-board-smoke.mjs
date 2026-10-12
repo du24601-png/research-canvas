@@ -98,7 +98,7 @@ async function main() {
       fail(`page load HTTP ${response?.status() ?? 'unknown'}`)
     }
 
-    const titleMenu = page.getByRole('button', { name: /打开看板菜单/ })
+    const titleMenu = page.getByRole('button', { name: /打开对话操作/ })
     await titleMenu.waitFor({ state: 'visible', timeout: 60_000 })
     await titleMenu.click()
     await page.getByRole('button', { name: '新建对话', exact: true }).click()

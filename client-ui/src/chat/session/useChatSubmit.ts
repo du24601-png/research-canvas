@@ -6,6 +6,7 @@ import {
   mergeCollaborationTasksFromApi,
 } from '../sessionCollaborationTasks'
 import type { ChatEngineRefs, ChatSubmitPorts, StreamFlags } from './engineTypes'
+import { consumeLibraryAsk } from '../library/libraryAsk'
 
 /** 中断 / 停止 / 提交入口（原 ChatAppShell 段逐字迁移；先 bump gen 再 abort 语义保留） */
 export function useChatSubmit(refs: ChatEngineRefs, flags: StreamFlags, ports: ChatSubmitPorts) {
@@ -69,7 +70,10 @@ export function useChatSubmit(refs: ChatEngineRefs, flags: StreamFlags, ports: C
   engineApiRef.current.abortSessionStream = abortSessionStream
 
   const handleSubmit = useCallback((text?: string, attachmentIds?: string[], attachmentMetas?: ChatAttachmentMeta[]) => {
-    void submitImplRef.current(text, attachmentIds, attachmentMetas)
+    const msg = (text ?? '').trim()
+    const hasPayload = Boolean(msg) || Boolean(attachmentIds?.some(Boolean))
+    const libraryOnly = hasPayload && consumeLibraryAsk()
+    void submitImplRef.current(text, attachmentIds, attachmentMetas, libraryOnly)
   }, [submitImplRef])
 
   return { abortSessionStream, handleStop, handleSubmit }

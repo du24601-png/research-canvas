@@ -23,8 +23,8 @@ const layoutTokens = {
   mobileDrawerWidth: 'min(88vw, 272px)',
   panelWidth: '380px',
 
-  /** 宽屏随视口放宽（图表/表格更宽），窄屏保持 820px；上限 1240px 保证正文行长可读 */
-  chatThreadMaxWidth: 'clamp(820px, 64vw, 1240px)',
+  /** 居中阅读栏，回答卡片与输入框同一宽度；窄屏或右栏预览打开时收到 100% */
+  chatThreadMaxWidth: 'min(100%, 48rem)',
   /** Desktop thread/composer horizontal inset (symmetric left & right). */
   chatThreadPaddingX: '25px',
   /**

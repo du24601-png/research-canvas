@@ -171,6 +171,14 @@ import {
 import type { UsageMeterHooks } from './usage-meter.js'
 import { deriveApprovedFromUserPromptAnswer } from './approval-tracker.js'
 import {
+  beginLibraryOnlyTurn,
+  endLibraryOnlyTurn,
+  isLibraryOnlyTool,
+  isLibraryOnlyTurn,
+  LIBRARY_ONLY_TURN_TAIL,
+  narrowLibraryOnlyRound,
+} from './library-only-turn.js'
+import {
   UNATTENDED_ASK_USER_RESULT,
   UNATTENDED_SECRET_RESULT,
   appendUnattendedTurnTail,
@@ -2004,6 +2012,15 @@ export class AgentEngine {
     let checklistNoneTried = false
     let forceToolChoice: import('./llm/provider.js').LlmToolChoice | undefined
     let ephemeralTurnTailExtra = ''
+    if (progress?.libraryOnly) {
+      beginLibraryOnlyTurn(sessionId)
+      ephemeralTurnTailExtra = LIBRARY_ONLY_TURN_TAIL
+      const narrowed = narrowLibraryOnlyRound(sessionId, activeNames, openAiTools)
+      if (narrowed) {
+        activeNames = narrowed.activeNames
+        openAiTools = narrowed.openAiTools
+      }
+    }
     let softRemindInjected = false
     const maxSafetyRounds = resolveMaxSafetyRounds()
     const softRemindRound = resolveSoftRemindRound()
@@ -2368,6 +2385,8 @@ export class AgentEngine {
             })
             if (blocked) {
               result = blocked
+            } else if (isLibraryOnlyTurn(sessionId) && !isLibraryOnlyTool(fn)) {
+              result = { error: '本轮只能根据已加入的资料回答' }
             } else if (fn === 'ask_user') {
               if (isSubSession) {
                 const blocked = subagentBlockedToolError('ask_user')
@@ -2541,6 +2560,11 @@ export class AgentEngine {
           })
           activeNames = [...refrozen.activeNames]
           openAiTools = refrozen.openAiTools
+          const narrowed = narrowLibraryOnlyRound(sessionId, activeNames, openAiTools)
+          if (narrowed) {
+            activeNames = narrowed.activeNames
+            openAiTools = narrowed.openAiTools
+          }
           broker = await this.createRoundBroker(activeNames)
         }
         continue
@@ -2688,6 +2712,7 @@ export class AgentEngine {
     }
     return { reply, toolsUsed, sessionId, title: record.title }
     } finally {
+      endLibraryOnlyTurn(sessionId)
       endResearchCanvasTurn(sessionId)
       await broker.close().catch(() => {})
       this.tools.clearPackSession(sessionId, packBridgeGen)

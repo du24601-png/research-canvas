@@ -17,7 +17,7 @@ export default function LibraryMenuView({ enabled, onSelect }: Props) {
   if (docs.length === 0) {
     return (
       <div className="opptrix-composer-plus-menu__empty">
-        还没有资料。用「添加附件」上传年报、研报或纪要，之后提问时我会引用里面的原文和页码。
+        还没有资料。在左侧打开「我的资料」，拖入年报、研报或纪要。
       </div>
     )
   }

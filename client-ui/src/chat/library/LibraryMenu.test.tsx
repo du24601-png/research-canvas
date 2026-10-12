@@ -48,7 +48,7 @@ describe('我的资料', () => {
   it('shows the empty state', async () => {
     vi.spyOn(libraryApi, 'listLibraryDocuments').mockResolvedValue(resp([]))
     openLibrary()
-    await screen.findByText(/还没有资料。用「添加附件」上传年报、研报或纪要/)
+    await screen.findByText(/还没有资料。在左侧打开「我的资料」/)
   })
 
   it('shows a plain-language error', async () => {

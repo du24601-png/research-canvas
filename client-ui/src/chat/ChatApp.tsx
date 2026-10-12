@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { makeStyles, mergeClasses } from '@fluentui/react-components'
 import { opptrixCssVars } from '../theme/tokens'
 import { electronPlatform } from '../platform/detect'
+import ChromeToolButton from '../desktop/ChromeToolButton'
+import { DESKTOP_TOOL_ICON_SIZE } from '../desktop/constants'
+import { PanelLeftContractRegular, PanelLeftExpandRegular } from './chatIcons'
+import WorkspaceSplitDivider from './WorkspaceSplitDivider'
 import WorkspaceSearchDialog from './WorkspaceSearchDialog'
 import SessionSidebar, { type SidebarListTab } from './SessionSidebar'
 import { sessionSidebarPresentation } from './sessionSidebarPresentation'
@@ -37,11 +41,19 @@ const useStyles = makeStyles({
     boxSizing: 'border-box',
   },
   rootLayout: {
+    position: 'relative',
     display: 'flex',
     flex: 1,
     minWidth: 0,
     minHeight: 0,
     width: '100%',
+  },
+  /** 窗口左缘的列表开关。不跟着对话栏走，展开和收起都从同一点发生。 */
+  listToggle: {
+    position: 'absolute',
+    zIndex: 4,
+    top: '6px',
+    left: '8px',
   },
 })
 
@@ -67,7 +79,7 @@ function ChatAppShell() {
   const {
     view, canGoBack, canGoForward, goForward,
     isMobile, electronChrome,
-    sidebarWidth, drawerOpen, closeDrawer,
+    sidebarWidth, sidebarVisible, sidebarDragging, drawerOpen, closeDrawer,
     setSettingsSidebarVisible,
   } = ui
 
@@ -167,6 +179,25 @@ function ChatAppShell() {
         electronChrome && 'opptrix-app-shell',
       )}>
         <div className={s.rootLayout}>
+        {sessionPresentation === 'panel' && view === 'chat' && !hideChrome ? (
+          <SessionSidebar
+            mode="panel"
+            width={sidebarWidth}
+            visible={sidebarVisible}
+            isDragging={sidebarDragging}
+            {...flow.sidebarProps}
+          />
+        ) : null}
+        {sessionPresentation === 'panel' && view === 'chat' && !hideChrome && sidebarVisible ? (
+          <WorkspaceSplitDivider
+            electronChrome={electronChrome}
+            tone="subtle"
+            isDragging={sidebarDragging}
+            onBeginDrag={ui.beginSidebarDrag}
+            ariaLabel="调整对话列表宽度"
+            hitSlop={6}
+          />
+        ) : null}
         {isSettings && (
           <SettingsViewHost
             isMobile={isMobile}
@@ -179,6 +210,19 @@ function ChatAppShell() {
             onSidebarClose={() => setSettingsSidebarVisible(false)}
           />
         )}
+
+        {!isMobile && !electronChrome && view === 'chat' && !hideChrome ? (
+          <ChromeToolButton
+            className={s.listToggle}
+            label={sidebarVisible ? '收起对话列表' : '打开对话列表'}
+            aria-expanded={sidebarVisible}
+            onClick={ui.toggleSidebarVisible}
+          >
+            {sidebarVisible
+              ? <PanelLeftContractRegular fontSize={DESKTOP_TOOL_ICON_SIZE} />
+              : <PanelLeftExpandRegular fontSize={DESKTOP_TOOL_ICON_SIZE} />}
+          </ChromeToolButton>
+        ) : null}
 
         <ChatWorkspace
           active={view === 'chat'}

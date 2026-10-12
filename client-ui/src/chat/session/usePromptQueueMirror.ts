@@ -81,6 +81,7 @@ export function usePromptQueueMirror(ports: PromptQueueMirrorPorts) {
         next.text || undefined,
         next.attachmentIds,
         next.attachmentMetas,
+        next.libraryOnly === true,
       )
     })
   }, [drainIntentRef, streamCacheRef, streamHandlesRef, streamingSessionIdsRef, submitImplRef, syncPromptQueueUi])
@@ -103,7 +104,7 @@ export function usePromptQueueMirror(ports: PromptQueueMirrorPorts) {
       const { item } = takeQueuedPromptById(sid, id)
       syncPromptQueueUi(sid)
       if (!item) return
-      void submitImplRef.current(item.text || undefined, item.attachmentIds, item.attachmentMetas)
+      void submitImplRef.current(item.text || undefined, item.attachmentIds, item.attachmentMetas, item.libraryOnly === true)
       return
     }
 

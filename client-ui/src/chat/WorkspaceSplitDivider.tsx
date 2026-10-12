@@ -80,6 +80,8 @@ interface Props {
   isDragging?: boolean
   onBeginDrag: (clientX: number) => void
   ariaLabel?: string
+  /** 左右各延伸的可拖区域（像素）。不占布局，只扩大抓取范围。 */
+  hitSlop?: number
 }
 
 export default function WorkspaceSplitDivider({
@@ -89,6 +91,7 @@ export default function WorkspaceSplitDivider({
   isDragging = false,
   onBeginDrag,
   ariaLabel = '调整聊天区与右侧面板宽度',
+  hitSlop = WORKSPACE_SPLITTER_HIT_SLOP,
 }: Props) {
   const s = useStyles()
   const dividerRef = useRef<HTMLDivElement>(null)
@@ -141,7 +144,12 @@ export default function WorkspaceSplitDivider({
         aria-hidden
         style={{ background: buildLineBackground(active ? focusRatio : null, subtle) }}
       />
-      <div className={s.hitZone} aria-hidden {...bindHitZonePointer} />
+      <div
+        className={s.hitZone}
+        aria-hidden
+        style={{ left: `-${hitSlop}px`, right: `-${hitSlop}px` }}
+        {...bindHitZonePointer}
+      />
     </div>
   )
 }
